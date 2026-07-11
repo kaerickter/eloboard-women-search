@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>행운 룰렛 - 랜덤 추첨 도구</title>
+    <meta
+      name="description"
+      content="항목을 입력하고 룰렛을 돌려 무작위로 하나를 선택하는 한국어 랜덤 추첨 도구입니다."
+    />
+    <link rel="stylesheet" href="./lucky-roulette.css" />
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab active" href="./lucky-roulette.html" aria-current="page">행운 돌림판</a>
+    </nav>
+
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="행운 룰렛 홈">
+        <span class="brand-mark">◎</span>
+        <span>행운 룰렛</span>
+      </a>
+      <nav aria-label="주요 메뉴">
+        <a href="#roulette">룰렛</a>
+        <a href="#items">항목</a>
+      </nav>
+    </header>
+
+    <section class="timer-strip" aria-label="스톱워치">
+      <div class="timer-panel">
+        <div class="timer-head">
+          <h2>스톱워치</h2>
+          <strong id="timerDisplay">00:00:00</strong>
+        </div>
+
+        <div class="timer-inputs">
+          <label>
+            <span>시</span>
+            <input id="timerHours" type="number" min="0" max="23" value="0" inputmode="numeric" />
+          </label>
+          <label>
+            <span>분</span>
+            <input id="timerMinutes" type="number" min="0" max="59" value="0" inputmode="numeric" />
+          </label>
+          <label>
+            <span>초</span>
+            <input id="timerSeconds" type="number" min="0" max="59" value="0" inputmode="numeric" />
+          </label>
+        </div>
+
+        <div class="timer-actions">
+          <button id="timerStartButton" class="timer-button primary" type="button">시작</button>
+          <button id="timerResetButton" class="timer-button" type="button">초기화</button>
+        </div>
+
+        <div class="target-time">
+          <div class="target-title">
+            <strong>종료 시각</strong>
+            <span>네이버 시간 기준</span>
+          </div>
+          <div class="target-row">
+            <label>
+              <span>시</span>
+              <input id="targetHour" type="number" min="0" max="23" value="0" inputmode="numeric" />
+            </label>
+            <label>
+              <span>분</span>
+              <input id="targetMinute" type="number" min="0" max="59" value="0" inputmode="numeric" />
+            </label>
+            <button id="targetStartButton" class="timer-button primary" type="button">시각 시작</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <main>
+      <section class="hero" id="roulette">
+        <div class="hero-copy">
+          <p class="eyebrow">무료 랜덤 선택기</p>
+          <h1>확률 조정 룰렛</h1>
+          <p>
+            항목을 추가하고 숫자를 조절하세요.
+            숫자가 높을수록 룰렛에서 뽑힐 확률이 올라갑니다.
+          </p>
+        </div>
+
+        <div class="play-area">
+          <div class="roulette-shell" aria-label="룰렛 추첨기">
+            <div class="wheel-wrap">
+              <canvas id="wheel" width="720" height="720" aria-label="추첨 룰렛"></canvas>
+              <div class="pointer" aria-hidden="true"></div>
+              <button id="spinButton" class="spin-button" type="button">돌리기</button>
+            </div>
+            <div class="result-panel" aria-live="polite">
+              <span class="result-label">결과</span>
+              <strong id="resultText">항목을 추가하세요</strong>
+            </div>
+          </div>
+
+          <aside class="editor" id="items">
+            <div class="section-heading compact">
+              <h2>항목 추가</h2>
+            </div>
+
+            <div class="add-row">
+              <input id="addItemInput" type="text" placeholder="항목 이름 입력" aria-label="항목 이름 입력" />
+              <button id="addItemButton" class="add-button" type="button">추가</button>
+            </div>
+
+            <div class="item-list-head">
+              <h3>현재 항목 <span id="itemCount">(0)</span></h3>
+              <button id="clearItemsButton" type="button">모두 삭제</button>
+            </div>
+
+            <div id="itemCards" class="item-cards" aria-live="polite"></div>
+
+            <div class="toolbar" aria-label="룰렛 설정">
+              <button id="shuffleButton" class="tool-button" type="button" title="항목 섞기">
+                ↻
+                <span>섞기</span>
+              </button>
+              <button id="shareButton" class="tool-button" type="button" title="현재 항목 링크 복사">
+                ⛓
+                <span>공유</span>
+              </button>
+              <button id="fullscreenButton" class="tool-button" type="button" title="전체화면으로 보기">
+                ⛶
+                <span>전체화면</span>
+              </button>
+            </div>
+
+            <p id="statusText" class="status">항목 이름을 입력하고 추가 버튼을 눌러주세요.</p>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="timeUpEffect" class="time-up-effect" role="status" aria-live="assertive">
+      <div class="time-up-burst" aria-hidden="true"></div>
+      <div class="time-up-card">
+        <span>00:00:00</span>
+        <strong>시간 종료</strong>
+      </div>
+    </div>
+
+    <script src="./lucky-roulette.js"></script>
+  </body>
+</html>
