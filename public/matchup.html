@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>상대전적 비교 · ELOBoard</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./matchup.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup active" href="./matchup.html">상대전적</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+    </nav>
+
+    <main class="matchup-shell">
+      <section class="matchup-hero">
+        <p class="matchup-eyebrow">HEAD TO HEAD RECORDS</p>
+        <h1>누가 더 강했는지,<br><em>실제 전적으로 확인하세요.</em></h1>
+        <p>eloboard의 공개 상대전적을 자동으로 불러옵니다. 전체 기록과 최근 90일의 흐름을 한 번에 비교하세요.</p>
+      </section>
+
+      <section class="matchup-search">
+        <div class="mode-tabs" role="tablist" aria-label="비교 방식">
+          <button type="button" data-mode="one">1 : 1 비교</button>
+          <button type="button" data-mode="many" class="selected">1 : 다수 비교</button>
+          <button type="button" data-mode="group">다수 : 다수 비교 <b>NEW</b></button>
+        </div>
+        <div class="picker-grid">
+          <label class="main-picker"><span id="mainLabel">기준 선수</span><input id="mainInput" list="playerList" value="이아깽" placeholder="선수 이름을 직접 입력하세요" autocomplete="off"></label>
+          <strong class="versus">VS</strong>
+          <div class="opponent-picker">
+            <span>상대 선수 <small id="multiHint">여러 명 선택 가능</small></span>
+            <div id="chips" class="chips"></div>
+            <input id="opponentInput" placeholder="선수 이름을 검색하세요" autocomplete="off">
+            <div id="suggestions" class="suggestions" hidden></div>
+          </div>
+          <button id="searchButton" class="matchup-search-button" type="button">전적 검색 <span>→</span></button>
+        </div>
+        <div class="quick"><span>빠른 선택</span><div id="quickPlayers"></div></div>
+        <datalist id="playerList"></datalist>
+      </section>
+
+      <section class="matchup-results">
+        <div class="results-head">
+          <div><p class="matchup-eyebrow">LIVE SEARCH RESULT</p><h2><strong id="resultMain">이아깽</strong> 기준 상대전적</h2><p id="resultStatus">검색할 선수를 선택해 주세요.</p></div>
+          <div class="range-switch"><button type="button" data-range="all" class="selected">전체 전적</button><button type="button" data-range="90">최근 90일</button></div>
+        </div>
+        <p id="errorMessage" class="matchup-error" hidden></p>
+        <div class="summary-grid">
+          <article><span id="summaryTitle">전체 종합</span><div><strong id="summaryWins">0승</strong><b id="summaryLosses">0패</b></div><div class="summary-bar"><i id="summaryBar"></i></div><small>승률 <em id="summaryRate">0%</em></small></article>
+          <article><span>가장 우세한 상대</span><div class="best"><i id="bestRace" class="race T">-</i><strong id="bestName">-</strong></div><small>선택한 상대 중 최고 승률</small></article>
+          <article><span>최근 경기</span><div id="latestDate" class="latest-date">경기 없음</div><small id="updatedAt">검색 후 표시됩니다</small></article>
+        </div>
+        <div class="matchup-table-card">
+          <div class="table-tools"><strong>상대별 실제 전적</strong><label>정렬 <select id="sortSelect"><option value="games">경기 많은 순</option><option value="rate">승률 높은 순</option><option value="recent">최근 경기 순</option></select></label></div>
+          <div class="record-table"><div class="matchup-tr matchup-th"><span>상대 선수</span><span>전적</span><span>승률</span><span>최근 90일</span><span>최근 경기</span><span></span></div><div id="recordRows"></div></div>
+        </div>
+        <p class="matchup-source">출처: eloboard.com 공개 전적 · 검색할 때마다 최신 데이터를 조회합니다.</p>
+      </section>
+    </main>
+    <script src="./matchup.js"></script>
+  </body>
+</html>
