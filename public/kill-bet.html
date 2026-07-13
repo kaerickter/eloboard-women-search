@@ -538,7 +538,7 @@
         </section>
       `;
 
-      initPanel(panel, panelId);
+      initPanel(panel, panelId, teamName);
       return panel;
     }
 
@@ -555,7 +555,7 @@
       `).join("");
     }
 
-    function initPanel(panel, panelId) {
+    function initPanel(panel, panelId, defaultTeamName) {
       const rows = [...panel.querySelectorAll(".counter-row")];
       const totalCount = panel.querySelector(".total-count");
       const resetButton = panel.querySelector(".reset-button");
@@ -617,7 +617,9 @@
         const shouldReset = window.confirm("이 팀 점수를 초기화할까요?");
         if (!shouldReset) return;
 
+        teamInput.value = defaultTeamName;
         rows.forEach((row) => {
+          row.querySelector(".name-input").value = "";
           row.dataset.score = "0";
           row.dataset.fail = "0";
           updateScoreDisplay(row);
