@@ -7,6 +7,8 @@ const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
 const BOARD_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_board";
 const BJ_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_list";
+const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=search_list";
+const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
@@ -300,6 +302,74 @@ function summarize(matches, query) {
   summary.pointNet = Math.round(summary.pointNet * 10) / 10;
   return { filtered, summary };
 }
+function stripRace(value) {
+  return cleanText(value).replace(/[TZP]$/i, "").trim();
+}
+function parseMatchupRows(html, main, opponent) {
+  const matches = [];
+  for (const row of html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)) {
+    const date = row[0].match(/<span class=["']td_datetime["']>(\d{8})<\/span>/i)?.[1];
+    if (!date) continue;
+    const cells = [...row[0].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((match) => cleanText(match[1]));
+    if (cells.length < 4) continue;
+    const winner = stripRace(cells[1]);
+    const loser = stripRace(cells[2]);
+    if (![winner, loser].includes(main) || ![winner, loser].includes(opponent)) continue;
+    matches.push({ date, map: cells[3], result: winner === main ? "승" : "패" });
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const recentMatches = matches.filter((match) => {
+    const date = new Date(match.date.slice(0, 4) + "-" + match.date.slice(4, 6) + "-" + match.date.slice(6, 8) + "T00:00:00+09:00");
+    return date >= cutoff;
+  });
+  const tally = (items) => [items.filter((item) => item.result === "승").length, items.filter((item) => item.result === "패").length];
+  return {
+    main,
+    opponent,
+    total: tally(matches),
+    recent: tally(recentMatches),
+    lastPlayed: matches[0] ? matches[0].date.slice(0, 4) + "." + matches[0].date.slice(4, 6) + "." + matches[0].date.slice(6, 8) : "경기 없음",
+    maps: matches.slice(0, 6).map((match) => ({ map: match.map, result: match.result, date: match.date.slice(4, 6) + "." + match.date.slice(6, 8) }))
+  };
+}
+async function loadMatchupPlayers() {
+  const response = await fetch(MATCHUP_LIST_URL, { headers: { "User-Agent": "Mozilla/5.0 elo-kitten matchup", "Accept-Language": "ko-KR,ko;q=0.9" } });
+  if (!response.ok) throw new Error("선수 목록 응답 오류: " + response.status);
+  const html = await response.text();
+  const select = html.match(/<select[^>]+name=["']player_1["'][\s\S]*?<\/select>/i)?.[0] || "";
+  return [...select.matchAll(/<option[^>]+value=["']([^"']+)["'][^>]*>([^<]+)<\/option>/gi)]
+    .map((match) => {
+      const parts = cleanText(match[2]).split("|");
+      const raceText = (parts[1] || "").toLowerCase();
+      return { name: (parts[0] || "").trim(), race: raceText.startsWith("t") ? "T" : raceText.startsWith("z") ? "Z" : "P" };
+    })
+    .filter((player) => player.name);
+}
+async function fetchMatchup(main, opponent) {
+  const body = new URLSearchParams({ wr_1: main, wr_2: opponent, sear: "", b_id: "eloboard" });
+  const response = await fetch(MATCHUP_SEARCH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "Mozilla/5.0 elo-kitten matchup" },
+    body
+  });
+  if (!response.ok) throw new Error("상대전적 응답 오류: " + response.status);
+  return parseMatchupRows(await response.text(), main, opponent);
+}
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 100000) reject(new Error("요청이 너무 큽니다."));
+    });
+    req.on("end", () => {
+      try { resolve(JSON.parse(body || "{}")); }
+      catch { reject(new Error("잘못된 요청입니다.")); }
+    });
+    req.on("error", reject);
+  });
+}
 function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
   const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
@@ -322,6 +392,29 @@ function lanUrls(port) {
 }
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
+  if (url.pathname === "/api/matchup/players" && req.method === "GET") {
+    try {
+      const players = await loadMatchupPlayers();
+      return send(res, 200, JSON.stringify({ players, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "선수 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/matchup/records" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const mains = (Array.isArray(body.mains) && body.mains.length ? body.mains : [body.main]).filter(Boolean).map((value) => String(value).trim()).filter(Boolean);
+      const opponents = (Array.isArray(body.opponents) ? body.opponents : []).map((value) => String(value).trim()).filter(Boolean);
+      if (!mains.length || !opponents.length || mains.length > 6 || opponents.length > 12 || mains.length * opponents.length > 36) {
+        return send(res, 400, JSON.stringify({ error: "기준 선수는 최대 6명, 전체 대결 조합은 최대 36개까지 가능합니다." }), "application/json; charset=utf-8");
+      }
+      const pairs = mains.flatMap((main) => opponents.filter((opponent) => opponent !== main).map((opponent) => ({ main, opponent })));
+      const rows = await Promise.all(pairs.map(({ main, opponent }) => fetchMatchup(main, opponent)));
+      return send(res, 200, JSON.stringify({ rows, source: "eloboard.com", updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "eloboard 전적을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/data") {
     try {
       const force = url.searchParams.get("refresh") === "1";
