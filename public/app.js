@@ -274,8 +274,7 @@ function render(data) {
 async function load(name = "", refresh = false) {
   const requestId = state.requestId + 1;
   state.requestId = requestId;
-  const pages = Math.min(Math.max(Number($("pageInput").value) || 10, 1), 40);
-  $("pageInput").value = pages;
+  const pages = 10;
   $("status").textContent = refresh ? TXT.refreshing : TXT.loading;
   const params = new URLSearchParams({ pages: String(pages) });
   if (name) params.set("name", name);
@@ -310,7 +309,6 @@ async function search(refresh = false) {
 $("searchButton").addEventListener("click", () => search(false));
 $("refreshButton").addEventListener("click", () => search(true));
 $("nameInput").addEventListener("keydown", (event) => { if (event.key === "Enter") search(false); });
-$("pageInput").addEventListener("keydown", (event) => { if (event.key === "Enter") search(false); });
 $("opponentInput").addEventListener("input", (event) => {
   state.opponentQuery = event.target.value.trim();
   renderOpponent(state.data);

@@ -106,6 +106,42 @@
       text-align: center;
     }
 
+    .kill-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .chicken-kill-setting {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 54px;
+      padding: 8px 14px;
+      border: 1px solid var(--line, #d9dbd3);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--ink);
+      font-size: 19px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .chicken-kill-setting input {
+      width: 86px;
+      min-width: 0;
+      height: 42px;
+      padding: 6px 9px;
+      border: 1px solid var(--button-edge);
+      background: #fff;
+      color: var(--score);
+      font-size: 22px;
+      font-weight: 900;
+      text-align: center;
+    }
+
     .board {
       width: 100%;
       display: grid;
@@ -153,8 +189,8 @@
     }
 
     .score-panel {
-      width: min(94vw, 322px);
-      padding: 16px;
+      width: min(94vw, 344px);
+      padding: 16px 10px 16px 16px;
       background: var(--panel);
       border: 3px solid var(--panel-edge);
       border-radius: 8px;
@@ -163,7 +199,7 @@
 
     .title-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto auto;
       align-items: center;
       gap: 6px;
       margin-bottom: 14px;
@@ -204,7 +240,8 @@
 
     .reset-button,
     .step-button,
-    .fail-button {
+    .fail-button,
+    .cancel-button {
       border: 2px solid var(--button-edge);
       border-radius: 7px;
       background: var(--button);
@@ -216,20 +253,51 @@
 
     .reset-button:hover,
     .step-button:hover,
-    .fail-button:hover {
+    .fail-button:hover,
+    .cancel-button:hover:not(:disabled) {
       background: var(--button-hover);
     }
 
     .reset-button:active,
     .step-button:active,
-    .fail-button:active {
+    .fail-button:active,
+    .cancel-button:active:not(:disabled) {
       transform: translateY(1px);
     }
 
     .reset-button {
+      width: 48px;
       height: 30px;
-      padding: 0 8px;
+      justify-self: end;
+      padding: 0;
       font-size: 13px;
+    }
+
+    .panel-chicken-field {
+      display: inline-flex;
+      height: 30px;
+      align-items: center;
+      gap: 3px;
+      margin-right: 14px;
+      padding: 0 5px;
+      border: 1px solid var(--button-edge);
+      border-radius: 6px;
+      background: #fff;
+      font-size: 17px;
+    }
+
+    .panel-chicken-input {
+      width: 38px;
+      min-width: 0;
+      height: 26px;
+      padding: 0 2px;
+      border: 0;
+      background: transparent;
+      color: var(--score);
+      font-size: 14px;
+      font-weight: 900;
+      text-align: center;
+      outline: none;
     }
 
     .rows {
@@ -239,9 +307,10 @@
 
     .counter-row {
       display: grid;
-      grid-template-columns: 66px 64px 36px 36px 54px;
+      grid-template-columns: 66px 54px 36px 36px 48px 48px;
       align-items: center;
-      gap: 7px;
+      justify-content: end;
+      gap: 4px;
       min-height: 38px;
     }
 
@@ -291,6 +360,21 @@
       white-space: nowrap;
     }
 
+    .cancel-button {
+      width: 48px;
+      height: 32px;
+      justify-self: end;
+      padding: 0 6px;
+      color: var(--name);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .cancel-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.38;
+    }
+
     .fail-button.has-fails {
       background: #ffd1bc;
       border-color: #b54825;
@@ -313,12 +397,12 @@
       }
 
       .score-panel {
-        padding: 12px;
+        padding: 12px 8px 12px 12px;
       }
 
       .counter-row {
-        grid-template-columns: 54px 58px 32px 32px 48px;
-        gap: 5px;
+        grid-template-columns: 54px 48px 32px 32px 44px 44px;
+        gap: 4px;
       }
 
       .title-main {
@@ -348,6 +432,13 @@
         padding: 0 5px;
         font-size: 13px;
       }
+
+      .cancel-button {
+        width: 44px;
+        height: 30px;
+        padding: 0 4px;
+        font-size: 13px;
+      }
     }
 
     @media (max-width: 980px) {
@@ -365,6 +456,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="./common-theme.css">
 </head>
 <body>
   <main class="page-shell">
@@ -377,7 +469,12 @@
     </nav>
 
     <section class="kill-area" aria-label="킬 내기 점수판">
-      <h1 class="page-title">킬 내기</h1>
+      <div class="kill-title-row">
+        <h1 class="page-title">킬 내기</h1>
+        <label class="chicken-kill-setting">🍗 치킨 킬수
+          <input id="chickenKillValue" type="number" min="0" step="1" value="1" inputmode="numeric" aria-label="치킨 한 개당 킬수">
+        </label>
+      </div>
       <div class="board"></div>
     </section>
   </main>
@@ -393,6 +490,8 @@
 
     const storageKey = "eloboard.killBet.v1";
     const savedState = loadState();
+    const chickenKillInput = document.querySelector("#chickenKillValue");
+    chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
 
     modes.forEach((mode) => {
       const section = document.createElement("section");
@@ -405,6 +504,16 @@
       });
 
       board.append(section);
+    });
+
+    chickenKillInput.addEventListener("input", () => {
+      const chickenKillValue = Math.max(0, Number(chickenKillInput.value) || 0);
+      chickenKillInput.value = String(chickenKillValue);
+      savedState.chickenKillValue = chickenKillValue;
+      document.querySelectorAll(".score-panel").forEach((panel) => {
+        updateTotal([...panel.querySelectorAll(".counter-row")], panel.querySelector(".total-count"));
+      });
+      persistState();
     });
 
     function createScorePanel(modeLabel, teamName, teamIndex) {
@@ -420,6 +529,7 @@
             <span>:</span>
             <output class="total-count" aria-label="자동 합산">0킬</output>
           </div>
+          <label class="panel-chicken-field" aria-label="팀 치킨 수"><span aria-hidden="true">🍗</span><input class="panel-chicken-input" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
           <button class="reset-button" type="button">초기화</button>
         </div>
 
@@ -440,6 +550,7 @@
           <button class="step-button" type="button" data-step="-1" aria-label="${index + 1}번째 숫자 감소">-</button>
           <button class="step-button" type="button" data-step="1" aria-label="${index + 1}번째 숫자 증가">+</button>
           <button class="fail-button" type="button" aria-label="${index + 1}번째 실패 카운트">실패</button>
+          <button class="cancel-button" type="button" aria-label="${index + 1}번째 실패 취소">취소</button>
         </div>
       `).join("");
     }
@@ -449,7 +560,15 @@
       const totalCount = panel.querySelector(".total-count");
       const resetButton = panel.querySelector(".reset-button");
       const teamInput = panel.querySelector(".team-input");
+      const panelChickenInput = panel.querySelector(".panel-chicken-input");
       const panelState = getSavedPanel(panelId);
+
+      panelChickenInput.value = String(panelState.chicken ?? 0);
+      panelChickenInput.addEventListener("input", () => {
+        panelChickenInput.value = String(Math.max(0, Number(panelChickenInput.value) || 0));
+        updateTotal(rows, totalCount);
+        savePanel(panelId, panel);
+      });
 
       teamInput.addEventListener("input", () => {
         savePanel(panelId, panel);
@@ -484,6 +603,14 @@
           updateTotal(rows, totalCount);
           savePanel(panelId, panel);
         });
+
+        row.querySelector(".cancel-button").addEventListener("click", () => {
+          if (Number(row.dataset.fail) >= 0) return;
+          row.dataset.fail = String(Number(row.dataset.fail) + 1);
+          updateScoreDisplay(row);
+          updateTotal(rows, totalCount);
+          savePanel(panelId, panel);
+        });
       });
 
       resetButton.addEventListener("click", () => {
@@ -495,6 +622,7 @@
           row.dataset.fail = "0";
           updateScoreDisplay(row);
         });
+        panelChickenInput.value = "0";
         updateTotal(rows, totalCount);
         savePanel(panelId, panel);
       });
@@ -505,6 +633,7 @@
     function updateScoreDisplay(row) {
       const output = row.querySelector(".count");
       const failButton = row.querySelector(".fail-button");
+      const cancelButton = row.querySelector(".cancel-button");
       const scoreValue = Number(row.dataset.score);
       const failValue = Number(row.dataset.fail);
       const failText = failValue === 0 ? "" : `(${failValue})`;
@@ -512,14 +641,19 @@
       output.value = String(scoreValue + failValue);
       output.textContent = `${scoreValue}${failText}`;
       failButton.classList.toggle("has-fails", failValue < 0);
+      cancelButton.disabled = failValue >= 0;
     }
 
     function updateTotal(rows, totalCount) {
-      const total = rows.reduce((sum, row) => {
+      const baseTotal = rows.reduce((sum, row) => {
         const score = Number(row.dataset.score);
         const fail = Number(row.dataset.fail);
         return sum + score + fail;
       }, 0);
+      const panel = totalCount.closest(".score-panel");
+      const chicken = Math.max(0, Number(panel.querySelector(".panel-chicken-input").value) || 0);
+      const chickenKillValue = Math.max(0, Number(chickenKillInput.value) || 0);
+      const total = baseTotal + (chicken * chickenKillValue);
 
       totalCount.value = `${total}킬`;
       totalCount.textContent = `${total}킬`;
@@ -536,6 +670,7 @@
           ...(savedState.panels || {}),
           [panelId]: {
             team: panel.querySelector(".team-input").value,
+            chicken: Number(panel.querySelector(".panel-chicken-input").value),
             rows: [...panel.querySelectorAll(".counter-row")].map((row) => ({
               name: row.querySelector(".name-input").value,
               score: Number(row.dataset.score),
@@ -546,8 +681,12 @@
       };
 
       savedState.panels = nextState.panels;
+      persistState();
+    }
+
+    function persistState() {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(nextState));
+        localStorage.setItem(storageKey, JSON.stringify(savedState));
       } catch {
         // 저장 공간이 막힌 환경에서는 화면 동작만 유지합니다.
       }
