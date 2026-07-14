@@ -100,6 +100,11 @@ function render() {
     const nameCell = document.createElement("td");
     nameCell.className = "name-col";
     const name = document.createElement("input");
+    name.lang = "ko";
+    name.inputMode = "text";
+    name.autocomplete = "off";
+    name.autocapitalize = "none";
+    name.spellcheck = false;
     name.value = state.names[row];
     name.placeholder = "이름";
     name.setAttribute("aria-label", `${row + 1}번째 참가자 이름`);

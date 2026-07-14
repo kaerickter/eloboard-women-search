@@ -78,7 +78,7 @@
 .scoreboard-card thead .total-col { z-index: 3; background: #edf1c9 !important; }
 .scoreboard-card input { width: 100%; border: 0; outline: 0; padding: 0 6px; background: transparent; color: var(--theme-ink, #17213a); text-align: center; }
 .scoreboard-card input:focus { background: rgba(255,255,255,.78); box-shadow: inset 0 0 0 2px var(--theme-accent-deep, #7b8909); }
-.name-col input { height: 77px; text-align: left; font-weight: 800; }.game-entry { display: grid; grid-template-rows: 43px 34px; height: 77px; }.score-input { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }.comment-input { border-top: 1px dashed rgba(23,33,58,.18) !important; color: #626968 !important; font-size: 10px; }.comment-input::placeholder { color: #979c96; }
+.name-col input { height: 77px; text-align: left; font-weight: 800; ime-mode: active; }.game-entry { display: grid; grid-template-rows: 43px 34px; height: 77px; }.score-input { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }.comment-input { border-top: 1px dashed rgba(23,33,58,.18) !important; color: #626968 !important; font-size: 10px; }.comment-input::placeholder { color: #979c96; }
 .number-badge { display: inline-grid; place-items: center; width: 31px; height: 31px; border-radius: 50%; background: var(--theme-ink, #17213a); color: #fff; font-weight: 900; }.team-odd .number-badge { background: #a33e67; }.team-even .number-badge { background: #3d7697; }.waiting-number { color: #91958f; font-size: 10px; font-weight: 800; }
 .mobile-hint { display: none; margin: 0; padding: 10px; background: var(--theme-surface-soft, #f9f9f4); color: var(--theme-muted, #737a78); text-align: center; font-size: 11px; }
 
