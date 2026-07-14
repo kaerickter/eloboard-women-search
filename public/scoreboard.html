@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="참가자별 게임 점수를 기록하고 랜덤 번호로 홀수팀과 짝수팀의 승부를 계산하는 매치 점수판">
+    <title>매치 점수판 · ELOBoard 도구</title>
+    <link rel="stylesheet" href="./scoreboard.css">
+    <link rel="stylesheet" href="./common-theme.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab" href="./matchup.html">상대전적</a>
+      <a class="site-tab" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab active" href="./scoreboard.html" aria-current="page">매치 점수판</a>
+      <a class="site-tab" href="./lucky-roulette.html">행운 돌림판</a>
+    </nav>
+
+    <main class="scoreboard-shell">
+      <header class="scoreboard-hero">
+        <div>
+          <p class="scoreboard-eyebrow">TEAM MATCH SCOREBOARD</p>
+          <input id="boardTitle" class="board-title" value="매치 카멜레온" aria-label="점수판 제목" maxlength="40">
+          <p>게임별 점수와 코멘트를 기록하고, 마지막에 랜덤 번호를 뽑아 홀수팀과 짝수팀의 결과를 확인하세요.</p>
+        </div>
+        <span class="save-state"><i></i> 이 기기에 자동 저장</span>
+      </header>
+
+      <section class="scoreboard-controls" aria-label="점수판 설정">
+        <label>참가자 수 <input id="playerCount" type="number" min="1" max="30" value="7" inputmode="numeric"><small>명</small></label>
+        <label>게임 수 <input id="gameCount" type="number" min="1" max="20" value="9" inputmode="numeric"><small>게임</small></label>
+        <div class="size-summary"><strong id="sizeSummary">7 × 9</strong><span>현재 표 크기</span></div>
+        <button id="randomButton" class="action-button primary" type="button">랜덤 번호 지정</button>
+        <button id="sortButton" class="action-button secondary" type="button" hidden>번호순 정렬</button>
+        <button id="resetButton" class="action-button dark" type="button">점수 초기화</button>
+      </section>
+
+      <section id="teamResult" class="team-result" aria-live="polite" hidden>
+        <div class="team-score odd-score"><span>홀수팀</span><strong id="oddTotal">0</strong></div>
+        <div class="winner"><small>최종 결과</small><strong id="winnerText">무승부</strong></div>
+        <div class="team-score even-score"><span>짝수팀</span><strong id="evenTotal">0</strong></div>
+      </section>
+
+      <section class="scoreboard-card">
+        <div class="table-scroll">
+          <table>
+            <thead id="scoreHead"></thead>
+            <tbody id="scoreBody"></tbody>
+          </table>
+        </div>
+        <p class="mobile-hint">표가 길어지면 좌우로 밀어서 확인할 수 있습니다.</p>
+      </section>
+    </main>
+    <script src="./scoreboard.js"></script>
+  </body>
+</html>
