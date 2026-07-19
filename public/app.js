@@ -255,14 +255,17 @@ function renderProfile(data) {
     ? periodRows.map((match) => {
       const resultClass = match.elo >= 0 ? "result-win" : "result-loss";
       const deltaClass = match.elo >= 0 ? "delta-plus" : "delta-minus";
-      return '<div class="profile-match ' + resultClass + '"><span>' + match.date + '</span><strong>' + escapeHtml(match.opponent) + '</strong><span>' + escapeHtml(match.map) + '</span><span class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span>' + escapeHtml(match.format) + '</span></div>';
+      const memo = escapeHtml(match.memo || "-");
+      return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="ELO" class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
     }).join("")
     : '<div class="empty">' + TXT.noData + '</div>';
+
+  const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>ELO</span><span>경기방식</span><span>메모</span></div>';
 
   $("profile").innerHTML = '<div class="profile-title"><strong>' + escapeHtml(profile.name) + '</strong><span>wr_id=' + profile.wrId + '</span></div>' +
     '<div class="profile-cards">' + cards.map((card) => '<div class="profile-card"><span>' + card[0] + '</span><strong>' + card[1] + '</strong><small>' + card[2] + '</small></div>').join("") + '</div>' +
     most +
-    '<div class="profile-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + rows + '</div></div>';
+    '<div class="profile-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
 }
 
 function render(data) {
