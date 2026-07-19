@@ -446,8 +446,8 @@ http.createServer(async (req, res) => {
     }
   }
   serveStatic(req, res);
-}).listen(PORT, "0.0.0.0", () => {
-  console.log("ELOBoard board search app: http://localhost:" + PORT);
-  for (const url of lanUrls(PORT)) console.log("LAN: " + url);
+}).listen(PORT, process.env.RENDER ? "0.0.0.0" : "127.0.0.1", () => {
+  console.log("ELOBoard board search app: http://127.0.0.1:" + PORT);
+  if (process.env.RENDER) for (const url of lanUrls(PORT)) console.log("LAN: " + url);
 });
 
