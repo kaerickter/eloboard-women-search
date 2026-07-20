@@ -303,7 +303,7 @@ function summarize(matches, query) {
   return { filtered, summary };
 }
 function stripRace(value) {
-  return cleanText(value).replace(/[TZP]$/i, "").trim();
+  return cleanText(value).replace(/\s*\([TZP]\)\s*$/i, "").replace(/[TZP]$/i, "").trim();
 }
 function parseMatchupRows(html, main, opponent) {
   const matches = [];
@@ -345,6 +345,33 @@ async function loadMatchupPlayers() {
       return { name: (parts[0] || "").trim(), race: raceText.startsWith("t") ? "T" : raceText.startsWith("z") ? "Z" : "P" };
     })
     .filter((player) => player.name);
+}
+async function findMatchupProfile(name) {
+  const searchUrl = BJ_LIST_URL + "&sfl=wr_subject&stx=" + encodeURIComponent(name);
+  const response = await fetch(searchUrl, { headers: { "User-Agent": "Mozilla/5.0 elo-kitten matchup", "Accept-Language": "ko-KR,ko;q=0.9" } });
+  if (!response.ok) throw new Error("선수 프로필 검색 오류: " + response.status);
+  const html = await response.text();
+  const wrId = html.match(/(?:&amp;|&)wr_id=(\d+)/i)?.[1] || "";
+  return wrId ? loadProfile(wrId) : null;
+}
+function recentOpponentRecommendations(profile, days = 90) {
+  const rows = profile?.matches || [];
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - days);
+  const opponents = new Map();
+  for (const row of rows) {
+    const date = new Date(String(row.date || "") + "T00:00:00+09:00");
+    const opponent = stripRace(row.opponent);
+    if (!opponent || Number.isNaN(date.getTime()) || date < cutoff) continue;
+    const item = opponents.get(opponent) || { name: opponent, games: 0, wins: 0, losses: 0, lastPlayed: "" };
+    item.games += 1;
+    if (Number(row.elo) > 0) item.wins += 1;
+    if (Number(row.elo) < 0) item.losses += 1;
+    if (String(row.date) > item.lastPlayed) item.lastPlayed = String(row.date);
+    opponents.set(opponent, item);
+  }
+  return [...opponents.values()].sort((a, b) => b.games - a.games || b.lastPlayed.localeCompare(a.lastPlayed) || a.name.localeCompare(b.name, "ko"));
 }
 async function fetchMatchup(main, opponent) {
   const body = new URLSearchParams({ wr_1: main, wr_2: opponent, sear: "", b_id: "eloboard" });
@@ -400,6 +427,18 @@ http.createServer(async (req, res) => {
       return send(res, 502, JSON.stringify({ error: error.message || "선수 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/matchup/recommendations" && req.method === "GET") {
+    try {
+      const main = String(url.searchParams.get("main") || "").trim();
+      if (!main) return send(res, 400, JSON.stringify({ error: "기준 선수 이름을 입력해 주세요." }), "application/json; charset=utf-8");
+      const profile = await findMatchupProfile(main);
+      if (!profile) return send(res, 404, JSON.stringify({ error: "선수 프로필을 찾지 못했습니다." }), "application/json; charset=utf-8");
+      const recommendations = recentOpponentRecommendations(profile);
+      return send(res, 200, JSON.stringify({ main: profile.name || main, recommendations, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "최근 상대 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/matchup/records" && req.method === "POST") {
     try {
       const body = await readJsonBody(req);
@@ -446,8 +485,8 @@ http.createServer(async (req, res) => {
     }
   }
   serveStatic(req, res);
-}).listen(PORT, process.env.RENDER ? "0.0.0.0" : "127.0.0.1", () => {
-  console.log("ELOBoard board search app: http://127.0.0.1:" + PORT);
-  if (process.env.RENDER) for (const url of lanUrls(PORT)) console.log("LAN: " + url);
+}).listen(PORT, "0.0.0.0", () => {
+  console.log("ELOBoard board search app: http://localhost:" + PORT);
+  for (const url of lanUrls(PORT)) console.log("LAN: " + url);
 });
 
