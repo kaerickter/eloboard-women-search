@@ -51,6 +51,8 @@ html {
 
 body {
   min-width: 320px;
+  margin: 0 !important;
+  padding: 0 !important;
   color: var(--theme-ink);
   background: var(--theme-bg) !important;
   font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif !important;
@@ -68,6 +70,7 @@ body::before {
 
 .site-nav,
 .top-nav {
+  --menu-tab-width: 128px;
   position: sticky !important;
   top: 0 !important;
   z-index: 50 !important;
@@ -79,8 +82,9 @@ body::before {
   align-items: center !important;
   justify-content: center !important;
   flex-wrap: nowrap !important;
-  gap: 6px !important;
+  gap: 8px !important;
   overflow-x: auto;
+  scrollbar-width: none;
   border: 0 !important;
   border-bottom: 1px solid var(--theme-line) !important;
   background: rgba(244, 243, 237, 0.94) !important;
@@ -88,9 +92,16 @@ body::before {
   backdrop-filter: blur(16px) !important;
 }
 
+.site-nav::-webkit-scrollbar,
+.top-nav::-webkit-scrollbar {
+  display: none;
+}
+
 .site-tab,
 .nav-button {
-  flex: 0 0 auto;
+  box-sizing: border-box;
+  flex: 0 0 var(--menu-tab-width);
+  width: var(--menu-tab-width);
   min-height: 40px !important;
   padding: 0 18px !important;
   display: inline-flex !important;
@@ -104,6 +115,7 @@ body::before {
   font-size: 14px !important;
   font-weight: 800 !important;
   line-height: 1 !important;
+  white-space: nowrap;
   text-decoration: none !important;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
@@ -178,16 +190,26 @@ body::before {
 }
 
 .page-shell {
+  --page-shell-inline: 18px;
   width: min(1380px, 100%) !important;
   margin: 0 auto !important;
-  padding: 0 18px 48px;
+  padding: 0 var(--page-shell-inline) 48px;
+  grid-template-columns: minmax(0, 1fr) !important;
   gap: 22px !important;
 }
 
+.page-shell > * {
+  min-width: 0;
+}
+
+.page-shell .kill-area {
+  overflow-x: auto;
+}
+
 .page-shell .top-nav {
-  width: 100vw !important;
-  margin-left: calc(50% - 50vw) !important;
-  margin-right: calc(50% - 50vw) !important;
+  width: auto !important;
+  margin-left: calc(var(--page-shell-inline) * -1) !important;
+  margin-right: calc(var(--page-shell-inline) * -1) !important;
 }
 
 .page-title {
@@ -271,6 +293,7 @@ button:not(.ghost):not(.site-tab):not(.nav-button):not(.choice):not(.pill):not(.
 @media (max-width: 900px) {
   .site-nav,
   .top-nav {
+    --menu-tab-width: 112px;
     justify-content: flex-start !important;
     min-height: 60px;
     padding: 10px 14px !important;
@@ -302,7 +325,7 @@ button:not(.ghost):not(.site-tab):not(.nav-button):not(.choice):not(.pill):not(.
   }
 
   .page-shell {
-    padding-inline: 12px;
+    --page-shell-inline: 12px;
   }
 
   .matchup-shell {
