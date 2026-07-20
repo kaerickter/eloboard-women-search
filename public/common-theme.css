@@ -137,7 +137,7 @@ body::before {
 }
 
 .matchup-shell {
-  width: min(1440px, 100%);
+  width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   min-height: 100vh;
   background: var(--theme-bg) !important;
@@ -303,5 +303,9 @@ button:not(.ghost):not(.site-tab):not(.nav-button):not(.choice):not(.pill):not(.
 
   .page-shell {
     padding-inline: 12px;
+  }
+
+  .matchup-shell {
+    width: min(100% - 24px, 1180px);
   }
 }
