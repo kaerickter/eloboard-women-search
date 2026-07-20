@@ -193,7 +193,7 @@ body::before {
   --page-shell-inline: 18px;
   width: min(1380px, 100%) !important;
   margin: 0 auto !important;
-  padding: 0 var(--page-shell-inline) 48px;
+  padding: 22px var(--page-shell-inline) 48px;
   grid-template-columns: minmax(0, 1fr) !important;
   gap: 22px !important;
 }
@@ -204,12 +204,6 @@ body::before {
 
 .page-shell .kill-area {
   overflow-x: auto;
-}
-
-.page-shell .top-nav {
-  width: auto !important;
-  margin-left: calc(var(--page-shell-inline) * -1) !important;
-  margin-right: calc(var(--page-shell-inline) * -1) !important;
 }
 
 .page-title {
