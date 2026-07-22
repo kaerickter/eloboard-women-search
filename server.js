@@ -9,6 +9,8 @@ const BOARD_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_board";
 const BJ_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_list";
 const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=search_list";
 const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
+const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_list";
+const MEN_SEARCH_URL = "https://eloboard.com/men/bbs/search_bj_list.php";
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
@@ -409,6 +411,39 @@ async function fetchMatchup(main, opponent) {
   if (!response.ok) throw new Error("상대전적 응답 오류: " + response.status);
   return parseMatchupRows(await response.text(), main, opponent);
 }
+function selectOptions(html, name) {
+  const select = html.match(new RegExp("<select[^>]+(?:name|id)=[\"']" + name + "[\"'][\\s\\S]*?<\\/select>", "i"))?.[0] || "";
+  return [...select.matchAll(/<option[^>]*value=["']([^"']*)["'][^>]*>([\s\S]*?)<\/option>/gi)]
+    .map((match) => ({ value: cleanText(match[1]), label: cleanText(match[2]) })).filter((item) => item.value.trim());
+}
+async function loadMenOptions() {
+  const response = await fetch(MEN_LIST_URL, { headers: { "User-Agent": "Mozilla/5.0 elo-kitten men records", "Accept-Language": "ko-KR,ko;q=0.9" } });
+  if (!response.ok) throw new Error("남성 선수 목록 응답 오류: " + response.status);
+  const html = await response.text();
+  return { players: selectOptions(html, "wr_3").map((item) => item.label), maps: selectOptions(html, "wr_subject").map((item) => item.label) };
+}
+function parseMenRecord(html) {
+  const raceRecords = [];
+  for (const match of html.matchAll(/<th[^>]*>(Zerg|Protoss|Terran)<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>/gi)) {
+    const record = cleanText(match[2]).match(/([\d,]+)전\s*([\d,]+)승\s*([\d,]+)패\s*\(([\d.]+)%\)/);
+    if (record) raceRecords.push({ race: match[1], games: Number(record[1].replace(/,/g, "")), wins: Number(record[2].replace(/,/g, "")), losses: Number(record[3].replace(/,/g, "")), rate: Number(record[4]) });
+  }
+  const opponents = [];
+  for (const match of html.matchAll(/<tr[^>]*>\s*<td[^>]*>\s*<a[^>]*bo_table=bj_list[^>]*>([\s\S]*?)<\/a><\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi)) {
+    const rawName = cleanText(match[1]);
+    const record = cleanText(match[2]).match(/([\d,]+)승\s*([\d,]+)패/);
+    if (!record) continue;
+    opponents.push({ name: rawName.replace(/\s*\([TZP]\)\s*$/i, ""), race: rawName.match(/\(([TZP])\)\s*$/i)?.[1]?.toUpperCase() || "", wins: Number(record[1].replace(/,/g, "")), losses: Number(record[2].replace(/,/g, "")), rate: Number(cleanText(match[3]).replace("%", "")) || 0, eloPoint: cleanText(match[4]), opponentElo: cleanText(match[5]) });
+  }
+  return { raceRecords, opponents };
+}
+async function fetchMenRecords(filters) {
+  const body = new URLSearchParams({ wr_1: filters.startDate || "", wr_2: filters.endDate || "", wr_3: filters.player1 || " ", wr_4: filters.player2 || " ", wr_5: filters.memo || "", wr_6: filters.inputBy || "", wr_subject: filters.map || " ", sear: "", b_id: "eloboard" });
+  if (filters.proLeague) body.set("wr_8", "1");
+  const response = await fetch(MEN_SEARCH_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "Mozilla/5.0 elo-kitten men records" }, body });
+  if (!response.ok) throw new Error("남성전적 응답 오류: " + response.status);
+  return parseMenRecord(await response.text());
+}
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -445,6 +480,25 @@ function lanUrls(port) {
 }
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
+  if (url.pathname === "/api/men/options" && req.method === "GET") {
+    try {
+      const options = await loadMenOptions();
+      return send(res, 200, JSON.stringify({ ...options, source: MEN_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "남성 선수 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/men/records" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const filters = { startDate: String(body.startDate || "").trim(), endDate: String(body.endDate || "").trim(), player1: String(body.player1 || "").trim(), player2: String(body.player2 || "").trim(), map: String(body.map || "").trim(), memo: String(body.memo || "").trim(), inputBy: String(body.inputBy || "").trim(), proLeague: body.proLeague === true };
+      if (!filters.player1 && !filters.player2 && !filters.map && !filters.memo && !filters.inputBy && !filters.startDate && !filters.endDate && !filters.proLeague) return send(res, 400, JSON.stringify({ error: "선수 또는 검색 조건을 하나 이상 선택해 주세요." }), "application/json; charset=utf-8");
+      const result = await fetchMenRecords(filters);
+      return send(res, 200, JSON.stringify({ ...result, filters, source: MEN_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "남성전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/matchup/players" && req.method === "GET") {
     try {
       const players = await loadMatchupPlayers();
