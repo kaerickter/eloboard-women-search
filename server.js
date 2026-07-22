@@ -20,7 +20,7 @@ let profileCache = new Map();
 const CACHE_MS = 1000 * 60 * 3;
 
 function send(res, status, body, type = "text/plain; charset=utf-8") {
-  res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store" });
+  res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" });
   res.end(body);
 }
 function decodeEntities(value) {
@@ -480,6 +480,7 @@ function lanUrls(port) {
 }
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
+  if (req.method === "OPTIONS") return send(res, 204, "");
   if (url.pathname === "/api/men/options" && req.method === "GET") {
     try {
       const options = await loadMenOptions();
