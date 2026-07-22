@@ -236,11 +236,11 @@ function renderResults() {
     return '<article class="men-duel-card matchup-duel-card"><div class="duel-stage">'
       + duelPlayerMarkup(row.main)
       + '<div class="duel-score duel-score-one"><strong>' + record[0] + '</strong><span>' + rate + '% WINS</span><small>' + record[0] + '승</small></div>'
-      + '<div class="duel-logo"><img src="https://eloboard.com/men/img/vs_01.png" alt="VS"><b>VS</b></div>'
+      + '<div class="duel-center"><div class="duel-logo"><img src="https://eloboard.com/men/img/vs_01.png" alt="VS"><b>VS</b></div>'
+      + '<div class="duel-recent"><span>최근 90일</span><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패</strong><em>' + recentRate + '%</em></div></div>'
       + '<div class="duel-score duel-score-two"><strong>' + record[1] + '</strong><span>' + opponentRate + '% WINS</span><small>' + record[1] + '승</small></div>'
       + duelPlayerMarkup(row.opponent)
       + '</div><div class="duel-record-meta"><span><small>조회 범위</small><strong>' + (state.range === "all" ? "전체 전적" : "최근 90일") + '</strong></span>'
-      + '<span><small>최근 90일</small><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패 · ' + recentRate + '%</strong></span>'
       + '<span><small>최근 경기</small><strong>' + safe(row.lastPlayed) + '</strong></span>'
       + '<button class="details duel-detail-button" type="button" data-detail="' + safe(key) + '" aria-label="상세 경기 ' + (state.expanded === key ? "닫기" : "열기") + '">' + (state.expanded === key ? "상세 닫기 −" : "상세 보기 +") + '</button></div>' + detail + '</article>';
   }).join("") : '<div class="empty-row">검색 결과가 없습니다.</div>';
