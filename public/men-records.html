@@ -14,7 +14,8 @@
     <section class="matchup-search men-search-card">
       <div class="mode-tabs" role="tablist" aria-label="전적 메뉴"><a class="men-mode-link" href="./matchup.html">1 : 1 비교</a><a class="men-mode-link" href="./matchup.html">1 : 다수 비교</a><a class="men-mode-link" href="./matchup.html">다수 : 다수 비교</a><a class="men-mode-tab active" href="./men-records.html" aria-current="page">남성전적 <b>NEW</b></a></div>
       <form id="menSearchForm" class="men-filter-grid">
-        <label><span>플레이어 1</span><select id="player1"><option value="">전체</option></select></label><label><span>플레이어 2</span><select id="player2"><option value="">전체</option></select></label>
+        <label><span>플레이어 1</span><input id="player1" type="search" list="menPlayerList" placeholder="선수 이름 입력" autocomplete="off"></label><label><span>플레이어 2</span><input id="player2" type="search" list="menPlayerList" placeholder="선수 이름 입력" autocomplete="off"></label>
+        <datalist id="menPlayerList"></datalist>
         <label class="league-check"><input id="proLeague" type="checkbox"><span>프로리그만 보기</span></label>
         <button id="menSearchButton" class="matchup-search-button" type="submit">남성전적 검색 <span>→</span></button>
       </form>
