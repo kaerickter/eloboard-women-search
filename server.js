@@ -442,12 +442,23 @@ http.createServer(async (req, res) => {
   if (url.pathname === "/api/matchup/records" && req.method === "POST") {
     try {
       const body = await readJsonBody(req);
-      const mains = (Array.isArray(body.mains) && body.mains.length ? body.mains : [body.main]).filter(Boolean).map((value) => String(value).trim()).filter(Boolean);
-      const opponents = (Array.isArray(body.opponents) ? body.opponents : []).map((value) => String(value).trim()).filter(Boolean);
-      if (!mains.length || !opponents.length || mains.length > 6 || opponents.length > 12 || mains.length * opponents.length > 36) {
-        return send(res, 400, JSON.stringify({ error: "기준 선수는 최대 6명, 전체 대결 조합은 최대 36개까지 가능합니다." }), "application/json; charset=utf-8");
+      let pairs;
+      if (Array.isArray(body.pairs)) {
+        pairs = body.pairs.map((pair) => ({
+          main: String(pair?.main || "").trim(),
+          opponent: String(pair?.opponent || "").trim()
+        })).filter((pair) => pair.main && pair.opponent && pair.main !== pair.opponent);
+        if (!pairs.length || pairs.length > 12) {
+          return send(res, 400, JSON.stringify({ error: "A팀과 B팀 선수 짝을 1개 이상, 최대 12개까지 입력해 주세요." }), "application/json; charset=utf-8");
+        }
+      } else {
+        const mains = (Array.isArray(body.mains) && body.mains.length ? body.mains : [body.main]).filter(Boolean).map((value) => String(value).trim()).filter(Boolean);
+        const opponents = (Array.isArray(body.opponents) ? body.opponents : []).map((value) => String(value).trim()).filter(Boolean);
+        if (!mains.length || !opponents.length || mains.length > 6 || opponents.length > 12 || mains.length * opponents.length > 36) {
+          return send(res, 400, JSON.stringify({ error: "기준 선수는 최대 6명, 전체 대결 조합은 최대 36개까지 가능합니다." }), "application/json; charset=utf-8");
+        }
+        pairs = mains.flatMap((main) => opponents.filter((opponent) => opponent !== main).map((opponent) => ({ main, opponent })));
       }
-      const pairs = mains.flatMap((main) => opponents.filter((opponent) => opponent !== main).map((opponent) => ({ main, opponent })));
       const rows = await Promise.all(pairs.map(({ main, opponent }) => fetchMatchup(main, opponent)));
       return send(res, 200, JSON.stringify({ rows, source: "eloboard.com", updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
