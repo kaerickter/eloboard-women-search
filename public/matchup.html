@@ -32,29 +32,37 @@
           <button type="button" data-mode="group">다수 : 다수 비교 <b>NEW</b></button>
         </div>
         <div class="picker-grid">
-          <label class="main-picker"><span id="mainLabel">기준 선수</span><input id="mainInput" list="playerList" value="이아깽" placeholder="선수 이름을 직접 입력하세요" autocomplete="off"></label>
+          <div class="player-picker main-picker" data-side="main">
+            <div class="picker-title"><span id="mainLabel">기준 선수</span><button id="clearMains" type="button">초기화</button></div>
+            <div id="mainChips" class="chips" aria-live="polite"></div>
+            <input id="mainInput" placeholder="선수 이름을 검색하세요" autocomplete="off" aria-label="기준 선수 검색" aria-controls="mainSuggestions">
+            <div id="mainSuggestions" class="suggestions" hidden></div>
+          </div>
           <strong class="versus">VS</strong>
-          <div class="opponent-picker">
-            <span>상대 선수 <small id="multiHint">여러 명 선택 가능</small></span>
-            <div id="chips" class="chips"></div>
-            <input id="opponentInput" placeholder="선수 이름을 검색하세요" autocomplete="off">
-            <div id="suggestions" class="suggestions" hidden></div>
+          <div class="player-picker opponent-picker" data-side="opponent">
+            <div class="picker-title"><span id="opponentLabel">상대 선수 <small id="multiHint">여러 명 선택 가능</small></span><button id="clearOpponents" type="button">초기화</button></div>
+            <div id="opponentChips" class="chips" aria-live="polite"></div>
+            <input id="opponentInput" placeholder="선수 이름을 검색하세요" autocomplete="off" aria-label="상대 선수 검색" aria-controls="opponentSuggestions">
+            <div id="opponentSuggestions" class="suggestions" hidden></div>
           </div>
           <button id="searchButton" class="matchup-search-button" type="button">전적 검색 <span>→</span></button>
         </div>
-        <div class="quick"><span>빠른 선택</span><div id="quickPlayers"></div></div>
-        <datalist id="playerList"></datalist>
+        <div class="selection-actions">
+          <p id="selectionGuide">기준 선수 1명과 비교할 상대를 선택하세요.</p>
+          <button id="clearAll" type="button">전체 초기화</button>
+        </div>
+        <div class="quick"><span id="quickLabel">상대 빠른 선택</span><div id="quickPlayers"></div></div>
       </section>
 
       <section class="matchup-results">
         <div class="results-head">
-          <div><p class="matchup-eyebrow">LIVE SEARCH RESULT</p><h2><strong id="resultMain">이아깽</strong> 기준 상대전적</h2><p id="resultStatus">검색할 선수를 선택해 주세요.</p></div>
+          <div><p class="matchup-eyebrow">LIVE SEARCH RESULT</p><h2><strong id="resultMain">이아깽</strong> <span id="resultHeading">기준 상대전적</span></h2><p id="resultStatus">검색할 선수를 선택해 주세요.</p></div>
           <div class="range-switch"><button type="button" data-range="all" class="selected">전체 전적</button><button type="button" data-range="90">최근 90일</button></div>
         </div>
         <p id="errorMessage" class="matchup-error" hidden></p>
         <div class="summary-grid">
           <article><span id="summaryTitle">전체 종합</span><div><strong id="summaryWins">0승</strong><b id="summaryLosses">0패</b></div><div class="summary-bar"><i id="summaryBar"></i></div><small>승률 <em id="summaryRate">0%</em></small></article>
-          <article><span>가장 우세한 상대</span><div class="best"><i id="bestRace" class="race T">-</i><strong id="bestName">-</strong></div><small>선택한 상대 중 최고 승률</small></article>
+          <article><span id="bestTitle">가장 우세한 상대</span><div class="best"><i id="bestRace" class="race T">-</i><strong id="bestName">-</strong></div><small id="bestDescription">선택한 상대 중 최고 승률</small></article>
           <article><span>최근 경기</span><div id="latestDate" class="latest-date">경기 없음</div><small id="updatedAt">검색 후 표시됩니다</small></article>
         </div>
         <div class="matchup-table-card">
