@@ -11,12 +11,15 @@ const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=sear
 const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
 const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_list";
 const MEN_SEARCH_URL = "https://eloboard.com/men/bbs/search_bj_list.php";
+const UNIVERSITY_LIST_URL = "https://eloboard.com/univ/bbs/board.php?bo_table=all_bj_list";
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
 let cache = new Map();
 let playerIndexCache = null;
 let profileCache = new Map();
+let universityCache = null;
+let universityRosterCache = new Map();
 const CACHE_MS = 1000 * 60 * 3;
 
 function send(res, status, body, type = "text/plain; charset=utf-8") {
@@ -328,6 +331,7 @@ function parseMatchupRows(html, main, opponent) {
     matches.push({ date, map: cells[3], result: winner === main ? "승" : "패" });
   }
   const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
   cutoff.setDate(cutoff.getDate() - 90);
   const recentMatches = matches.filter((match) => {
     const date = new Date(match.date.slice(0, 4) + "-" + match.date.slice(4, 6) + "-" + match.date.slice(6, 8) + "T00:00:00+09:00");
@@ -482,6 +486,131 @@ async function fetchMenRecords(filters) {
   if (!response.ok) throw new Error("남성전적 응답 오류: " + response.status);
   return parseMenRecord(await response.text(), filters);
 }
+
+function parseUniversities(html) {
+  const universities = [];
+  const seen = new Set();
+  for (const match of html.matchAll(/<a\b[^>]*class=["'][^"']*portfolio_btn[^"']*["'][^>]*href=["']([^"']*univ_name=([^"'&]+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const label = cleanText(match[3]);
+    if (!label || label.toUpperCase() === "FA") continue;
+    let name = decodeEntities(match[2]);
+    try { name = decodeURIComponent(name); } catch {}
+    name = name.trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    universities.push({ name, label });
+  }
+  return universities;
+}
+
+function parseUniversityRoster(html, university) {
+  const players = [];
+  const seen = new Set();
+  const anchors = html.match(/<a\b[^>]*class=["'][^"']*p_name[^"']*["'][^>]*>[\s\S]*?<\/a>/gi) || [];
+  for (const anchor of anchors) {
+    const value = anchor.match(/\bvalue=["']([^"']+)["']/i)?.[1];
+    const display = cleanText(anchor);
+    const tierMatch = display.match(/\(([^()]+)\)\s*$/);
+    const name = decodeEntities(value || display.replace(/\s*\([^()]+\)\s*$/, "")).trim();
+    const tier = tierMatch?.[1]?.trim() || "";
+    if (!name || !tier || seen.has(name)) continue;
+    const image = anchor.match(/<img\b[^>]*src=["']([^"']+)["']/i)?.[1] || "";
+    const division = /\/men\//i.test(image) ? "men" : /\/women\//i.test(image) ? "women" : "unknown";
+    const race = (anchor.match(/\b(?:Terran|Zerg|Protoss)\b/i)?.[0] || "").slice(0, 1).toUpperCase();
+    seen.add(name);
+    players.push({ name, tier, division, race, university });
+  }
+  return players;
+}
+
+async function fetchUniversityPage(name = "") {
+  const url = name ? UNIVERSITY_LIST_URL + "&univ_name=" + encodeURIComponent(name) : UNIVERSITY_LIST_URL;
+  const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 elo-kitten university", "Accept-Language": "ko-KR,ko;q=0.9" } });
+  if (!response.ok) throw new Error("대학 명단 응답 오류: " + response.status);
+  return response.text();
+}
+
+async function loadUniversities(force = false) {
+  if (!force && universityCache && Date.now() - universityCache.cacheTime < CACHE_MS * 10) return universityCache.items;
+  const items = parseUniversities(await fetchUniversityPage());
+  if (!items.length) throw new Error("대학 목록을 찾지 못했습니다.");
+  universityCache = { cacheTime: Date.now(), items };
+  return items;
+}
+
+async function loadUniversityRoster(name, force = false) {
+  const cached = universityRosterCache.get(name);
+  if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS * 10) return cached.players;
+  const players = parseUniversityRoster(await fetchUniversityPage(name), name);
+  if (!players.length) throw new Error(name + " 소속 선수를 찾지 못했습니다.");
+  universityRosterCache.set(name, { cacheTime: Date.now(), players });
+  return players;
+}
+
+function compactDate(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length >= 8 ? digits.slice(0, 8) : "";
+}
+
+function matchupFromMenResult(result, main, opponent) {
+  const row = result.opponents?.[0];
+  const matches = row?.matches || [];
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 90);
+  const recent = matches.filter((match) => {
+    const date = compactDate(match.date);
+    if (!date) return false;
+    return new Date(date.slice(0, 4) + "-" + date.slice(4, 6) + "-" + date.slice(6, 8) + "T00:00:00+09:00") >= cutoff;
+  });
+  const recentWins = recent.filter((match) => match.winner === main).length;
+  const recentLosses = recent.filter((match) => match.loser === main).length;
+  const latest = compactDate(matches[0]?.date);
+  return {
+    main,
+    opponent,
+    total: [row?.wins || 0, row?.losses || 0],
+    recent: [recentWins, recentLosses],
+    lastPlayed: latest ? latest.slice(0, 4) + "." + latest.slice(4, 6) + "." + latest.slice(6, 8) : "경기 없음",
+    maps: matches.slice(0, 6).map((match) => ({ map: match.map, result: match.winner === main ? "승" : "패", date: String(match.date || "").slice(5) }))
+  };
+}
+
+async function fetchUniversityPair(pair) {
+  // 대학 페이지의 문자 티어(갓/킹/잭/조커)는 남성 전적, 숫자 티어는 여성·혼성 전적 체계를 사용한다.
+  // 이미지가 없는 선수도 있어 프로필 이미지 경로보다 티어 표기를 우선한다.
+  const useMen = !/^\d+$/.test(pair.tier);
+  const record = useMen
+    ? matchupFromMenResult(await fetchMenRecords({ player1: pair.playerA.name, player2: pair.playerB.name }), pair.playerA.name, pair.playerB.name)
+    : await fetchMatchup(pair.playerA.name, pair.playerB.name);
+  return { tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB, ...record };
+}
+
+async function mapConcurrent(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
+function tallyRows(rows, key) {
+  const wins = rows.reduce((sum, row) => sum + row[key][0], 0);
+  const losses = rows.reduce((sum, row) => sum + row[key][1], 0);
+  const games = wins + losses;
+  return { wins, losses, games, rate: games ? Math.round(wins / games * 1000) / 10 : 0 };
+}
+
+function buildUniversityPairs(rosterA, rosterB) {
+  return rosterA.flatMap((playerA) => rosterB
+    .filter((playerB) => playerB.tier === playerA.tier && playerB.name !== playerA.name)
+    .map((playerB) => ({ tier: playerA.tier, playerA, playerB })));
+}
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -519,6 +648,60 @@ function lanUrls(port) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname === "/api/universities" && req.method === "GET") {
+    try {
+      const force = url.searchParams.get("refresh") === "1";
+      const universities = await loadUniversities(force);
+      return send(res, 200, JSON.stringify({ universities, source: UNIVERSITY_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "대학 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/universities/roster" && req.method === "GET") {
+    try {
+      const name = String(url.searchParams.get("name") || "").trim();
+      const universities = await loadUniversities();
+      if (!universities.some((item) => item.name === name)) return send(res, 400, JSON.stringify({ error: "지원하는 대학을 선택해 주세요." }), "application/json; charset=utf-8");
+      const players = await loadUniversityRoster(name, url.searchParams.get("refresh") === "1");
+      return send(res, 200, JSON.stringify({ university: name, players, source: UNIVERSITY_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "대학 선수 명단을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/universities/matchup" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const universityA = String(body.universityA || "").trim();
+      const universityB = String(body.universityB || "").trim();
+      if (!universityA || !universityB || universityA === universityB) return send(res, 400, JSON.stringify({ error: "서로 다른 두 대학을 선택해 주세요." }), "application/json; charset=utf-8");
+      const universities = await loadUniversities();
+      const allowed = new Set(universities.map((item) => item.name));
+      if (!allowed.has(universityA) || !allowed.has(universityB)) return send(res, 400, JSON.stringify({ error: "지원하는 대학을 선택해 주세요." }), "application/json; charset=utf-8");
+      const [rosterA, rosterB] = await Promise.all([loadUniversityRoster(universityA), loadUniversityRoster(universityB)]);
+      const pairs = buildUniversityPairs(rosterA, rosterB);
+      if (pairs.length > 200) return send(res, 400, JSON.stringify({ error: "동일 티어 대결 조합이 200개를 초과합니다." }), "application/json; charset=utf-8");
+      const rows = await mapConcurrent(pairs, 4, fetchUniversityPair);
+      const tierOrder = [...new Set(pairs.map((pair) => pair.tier))];
+      const tiers = tierOrder.map((tier) => {
+        const tierRows = rows.filter((row) => row.tier === tier);
+        return { tier, pairCount: tierRows.length, total: tallyRows(tierRows, "total"), recent: tallyRows(tierRows, "recent") };
+      });
+      return send(res, 200, JSON.stringify({
+        universityA,
+        universityB,
+        rosters: { a: rosterA, b: rosterB },
+        pairCount: rows.length,
+        total: tallyRows(rows, "total"),
+        recent: tallyRows(rows, "recent"),
+        tiers,
+        rows,
+        source: UNIVERSITY_LIST_URL,
+        updatedAt: new Date().toISOString()
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "대학대결 전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/men/options" && req.method === "GET") {
     try {
       const options = await loadMenOptions();

@@ -65,3 +65,31 @@ http://localhost:5177
 ```text
 /scoreboard.html
 ```
+
+## 대학대결
+
+`/university-matchup.html`에서 FA를 제외한 현재 대학 두 곳을 선택하면 동일 티어 선수끼리의 모든 교차 조합을 조회합니다.
+
+- 대학과 선수 명단은 `eloboard.com/univ`의 공개 스폰현황에서 검색할 때 불러옵니다.
+- 이름 끝 괄호를 티어로 사용합니다. 예: `려원님(6)` → 선수 `려원님`, 티어 `6`.
+- 숫자 티어는 여성·혼성 상대전적, 문자 티어(갓/킹/잭/조커)는 남성 상대전적에서 조회합니다.
+- 각 선수 조합의 총 전적과 최근 90일 전적, 티어별 합계, 대학 전체 합계를 표시합니다.
+- 같은 티어가 A대학 2명, B대학 3명이면 2 × 3 = 6개 조합을 모두 표시합니다.
+
+### 로컬 실행
+
+```powershell
+npm start
+```
+
+브라우저에서 `http://localhost:5177/university-matchup.html`을 엽니다. 정적 HTML만 직접 열면 외부 데이터를 중계하는 API를 사용할 수 없으므로 반드시 Node 서버로 실행해야 합니다.
+
+### Render 배포
+
+기존 Render 서비스에 이 폴더를 반영한 뒤 다시 배포합니다. Build Command는 비워 두거나 `npm install`, Start Command는 `npm start`로 설정합니다. 서버는 Render가 제공하는 `PORT` 환경 변수를 자동으로 사용합니다. 별도의 데이터베이스나 비밀키는 필요하지 않습니다.
+
+추가된 API:
+
+- `GET /api/universities`: FA 제외 대학 목록
+- `GET /api/universities/roster?name=JSA`: 대학별 선수·티어 목록
+- `POST /api/universities/matchup`: 두 대학의 전체 동일 티어 전적 집계
