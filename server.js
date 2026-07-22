@@ -425,6 +425,7 @@ async function loadMenOptions() {
 function parseMenPairRecord(html, player1, player2) {
   let wins = 0;
   let losses = 0;
+  let player1Race = "";
   let opponentRace = "";
   const matches = [];
   for (const rowMatch of html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)) {
@@ -437,7 +438,9 @@ function parseMenPairRecord(html, player1, player2) {
     if (![winner, loser].includes(player1) || ![winner, loser].includes(player2)) continue;
     if (winner === player1) wins += 1;
     if (loser === player1) losses += 1;
+    const player1Raw = winner === player1 ? cells[1] : cells[2];
     const opponentRaw = winner === player2 ? cells[1] : cells[2];
+    player1Race ||= player1Raw.match(/([TZP])\s*$/i)?.[1]?.toUpperCase() || "";
     opponentRace ||= opponentRaw.match(/([TZP])\s*$/i)?.[1]?.toUpperCase() || "";
     matches.push({ date: cells[0], winner, loser, map: cells[3], elo: cells[4], format: cells[5], memo: cells[6] });
   }
@@ -445,9 +448,11 @@ function parseMenPairRecord(html, player1, player2) {
   if (!games) return { raceRecords: [], opponents: [] };
   const eloPoint = cleanText(html).match(/상대\s*ELO\s*POINT\s*:\s*([+-]?[\d,.]+)/i)?.[1] || "";
   const playerElos = [...html.matchAll(/font-size\s*:\s*1\.2em[^>]*font-weight\s*:\s*bold[^>]*>([\d,.]+)p/gi)].map((match) => match[1]);
+  const profileImages = [...html.matchAll(/<img\b[^>]*src=["']?([^"'\s>]*\/data\/file\/bj_list\/[^"'\s>]+)/gi)]
+    .map((match) => absoluteUrl(match[1]).replace(/^http:/i, "https:"));
   return {
     raceRecords: [],
-    opponents: [{ name: player2, race: opponentRace, wins, losses, rate: Math.round((wins / games) * 1000) / 10, eloPoint, opponentElo: playerElos[1] || "", matches }]
+    opponents: [{ name: player2, race: opponentRace, player1Race, wins, losses, rate: Math.round((wins / games) * 1000) / 10, eloPoint, player1Elo: playerElos[0] || "", opponentElo: playerElos[1] || "", player1Image: profileImages[0] || "", opponentImage: profileImages[1] || "", matches }]
   };
 }
 function parseMenRecord(html, filters = {}) {
