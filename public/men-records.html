@@ -10,7 +10,7 @@
     <a class="site-tab" href="./index.html">전적검색</a><a class="site-tab matchup active" href="./matchup.html">상대전적</a><a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a><a class="site-tab" href="./kill-bet.html">킬 내기</a><a class="site-tab" href="./scoreboard.html">매치 점수판</a><a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
   </nav>
   <main class="matchup-shell men-shell">
-    <section class="matchup-hero"><p class="matchup-eyebrow">MEN'S MATCH RECORDS</p><h1>남성 선수의 기록을,<br><em>간편하게 찾아보세요.</em></h1><p>플레이어 1·2와 프로리그 여부를 선택해 eloboard 남성 공개 전적을 최신 상태로 조회합니다.</p></section>
+    <section class="matchup-hero"><p class="matchup-eyebrow">MEN'S HEAD TO HEAD</p><h1>두 선수의 맞대결을,<br><em>한눈에 확인하세요.</em></h1><p>플레이어 1과 플레이어 2의 이름을 입력하면 플레이어 1 기준 승·패와 승률을 조회합니다.</p></section>
     <section class="matchup-search men-search-card">
       <div class="mode-tabs" role="tablist" aria-label="전적 메뉴"><a class="men-mode-link" href="./matchup.html">1 : 1 비교</a><a class="men-mode-link" href="./matchup.html">1 : 다수 비교</a><a class="men-mode-link" href="./matchup.html">다수 : 다수 비교</a><a class="men-mode-tab active" href="./men-records.html" aria-current="page">남성전적 <b>NEW</b></a></div>
       <form id="menSearchForm" class="men-filter-grid">
@@ -19,12 +19,12 @@
         <label class="league-check"><input id="proLeague" type="checkbox"><span>프로리그만 보기</span></label>
         <button id="menSearchButton" class="matchup-search-button" type="submit">남성전적 검색 <span>→</span></button>
       </form>
-      <p id="menGuide" class="men-guide">선수 또는 프로리그 조건을 하나 이상 선택해 주세요.</p>
+      <p id="menGuide" class="men-guide">맞대결을 확인할 두 선수의 이름을 모두 입력해 주세요.</p>
     </section>
     <section class="matchup-results men-results">
       <div class="results-head"><div><p class="matchup-eyebrow">LIVE SEARCH RESULT</p><h2><strong id="menResultTitle">남성전적</strong> 검색 결과</h2><p id="menStatus">선수 목록을 불러오는 중입니다.</p></div></div>
       <p id="menError" class="matchup-error" hidden></p><div id="raceSummary" class="summary-grid men-summary"></div>
-      <div class="matchup-table-card"><div class="table-tools"><div><strong>상대 선수별 전적</strong><small>승패, 승률, ELO 포인트를 확인하세요</small></div><label>정렬 <select id="menSort"><option value="games">경기 많은 순</option><option value="rate">승률 높은 순</option><option value="elo">상대 ELO 순</option></select></label></div><div id="menRows" class="men-table"><div class="men-empty">검색 조건을 선택해 주세요.</div></div></div>
+      <div class="matchup-table-card"><div class="table-tools"><div><strong>두 선수 맞대결 결과</strong><small>플레이어 1 기준 승패와 승률입니다</small></div></div><div id="menRows" class="men-table"><div class="men-empty">두 선수의 이름을 입력해 주세요.</div></div></div>
       <p class="matchup-source">출처: eloboard.com/men 공개 전적 · 검색할 때마다 최신 데이터를 조회합니다.</p>
     </section>
   </main><script src="./men-records.js"></script>
