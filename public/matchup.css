@@ -32,3 +32,6 @@
 
 /* 전적검색과 동일한 결과 색상: 승리=빨강, 패배=파랑 */
 .summary-bar i{background:#d95757}.donut{background:conic-gradient(#d95757 calc(var(--rate)*1%),#4c91cf 0)}.score-pair small{color:#a83232}.score-pair .loss small{color:#27639a}.win-bar{background:linear-gradient(90deg,#ef8a8a,#d95757)}.loss-bar{background:linear-gradient(90deg,#83b9e5,#4c91cf)}.bar-labels span:first-child{color:#a83232}.bar-labels span:last-child{color:#27639a}.recent-meter i{background:#d95757}.recent-panel>b{color:#a83232}.match-detail .win{background:#d95757}.match-detail .loss{background:#4c91cf}
+
+/* 상대전적 모드 탭과 같은 간격의 남성전적 링크 */
+.mode-tabs .men-mode-tab{position:relative;display:flex;align-items:center;border:0;background:#fff;padding:18px 24px;color:#8a9299;font-size:15px;font-weight:800;text-decoration:none}.mode-tabs .men-mode-tab.active{color:var(--matchup-ink)}.mode-tabs .men-mode-tab.active:after{position:absolute;right:21px;bottom:-1px;left:21px;height:3px;background:var(--matchup-lime);content:""}@media(max-width:560px){.mode-tabs .men-mode-tab{flex:0 0 auto;padding:16px 18px;font-size:13px}}
