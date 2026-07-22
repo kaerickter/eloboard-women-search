@@ -422,18 +422,51 @@ async function loadMenOptions() {
   const html = await response.text();
   return { players: selectOptions(html, "wr_3").map((item) => item.label), maps: selectOptions(html, "wr_subject").map((item) => item.label) };
 }
-function parseMenRecord(html) {
+function parseMenPairRecord(html, player1, player2) {
+  let wins = 0;
+  let losses = 0;
+  let opponentRace = "";
+  const matches = [];
+  for (const rowMatch of html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)) {
+    const rowHtml = rowMatch[0];
+    if (!/bo_table=bat/i.test(rowHtml)) continue;
+    const cells = [...rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map((match) => cleanText(match[1]));
+    if (cells.length < 7) continue;
+    const winner = stripRace(cells[1]);
+    const loser = stripRace(cells[2]);
+    if (![winner, loser].includes(player1) || ![winner, loser].includes(player2)) continue;
+    if (winner === player1) wins += 1;
+    if (loser === player1) losses += 1;
+    const opponentRaw = winner === player2 ? cells[1] : cells[2];
+    opponentRace ||= opponentRaw.match(/([TZP])\s*$/i)?.[1]?.toUpperCase() || "";
+    matches.push({ date: cells[0], winner, loser, map: cells[3], elo: cells[4], format: cells[5], memo: cells[6] });
+  }
+  const games = wins + losses;
+  if (!games) return { raceRecords: [], opponents: [] };
+  const eloPoint = cleanText(html).match(/상대\s*ELO\s*POINT\s*:\s*([+-]?[\d,.]+)/i)?.[1] || "";
+  const playerElos = [...html.matchAll(/font-size\s*:\s*1\.2em[^>]*font-weight\s*:\s*bold[^>]*>([\d,.]+)p/gi)].map((match) => match[1]);
+  return {
+    raceRecords: [],
+    opponents: [{ name: player2, race: opponentRace, wins, losses, rate: Math.round((wins / games) * 1000) / 10, eloPoint, opponentElo: playerElos[1] || "", matches }]
+  };
+}
+function parseMenRecord(html, filters = {}) {
+  if (filters.player1 && filters.player2) return parseMenPairRecord(html, filters.player1, filters.player2);
   const raceRecords = [];
   for (const match of html.matchAll(/<th[^>]*>(Zerg|Protoss|Terran)<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>/gi)) {
     const record = cleanText(match[2]).match(/([\d,]+)전\s*([\d,]+)승\s*([\d,]+)패\s*\(([\d.]+)%\)/);
     if (record) raceRecords.push({ race: match[1], games: Number(record[1].replace(/,/g, "")), wins: Number(record[2].replace(/,/g, "")), losses: Number(record[3].replace(/,/g, "")), rate: Number(record[4]) });
   }
   const opponents = [];
-  for (const match of html.matchAll(/<tr[^>]*>\s*<td[^>]*>\s*<a[^>]*bo_table=bj_list[^>]*>([\s\S]*?)<\/a><\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi)) {
-    const rawName = cleanText(match[1]);
-    const record = cleanText(match[2]).match(/([\d,]+)승\s*([\d,]+)패/);
+  for (const rowMatch of html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)) {
+    const rowHtml = rowMatch[0];
+    if (!/bo_table=bj_list/i.test(rowHtml)) continue;
+    const cells = [...rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map((match) => cleanText(match[1]));
+    if (cells.length < 5) continue;
+    const rawName = cells[0];
+    const record = cells[1].match(/([\d,]+)승\s*([\d,]+)패/);
     if (!record) continue;
-    opponents.push({ name: rawName.replace(/\s*\([TZP]\)\s*$/i, ""), race: rawName.match(/\(([TZP])\)\s*$/i)?.[1]?.toUpperCase() || "", wins: Number(record[1].replace(/,/g, "")), losses: Number(record[2].replace(/,/g, "")), rate: Number(cleanText(match[3]).replace("%", "")) || 0, eloPoint: cleanText(match[4]), opponentElo: cleanText(match[5]) });
+    opponents.push({ name: rawName.replace(/\s*\([TZP]\)\s*$/i, ""), race: rawName.match(/\(([TZP])\)\s*$/i)?.[1]?.toUpperCase() || "", wins: Number(record[1].replace(/,/g, "")), losses: Number(record[2].replace(/,/g, "")), rate: Number(cells[2].replace("%", "")) || 0, eloPoint: cells[3], opponentElo: cells[4] });
   }
   return { raceRecords, opponents };
 }
@@ -442,7 +475,7 @@ async function fetchMenRecords(filters) {
   if (filters.proLeague) body.set("wr_8", "1");
   const response = await fetch(MEN_SEARCH_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "Mozilla/5.0 elo-kitten men records" }, body });
   if (!response.ok) throw new Error("남성전적 응답 오류: " + response.status);
-  return parseMenRecord(await response.text());
+  return parseMenRecord(await response.text(), filters);
 }
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
