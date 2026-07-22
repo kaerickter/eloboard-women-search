@@ -24,6 +24,7 @@ const evenTotal = document.querySelector("#evenTotal");
 const winnerText = document.querySelector("#winnerText");
 
 let state = loadState();
+let realtimeRoom = null;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
@@ -106,9 +107,10 @@ function render() {
     name.autocapitalize = "none";
     name.spellcheck = false;
     name.value = state.names[row];
+    name.dataset.collabPath = `names.${row}`;
     name.placeholder = "이름";
     name.setAttribute("aria-label", `${row + 1}번째 참가자 이름`);
-    name.addEventListener("input", event => { state.names[row] = event.target.value; saveState(); });
+    name.addEventListener("input", event => { state.names[row] = event.target.value; realtimeRoom?.sendSet(`names.${row}`, state.names[row]); saveState(); });
     nameCell.append(name);
     tr.append(nameCell);
 
@@ -122,6 +124,7 @@ function render() {
       score.inputMode = "numeric";
       score.placeholder = "점수";
       score.value = state.scores[row][col];
+      score.dataset.collabPath = `scores.${row}.${col}`;
       score.setAttribute("aria-label", `${row + 1}번째 참가자 ${col + 1}게임 점수`);
       score.addEventListener("input", event => {
         if (event.target.value !== "" && !/^-?\d*$/.test(event.target.value)) {
@@ -129,6 +132,7 @@ function render() {
           return;
         }
         state.scores[row][col] = event.target.value;
+        realtimeRoom?.sendSet(`scores.${row}.${col}`, state.scores[row][col]);
         updateTotals();
         saveState();
       });
@@ -136,8 +140,9 @@ function render() {
       comment.className = "comment-input";
       comment.placeholder = "코멘트";
       comment.value = state.comments[row][col];
+      comment.dataset.collabPath = `comments.${row}.${col}`;
       comment.setAttribute("aria-label", `${row + 1}번째 참가자 ${col + 1}게임 코멘트`);
-      comment.addEventListener("input", event => { state.comments[row][col] = event.target.value; saveState(); });
+      comment.addEventListener("input", event => { state.comments[row][col] = event.target.value; realtimeRoom?.sendSet(`comments.${row}.${col}`, state.comments[row][col]); saveState(); });
       entry.append(score, comment);
       cell.append(entry);
       tr.append(cell);
@@ -166,6 +171,11 @@ function resize(key, rawValue) {
     comments: Array.from({ length: players }, (_, row) => Array.from({ length: games }, (_, col) => state.comments[row]?.[col] ?? "")),
     assignedNumbers: key === "players" ? null : state.assignedNumbers,
   };
+  realtimeRoom?.sendSet(key, value, 0);
+  realtimeRoom?.sendSet("names", state.names, 0);
+  realtimeRoom?.sendSet("scores", state.scores, 0);
+  realtimeRoom?.sendSet("comments", state.comments, 0);
+  realtimeRoom?.sendSet("assignedNumbers", state.assignedNumbers, 0);
   render();
 }
 
@@ -176,6 +186,7 @@ function assignRandomNumbers() {
     [numbers[index], numbers[target]] = [numbers[target], numbers[index]];
   }
   state.assignedNumbers = numbers;
+  realtimeRoom?.sendSet("assignedNumbers", numbers, 0);
   render();
 }
 
@@ -189,10 +200,15 @@ function sortByNumber() {
     scores: order.map(item => state.scores[item.index]),
     comments: order.map(item => state.comments[item.index]),
   };
+  realtimeRoom?.sendSet("assignedNumbers", state.assignedNumbers, 0);
+  realtimeRoom?.sendSet("names", state.names, 0);
+  realtimeRoom?.sendSet("scores", state.scores, 0);
+  realtimeRoom?.sendSet("comments", state.comments, 0);
   render();
 }
 
-titleInput.addEventListener("input", event => { state.title = event.target.value; saveState(); });
+titleInput.dataset.collabPath = "title";
+titleInput.addEventListener("input", event => { state.title = event.target.value; realtimeRoom?.sendSet("title", state.title); saveState(); });
 playerCount.addEventListener("change", event => resize("players", event.target.value));
 gameCount.addEventListener("change", event => resize("games", event.target.value));
 randomButton.addEventListener("click", assignRandomNumbers);
@@ -206,7 +222,19 @@ resetButton.addEventListener("click", () => {
     comments: Array.from({ length: state.players }, () => Array(state.games).fill("")),
     assignedNumbers: null,
   };
+  realtimeRoom?.sendSet("names", state.names, 0);
+  realtimeRoom?.sendSet("scores", state.scores, 0);
+  realtimeRoom?.sendSet("comments", state.comments, 0);
+  realtimeRoom?.sendSet("assignedNumbers", null, 0);
   render();
 });
 
 render();
+realtimeRoom = new RealtimeRoom({
+  feature: "scoreboard",
+  getState: () => state,
+  applyState: nextState => {
+    state = normalize(nextState);
+    RealtimeRoom.preserveFocus(render);
+  }
+});

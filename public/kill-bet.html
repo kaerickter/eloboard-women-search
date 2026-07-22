@@ -457,6 +457,7 @@
     }
   </style>
   <link rel="stylesheet" href="./common-theme.css">
+  <link rel="stylesheet" href="./collaboration.css">
 </head>
 <body>
     <nav class="top-nav" aria-label="페이지 전환">
@@ -482,6 +483,8 @@
     </section>
   </main>
 
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="./collaboration.js"></script>
   <script>
     const board = document.querySelector(".board");
     const modes = [
@@ -493,26 +496,31 @@
 
     const storageKey = "eloboard.killBet.v1";
     const savedState = loadState();
+    let realtimeRoom = null;
     const chickenKillInput = document.querySelector("#chickenKillValue");
     chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
 
-    modes.forEach((mode) => {
-      const section = document.createElement("section");
-      section.className = mode.wide ? "mode-section wide" : "mode-section";
-      section.innerHTML = `<h2 class="mode-title">${mode.label}</h2><div class="team-grid"></div>`;
+    function renderKillBoard() {
+      board.innerHTML = "";
+      modes.forEach((mode) => {
+        const section = document.createElement("section");
+        section.className = mode.wide ? "mode-section wide" : "mode-section";
+        section.innerHTML = `<h2 class="mode-title">${mode.label}</h2><div class="team-grid"></div>`;
 
-      const grid = section.querySelector(".team-grid");
-      mode.teams.forEach((team, teamIndex) => {
-        grid.append(createScorePanel(mode.label, team, teamIndex));
+        const grid = section.querySelector(".team-grid");
+        mode.teams.forEach((team, teamIndex) => {
+          grid.append(createScorePanel(mode.label, team, teamIndex));
+        });
+
+        board.append(section);
       });
-
-      board.append(section);
-    });
+    }
 
     chickenKillInput.addEventListener("input", () => {
       const chickenKillValue = Math.max(0, Number(chickenKillInput.value) || 0);
       chickenKillInput.value = String(chickenKillValue);
       savedState.chickenKillValue = chickenKillValue;
+      realtimeRoom?.sendSet("chickenKillValue", chickenKillValue);
       document.querySelectorAll(".score-panel").forEach((panel) => {
         updateTotal([...panel.querySelectorAll(".counter-row")], panel.querySelector(".total-count"));
       });
@@ -566,21 +574,26 @@
       const panelChickenInput = panel.querySelector(".panel-chicken-input");
       const panelState = getSavedPanel(panelId);
 
+      teamInput.dataset.collabPath = `panels.${panelId}.team`;
+      panelChickenInput.dataset.collabPath = `panels.${panelId}.chicken`;
       panelChickenInput.value = String(panelState.chicken ?? 0);
       panelChickenInput.addEventListener("input", () => {
         panelChickenInput.value = String(Math.max(0, Number(panelChickenInput.value) || 0));
         updateTotal(rows, totalCount);
         savePanel(panelId, panel);
+        realtimeRoom?.sendSet(`panels.${panelId}.chicken`, Number(panelChickenInput.value));
       });
 
       teamInput.addEventListener("input", () => {
         savePanel(panelId, panel);
+        realtimeRoom?.sendSet(`panels.${panelId}.team`, teamInput.value);
       });
 
       rows.forEach((row, rowIndex) => {
         const rowState = panelState.rows?.[rowIndex] || {};
         const nameInput = row.querySelector(".name-input");
 
+        nameInput.dataset.collabPath = `panels.${panelId}.rows.${rowIndex}.name`;
         nameInput.value = rowState.name || "";
         row.dataset.fail = "0";
         row.dataset.score = String(rowState.score ?? 0);
@@ -589,14 +602,17 @@
 
         nameInput.addEventListener("input", () => {
           savePanel(panelId, panel);
+          realtimeRoom?.sendSet(`panels.${panelId}.rows.${rowIndex}.name`, nameInput.value);
         });
 
         row.querySelectorAll(".step-button").forEach((button) => {
           button.addEventListener("click", () => {
-            row.dataset.score = String(Number(row.dataset.score) + Number(button.dataset.step));
+            const delta = Number(button.dataset.step);
+            row.dataset.score = String(Number(row.dataset.score) + delta);
             updateScoreDisplay(row);
             updateTotal(rows, totalCount);
             savePanel(panelId, panel);
+            realtimeRoom?.increment(`panels.${panelId}.rows.${rowIndex}.score`, delta);
           });
         });
 
@@ -605,6 +621,7 @@
           updateScoreDisplay(row);
           updateTotal(rows, totalCount);
           savePanel(panelId, panel);
+          realtimeRoom?.increment(`panels.${panelId}.rows.${rowIndex}.fail`, -1);
         });
 
         row.querySelector(".cancel-button").addEventListener("click", () => {
@@ -613,6 +630,7 @@
           updateScoreDisplay(row);
           updateTotal(rows, totalCount);
           savePanel(panelId, panel);
+          realtimeRoom?.increment(`panels.${panelId}.rows.${rowIndex}.fail`, 1);
         });
       });
 
@@ -630,6 +648,7 @@
         panelChickenInput.value = "0";
         updateTotal(rows, totalCount);
         savePanel(panelId, panel);
+        realtimeRoom?.sendSet(`panels.${panelId}`, savedState.panels[panelId], 0);
       });
 
       updateTotal(rows, totalCount);
@@ -704,6 +723,19 @@
         return { panels: {} };
       }
     }
+
+    renderKillBoard();
+    realtimeRoom = new RealtimeRoom({
+      feature: "kill-bet",
+      getState: () => savedState,
+      applyState: nextState => {
+        savedState.chickenKillValue = nextState.chickenKillValue;
+        savedState.panels = nextState.panels || {};
+        chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
+        RealtimeRoom.preserveFocus(renderKillBoard);
+        persistState();
+      }
+    });
   </script>
 </body>
 </html>

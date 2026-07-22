@@ -502,6 +502,7 @@
     }
   </style>
   <link rel="stylesheet" href="./common-theme.css">
+  <link rel="stylesheet" href="./collaboration.css">
 </head>
 <body>
   <nav class="site-nav" aria-label="페이지 이동">
@@ -566,6 +567,8 @@
     </aside>
   </main>
 
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="./collaboration.js"></script>
   <script>
     const state = {
       size: 4,
@@ -586,6 +589,7 @@
     const sizeButtons = document.querySelectorAll("[data-size]");
     const channel = "BroadcastChannel" in window ? new BroadcastChannel("broadcast-bingo") : null;
     let syncing = false;
+    let realtimeRoom = null;
 
     const saved = localStorage.getItem("broadcast-bingo-state");
     if (saved) {
@@ -708,6 +712,7 @@
         input.setAttribute("aria-label", `${i + 1}번 칸 내용`);
         input.addEventListener("input", event => {
           state.cells[i] = event.target.value;
+          realtimeRoom?.sendSet(`cells.${i}`, state.cells[i]);
           fitInput(event.target);
           save();
           renderPreviewOnly();
@@ -747,12 +752,15 @@
 
     function toggleCheck(index) {
       state.checked[index] = !state.checked[index];
+      realtimeRoom?.sendSet(`checked.${index}`, state.checked[index], 0);
       render();
     }
 
     function setSize(size) {
       state.size = size;
       state.checked = state.checked.map((checked, index) => index < activeCount() && checked);
+      realtimeRoom?.sendSet("size", state.size, 0);
+      state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
       render();
     }
 
@@ -778,6 +786,8 @@
       shuffle(pool).slice(0, count).forEach((value, index) => {
         state.cells[index] = value;
         state.checked[index] = false;
+        realtimeRoom?.sendSet(`cells.${index}`, value, 0);
+        realtimeRoom?.sendSet(`checked.${index}`, false, 0);
       });
 
       status.textContent = `${low} ~ ${high} 중 ${count}개를 랜덤으로 넣었습니다.`;
@@ -800,6 +810,7 @@
       const style = popup.document.createElement("style");
       style.textContent = `
         .site-nav { display: none; }
+        .collaboration-bar { display: none; }
         .app { display: block; min-height: 100vh; }
         .editor { display: none; }
         .broadcast { min-height: 100vh; }
@@ -810,6 +821,7 @@
 
     titleInput.addEventListener("input", event => {
       state.title = event.target.value;
+      realtimeRoom?.sendSet("title", state.title);
       previewTitle.textContent = state.title || "빙고";
       save();
     });
@@ -821,15 +833,29 @@
     document.getElementById("randomFill").addEventListener("click", randomFill);
     document.getElementById("clearMarks").addEventListener("click", () => {
       state.checked = state.checked.map(() => false);
+      state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
       render();
     });
     document.getElementById("clearAll").addEventListener("click", () => {
       state.cells = state.cells.map(() => "");
       state.checked = state.checked.map(() => false);
+      state.cells.forEach((value, index) => realtimeRoom?.sendSet(`cells.${index}`, value, 0));
+      state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
       status.textContent = "빙고판을 비웠습니다.";
       render();
     });
     document.getElementById("openBroadcast").addEventListener("click", openBroadcastWindow);
+
+    realtimeRoom = new RealtimeRoom({
+      feature: "bingo",
+      getState: () => state,
+      applyState: nextState => {
+        syncing = true;
+        Object.assign(state, nextState);
+        RealtimeRoom.preserveFocus(render);
+        syncing = false;
+      }
+    });
 
     render();
   </script>
