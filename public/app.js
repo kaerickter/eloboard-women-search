@@ -50,6 +50,20 @@ function escapeHtml(value) {
   return String(value || "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
 }
 
+function avatarMarkup(name, image) {
+  const initial = Array.from(String(name || "?").trim())[0] || "?";
+  const img = image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(name) + ' 프로필 사진">' : "";
+  return '<span class="player-photo">' + img + '<b aria-hidden="true">' + escapeHtml(initial) + '</b></span>';
+}
+
+function bindImageFallbacks(root) {
+  root.querySelectorAll(".player-photo img").forEach((image) => {
+    const fallback = () => { image.hidden = true; };
+    image.addEventListener("error", fallback);
+    if (image.complete && !image.naturalWidth) fallback();
+  });
+}
+
 function personal(match, query) {
   const key = cleanName(query);
   const won = cleanName(match.winner).includes(key);
@@ -262,10 +276,11 @@ function renderProfile(data) {
 
   const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>ELO</span><span>경기방식</span><span>메모</span></div>';
 
-  $("profile").innerHTML = '<div class="profile-title"><strong>' + escapeHtml(profile.name) + '</strong><span>wr_id=' + profile.wrId + '</span></div>' +
+  $("profile").innerHTML = '<div class="profile-title"><div class="profile-identity">' + avatarMarkup(profile.name, profile.image) + '<div><strong>' + escapeHtml(profile.name) + '</strong><span>wr_id=' + profile.wrId + '</span></div></div></div>' +
     '<div class="profile-cards">' + cards.map((card) => '<div class="profile-card"><span>' + card[0] + '</span><strong>' + card[1] + '</strong><small>' + card[2] + '</small></div>').join("") + '</div>' +
     most +
     '<div class="profile-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
+  bindImageFallbacks($("profile"));
 }
 
 function render(data) {

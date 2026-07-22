@@ -3,7 +3,7 @@ const state = {
   players: [], quick: [], quickStatus: "최근 전적 확인 중…",
   mains: ["이아깽"], opponents: [], rows: [], mode: "many",
   pairs: Array.from({ length: 7 }, () => ({ main: "", opponent: "" })), lastPairs: [],
-  range: "all", sort: "games", expanded: "", recommendationRequest: 0
+  photos: {}, range: "all", sort: "games", expanded: "", recommendationRequest: 0, photoRequest: 0
 };
 const raceName = { T: "테란", Z: "저그", P: "프로토스" };
 const fallback = [{name:"이아깽",race:"T"},{name:"오리꿍",race:"Z"},{name:"비재희",race:"Z"},{name:"치리",race:"Z"},{name:"귀요민정",race:"Z"},{name:"태린",race:"P"}];
@@ -12,6 +12,39 @@ const safe = (value) => String(value || "").replace(/[&<>"']/g, (char) => ({"&":
 const player = (name) => state.players.find((item) => item.name === name) || { name, race: "P" };
 const sideNames = (side) => side === "main" ? state.mains : state.opponents;
 const sideLimit = (side) => state.mode === "group" ? 6 : side === "main" || state.mode === "one" ? 1 : 12;
+
+function avatarMarkup(name, className = "matchup-photo") {
+  const initial = Array.from(String(name || "?").trim())[0] || "?";
+  const image = state.photos[name];
+  return '<span class="' + className + '">' + (image ? '<img src="' + safe(image) + '" alt="' + safe(name) + ' 프로필 사진">' : '') + '<b aria-hidden="true">' + safe(initial) + '</b></span>';
+}
+
+function bindImageFallbacks(root = document) {
+  root.querySelectorAll(".matchup-photo img").forEach((image) => {
+    const fallback = () => { image.hidden = true; };
+    image.addEventListener("error", fallback);
+    if (image.complete && !image.naturalWidth) fallback();
+  });
+}
+
+async function loadPhotos(names) {
+  const missing = [...new Set(names.filter(Boolean))].filter((name) => !Object.prototype.hasOwnProperty.call(state.photos, name));
+  if (!missing.length) return;
+  const requestId = ++state.photoRequest;
+  try {
+    const response = await fetch("/api/matchup/photos", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ names: missing.slice(0, 24) })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "선수 사진을 불러오지 못했습니다.");
+    if (requestId !== state.photoRequest) return;
+    Object.assign(state.photos, data.photos || {});
+    renderResults();
+  } catch {
+    missing.forEach((name) => { state.photos[name] = ""; });
+    renderResults();
+  }
+}
 
 function setError(message = "") {
   byId("errorMessage").textContent = message;
@@ -177,6 +210,10 @@ function renderResults() {
   byId("latestDate").textContent = rows.map((row) => row.lastPlayed).filter((date) => date !== "경기 없음").sort((a, b) => b.localeCompare(a))[0] || "경기 없음";
   byId("resultMain").textContent = group ? (state.lastPairs.length ? state.lastPairs.length + "개 짝" : "A팀 vs B팀") : (state.mains[0] || "-");
   byId("resultHeading").textContent = group ? "선수별 비교" : "기준 상대전적";
+  byId("resultAvatar").innerHTML = group
+    ? (state.lastPairs.length ? avatarMarkup(state.lastPairs[0].main) + avatarMarkup(state.lastPairs[0].opponent) : "")
+    : (state.mains[0] ? avatarMarkup(state.mains[0]) : "");
+  byId("resultAvatar").classList.toggle("dual", group && state.lastPairs.length > 0);
   byId("resultStatus").textContent = rows.length
     ? rows.length + (group ? "개 선수 짝" : "개 대결 조합") + " · 총 " + (summary[0] + summary[1]) + "경기"
     : (group ? "비교할 선수 짝을 입력해 주세요." : "검색할 선수를 선택해 주세요.");
@@ -187,9 +224,14 @@ function renderResults() {
     const key = row.main + "|" + row.opponent;
     const recentRate = pct(row.recent);
     const playerLabel = safe(group ? row.main + " vs " + row.opponent : row.opponent);
+    const identity = group
+      ? '<span class="matchup-pair-identity"><span>' + avatarMarkup(row.main) + '<b>' + safe(row.main) + '</b></span><em>VS</em><span>' + avatarMarkup(row.opponent) + '<b>' + safe(row.opponent) + '</b></span></span>'
+      : '<span class="matchup-player">' + avatarMarkup(row.opponent) + '<span><b>' + playerLabel + '</b><small>' + raceName[p.race] + '</small></span></span>';
     const detail = state.expanded === key ? '<div class="match-detail">' + (row.maps.length ? row.maps.map((match) => '<span><b class="' + (match.result === "승" ? "win" : "loss") + '">' + match.result + '</b>' + safe(match.date) + ' · ' + safe(match.map) + '</span>').join("") : "등록된 맞대결이 없습니다.") + '</div>' : "";
-    return '<article class="record-graph-card"><div class="graph-card-head"><span class="matchup-player"><i class="race ' + p.race + '">' + p.race + '</i><span><b>' + playerLabel + '</b><small>' + raceName[p.race] + '</small></span></span><span class="last-played">최근 경기 <b>' + safe(row.lastPlayed) + '</b></span></div><div class="graph-card-body"><div class="donut" style="--rate:' + rate + '"><div><strong>' + rate + '%</strong><small>승률</small></div></div><div class="graph-stats"><div class="score-pair"><span><small>WIN</small><strong>' + record[0] + '<em>승</em></strong></span><i></i><span class="loss"><small>LOSS</small><strong>' + record[1] + '<em>패</em></strong></span></div><div class="battle-bar" aria-label="승률 ' + rate + '%"><i class="win-bar" style="width:' + rate + '%"></i><i class="loss-bar" style="width:' + (100-rate) + '%"></i></div><div class="bar-labels"><span>승리 ' + rate + '%</span><span>패배 ' + (100-rate) + '%</span></div></div></div><div class="recent-panel"><div><span>최근 90일</span><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패</strong></div><div class="recent-meter"><i style="width:' + recentRate + '%"></i></div><b>' + recentRate + '%</b><button class="details" type="button" data-detail="' + safe(key) + '" aria-label="상세 경기 ' + (state.expanded === key ? "닫기" : "열기") + '">' + (state.expanded === key ? "−" : "+") + '</button></div>' + detail + '</article>';
+    return '<article class="record-graph-card"><div class="graph-card-head">' + identity + '<span class="last-played">최근 경기 <b>' + safe(row.lastPlayed) + '</b></span></div><div class="graph-card-body"><div class="donut" style="--rate:' + rate + '"><div><strong>' + rate + '%</strong><small>승률</small></div></div><div class="graph-stats"><div class="score-pair"><span><small>WIN</small><strong>' + record[0] + '<em>승</em></strong></span><i></i><span class="loss"><small>LOSS</small><strong>' + record[1] + '<em>패</em></strong></span></div><div class="battle-bar" aria-label="승률 ' + rate + '%"><i class="win-bar" style="width:' + rate + '%"></i><i class="loss-bar" style="width:' + (100-rate) + '%"></i></div><div class="bar-labels"><span>승리 ' + rate + '%</span><span>패배 ' + (100-rate) + '%</span></div></div></div><div class="recent-panel"><div><span>최근 90일</span><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패</strong></div><div class="recent-meter"><i style="width:' + recentRate + '%"></i></div><b>' + recentRate + '%</b><button class="details" type="button" data-detail="' + safe(key) + '" aria-label="상세 경기 ' + (state.expanded === key ? "닫기" : "열기") + '">' + (state.expanded === key ? "−" : "+") + '</button></div>' + detail + '</article>';
   }).join("") : '<div class="empty-row">검색 결과가 없습니다.</div>';
+  bindImageFallbacks(byId("recordRows"));
+  bindImageFallbacks(byId("resultAvatar"));
   document.querySelectorAll("[data-detail]").forEach((button) => button.onclick = () => {
     state.expanded = state.expanded === button.dataset.detail ? "" : button.dataset.detail;
     renderResults();
@@ -244,6 +286,7 @@ async function search() {
     state.rows = data.rows || [];
     byId("updatedAt").textContent = "갱신 " + new Date(data.updatedAt).toLocaleTimeString("ko-KR");
     renderResults();
+    loadPhotos([...state.mains, ...state.opponents]);
   } catch (cause) {
     setError(cause.message);
     byId("resultStatus").textContent = "조회에 실패했습니다.";
@@ -273,6 +316,7 @@ async function searchPairs(rawPairs, button) {
     state.rows = data.rows || [];
     byId("updatedAt").textContent = "갱신 " + new Date(data.updatedAt).toLocaleTimeString("ko-KR");
     renderResults();
+    loadPhotos(pairs.flatMap((pair) => [pair.main, pair.opponent]));
   } catch (cause) {
     setError(cause.message);
     byId("resultStatus").textContent = "조회에 실패했습니다.";
