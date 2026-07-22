@@ -44,14 +44,17 @@ function updateSearchState() {
   universityById("searchUniversities").disabled = !a || !b || a === b;
 }
 
-function renderPair(row) {
+function renderPair(row, universityA, universityB) {
   const totalGames = row.total[0] + row.total[1];
   const recentGames = row.recent[0] + row.recent[1];
-  return '<div class="university-pair">'
-    + '<div class="pair-identity"><b>' + universitySafe(row.playerA.name) + '</b><em>VS</em><b>' + universitySafe(row.playerB.name) + '</b></div>'
-    + '<div class="pair-score ' + (totalGames ? '' : 'no-games') + '">' + (totalGames ? '<span class="win">' + row.total[0] + '승</span> <span class="loss">' + row.total[1] + '패</span><small>승률 ' + Math.round(row.total[0] / totalGames * 1000) / 10 + '%</small>' : '전적 없음') + '</div>'
-    + '<div class="pair-score ' + (recentGames ? '' : 'no-games') + '">' + (recentGames ? '<span class="win">' + row.recent[0] + '승</span> <span class="loss">' + row.recent[1] + '패</span><small>최근 90일</small>' : '최근 전적 없음') + '</div>'
-    + '<div class="last-date">' + universitySafe(row.lastPlayed) + '</div></div>';
+  const rateA = totalGames ? Math.round(row.total[0] / totalGames * 1000) / 10 : 0;
+  const rateB = totalGames ? Math.round(row.total[1] / totalGames * 1000) / 10 : 0;
+  const recentRate = recentGames ? Math.round(row.recent[0] / recentGames * 1000) / 10 : 0;
+  return '<article class="university-duel-card"><div class="university-duel-stage">'
+    + '<div class="university-duel-side side-a"><small>' + universitySafe(universityA) + ' · ' + universitySafe(row.tier) + '티어</small><strong class="university-player-name">' + universitySafe(row.playerA.name) + '</strong><b class="university-duel-wins">' + row.total[0] + '</b><span>' + rateA + '% WINS</span></div>'
+    + '<div class="university-duel-center"><div class="university-vs-logo"><b>VS</b></div><div class="university-duel-recent"><span>최근 90일</span><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패</strong><em>' + recentRate + '%</em></div></div>'
+    + '<div class="university-duel-side side-b"><small>' + universitySafe(universityB) + ' · ' + universitySafe(row.tier) + '티어</small><strong class="university-player-name">' + universitySafe(row.playerB.name) + '</strong><b class="university-duel-wins">' + row.total[1] + '</b><span>' + rateB + '% WINS</span></div>'
+    + '</div><footer class="university-duel-meta"><span>전체 전적 <strong>' + (totalGames ? row.total[0] + '승 ' + row.total[1] + '패' : '전적 없음') + '</strong></span><span>최근 경기 <strong>' + universitySafe(row.lastPlayed) + '</strong></span></footer></article>';
 }
 
 function renderResults(data) {
@@ -65,7 +68,7 @@ function renderResults(data) {
   universityById("tierCount").textContent = data.tiers.length + "개 티어";
   universityById("tierResults").innerHTML = data.tiers.length ? data.tiers.map((tier) => {
     const rows = data.rows.filter((row) => row.tier === tier.tier);
-    return '<article class="tier-card"><header class="tier-head"><span class="tier-badge">' + universitySafe(tier.tier) + '</span><div><h3>' + universitySafe(tier.tier) + '티어 대결</h3><small>' + tier.pairCount + '개 교차 조합</small></div><div class="tier-totals"><span>총 전적<b>' + recordText(tier.total) + '</b></span><span>최근 90일<b>' + recordText(tier.recent) + '</b></span></div></header><div class="pair-table-head"><span>선수 조합</span><span>총 전적</span><span>최근 90일</span><span>최근 경기</span></div>' + rows.map(renderPair).join("") + '</article>';
+    return '<article class="tier-card"><header class="tier-head"><span class="tier-badge">' + universitySafe(tier.tier) + '</span><div><h3>' + universitySafe(tier.tier) + '티어 대결</h3><small>' + tier.pairCount + '개 교차 조합</small></div><div class="tier-totals"><span>총 전적<b>' + recordText(tier.total) + '</b></span><span>최근 90일<b>' + recordText(tier.recent) + '</b></span></div></header><div class="university-duel-list">' + rows.map((row) => renderPair(row, data.universityA, data.universityB)).join("") + '</div></article>';
   }).join("") : '<div class="university-empty">동일 티어 선수 조합이 없습니다.</div>';
 }
 
