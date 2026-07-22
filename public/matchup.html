@@ -31,7 +31,7 @@
           <button type="button" data-mode="many" class="selected">1 : 다수 비교</button>
           <button type="button" data-mode="group">다수 : 다수 비교 <b>NEW</b></button>
         </div>
-        <div class="picker-grid">
+        <div id="standardPicker" class="picker-grid">
           <div class="player-picker main-picker" data-side="main">
             <div class="picker-title"><span id="mainLabel">기준 선수</span><button id="clearMains" type="button">초기화</button></div>
             <div id="mainChips" class="chips" aria-live="polite"></div>
@@ -52,6 +52,19 @@
           <button id="clearAll" type="button">전체 초기화</button>
         </div>
         <div class="quick"><span id="quickLabel">상대 빠른 선택</span><div id="quickPlayers"></div></div>
+        <div id="pairEditor" class="pair-editor" hidden>
+          <div class="pair-editor-head">
+            <div><strong>A팀 선수와 B팀 선수를 한 줄씩 비교</strong><small>각 줄의 두 선수가 한 쌍으로 조회됩니다.</small></div>
+            <button id="resetPairs" type="button">전체 초기화</button>
+          </div>
+          <div class="pair-column-head"><span>A팀 선수</span><i></i><span>B팀 선수</span><i></i></div>
+          <div id="pairRows" class="pair-rows"></div>
+          <div class="pair-editor-actions">
+            <button id="addPairRow" class="add-pair-row" type="button">＋ 비교 행 추가</button>
+            <button id="searchAllPairs" class="matchup-search-button" type="button">입력한 전체 전적 비교 <span>→</span></button>
+          </div>
+        </div>
+        <datalist id="playerList"></datalist>
       </section>
 
       <section class="matchup-results">

@@ -2,6 +2,7 @@ const byId = (id) => document.getElementById(id);
 const state = {
   players: [], quick: [], quickStatus: "최근 전적 확인 중…",
   mains: ["이아깽"], opponents: [], rows: [], mode: "many",
+  pairs: Array.from({ length: 7 }, () => ({ main: "", opponent: "" })), lastPairs: [],
   range: "all", sort: "games", expanded: "", recommendationRequest: 0
 };
 const raceName = { T: "테란", Z: "저그", P: "프로토스" };
@@ -46,7 +47,39 @@ function renderPickers() {
       ? "기준 선수 1명과 상대 선수 1명을 선택하세요."
       : "기준 선수 1명 · 상대 " + state.opponents.length + "/12명";
   byId("searchButton").disabled = !state.mains.length || !state.opponents.length;
+  byId("playerList").innerHTML = state.players.map((item) => '<option value="' + safe(item.name) + '">' + raceName[item.race] + '</option>').join("");
   renderQuickPlayers();
+}
+
+function completePairs() {
+  return state.pairs.map((pair) => ({ main: pair.main.trim(), opponent: pair.opponent.trim() }))
+    .filter((pair) => pair.main && pair.opponent && pair.main !== pair.opponent);
+}
+
+function renderPairEditor() {
+  byId("pairRows").innerHTML = state.pairs.map((pair, index) => '<div class="pair-row">'
+    + '<input list="playerList" data-pair-index="' + index + '" data-pair-side="main" value="' + safe(pair.main) + '" placeholder="A팀 ' + (index + 1) + '번 선수" aria-label="A팀 ' + (index + 1) + '번 선수">'
+    + '<span>VS</span>'
+    + '<input list="playerList" data-pair-index="' + index + '" data-pair-side="opponent" value="' + safe(pair.opponent) + '" placeholder="B팀 ' + (index + 1) + '번 선수" aria-label="B팀 ' + (index + 1) + '번 선수">'
+    + '<button type="button" data-pair-search="' + index + '" ' + (!pair.main.trim() || !pair.opponent.trim() || pair.main.trim() === pair.opponent.trim() ? 'disabled' : '') + '>✓ 상대전적</button></div>').join("");
+  byId("searchAllPairs").disabled = !completePairs().length;
+  byId("addPairRow").disabled = state.pairs.length >= 12;
+  document.querySelectorAll("[data-pair-index]").forEach((input) => {
+    input.oninput = () => {
+      const pair = state.pairs[Number(input.dataset.pairIndex)];
+      pair[input.dataset.pairSide] = input.value;
+      const row = input.closest(".pair-row");
+      const compare = row.querySelector("[data-pair-search]");
+      compare.disabled = !pair.main.trim() || !pair.opponent.trim() || pair.main.trim() === pair.opponent.trim();
+      byId("searchAllPairs").disabled = !completePairs().length;
+      state.rows = [];
+      state.lastPairs = [];
+      renderResults();
+    };
+  });
+  document.querySelectorAll("[data-pair-search]").forEach((button) => {
+    button.onclick = () => searchPairs([state.pairs[Number(button.dataset.pairSearch)]], button);
+  });
 }
 
 function addPlayer(side, rawName) {
@@ -142,9 +175,11 @@ function renderResults() {
   byId("bestTitle").textContent = group ? "가장 우세한 조합" : "가장 우세한 상대";
   byId("bestDescription").textContent = group ? "A팀 관점 최고 승률 대결" : "선택한 상대 중 최고 승률";
   byId("latestDate").textContent = rows.map((row) => row.lastPlayed).filter((date) => date !== "경기 없음").sort((a, b) => b.localeCompare(a))[0] || "경기 없음";
-  byId("resultMain").textContent = group ? "A팀 " + state.mains.length + "명 vs B팀 " + state.opponents.length + "명" : (state.mains[0] || "-");
-  byId("resultHeading").textContent = group ? "팀 비교" : "기준 상대전적";
-  byId("resultStatus").textContent = rows.length ? rows.length + "개 대결 조합 · 총 " + (summary[0] + summary[1]) + "경기" : "검색할 선수를 선택해 주세요.";
+  byId("resultMain").textContent = group ? (state.lastPairs.length ? state.lastPairs.length + "개 짝" : "A팀 vs B팀") : (state.mains[0] || "-");
+  byId("resultHeading").textContent = group ? "선수별 비교" : "기준 상대전적";
+  byId("resultStatus").textContent = rows.length
+    ? rows.length + (group ? "개 선수 짝" : "개 대결 조합") + " · 총 " + (summary[0] + summary[1]) + "경기"
+    : (group ? "비교할 선수 짝을 입력해 주세요." : "검색할 선수를 선택해 주세요.");
   byId("recordRows").innerHTML = rows.length ? rows.map((row) => {
     const record = state.range === "all" ? row.total : row.recent;
     const rate = pct(record);
@@ -191,6 +226,7 @@ async function loadRecommendations(autoSearch = false) {
 }
 
 async function search() {
+  if (state.mode === "group") return searchPairs(completePairs(), byId("searchAllPairs"));
   if (!state.mains.length || !state.opponents.length) return setError("양쪽에서 비교할 선수를 한 명 이상 선택해 주세요.");
   if (state.mains.length * state.opponents.length > 36) return setError("전체 대결 조합은 최대 36개까지 가능합니다.");
   const button = byId("searchButton");
@@ -217,16 +253,50 @@ async function search() {
   }
 }
 
+async function searchPairs(rawPairs, button) {
+  const pairs = rawPairs.map((pair) => ({ main: String(pair.main || "").trim(), opponent: String(pair.opponent || "").trim() }))
+    .filter((pair) => pair.main && pair.opponent && pair.main !== pair.opponent);
+  if (!pairs.length) return setError("각 줄의 A팀 선수와 B팀 선수를 모두 입력해 주세요.");
+  if (pairs.length > 12) return setError("선수 짝은 최대 12개까지 비교할 수 있습니다.");
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.textContent = "불러오는 중…";
+  setError();
+  byId("resultStatus").textContent = "eloboard에서 최신 기록을 가져오고 있습니다.";
+  try {
+    const response = await fetch("/api/matchup/records", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pairs })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "전적을 불러오지 못했습니다.");
+    state.lastPairs = pairs;
+    state.rows = data.rows || [];
+    byId("updatedAt").textContent = "갱신 " + new Date(data.updatedAt).toLocaleTimeString("ko-KR");
+    renderResults();
+  } catch (cause) {
+    setError(cause.message);
+    byId("resultStatus").textContent = "조회에 실패했습니다.";
+  } finally {
+    button.innerHTML = original;
+    button.disabled = button.id === "searchAllPairs" ? !completePairs().length : false;
+  }
+}
+
 function setMode(mode) {
   state.mode = mode;
   document.querySelectorAll("[data-mode]").forEach((button) => button.classList.toggle("selected", button.dataset.mode === mode));
   if (mode !== "group") state.mains = state.mains.slice(0, 1);
   if (mode === "one") state.opponents = state.opponents.slice(0, 1);
-  if (mode === "group") state.opponents = state.opponents.slice(0, 6);
   state.rows = [];
+  state.lastPairs = [];
   state.expanded = "";
   setError();
+  byId("standardPicker").hidden = mode === "group";
+  byId("clearAll").parentElement.hidden = mode === "group";
+  byId("quickPlayers").parentElement.hidden = mode === "group";
+  byId("pairEditor").hidden = mode !== "group";
   renderPickers();
+  renderPairEditor();
   renderResults();
 }
 
@@ -249,6 +319,20 @@ byId("clearMains").onclick = () => clearSide("main");
 byId("clearOpponents").onclick = () => clearSide("opponent");
 byId("clearAll").onclick = () => { state.mains = []; state.opponents = []; clearSide("main"); };
 byId("searchButton").onclick = search;
+byId("searchAllPairs").onclick = search;
+byId("addPairRow").onclick = () => {
+  if (state.pairs.length >= 12) return;
+  state.pairs.push({ main: "", opponent: "" });
+  renderPairEditor();
+};
+byId("resetPairs").onclick = () => {
+  state.pairs = Array.from({ length: 7 }, () => ({ main: "", opponent: "" }));
+  state.rows = [];
+  state.lastPairs = [];
+  setError();
+  renderPairEditor();
+  renderResults();
+};
 byId("sortSelect").onchange = (event) => { state.sort = event.target.value; renderResults(); };
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".main-picker")) byId("mainSuggestions").hidden = true;
@@ -258,6 +342,7 @@ document.addEventListener("click", (event) => {
 async function boot() {
   state.players = fallback;
   renderPickers();
+  renderPairEditor();
   renderResults();
   try {
     const response = await fetch("/api/matchup/players");
