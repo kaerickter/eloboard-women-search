@@ -1,6 +1,7 @@
 (function () {
   "use strict";
   const CLIENT_KEY = "eloboard.collaboration.clientId";
+  const ROOM_KEY_PREFIX = "eloboard.collaboration.room.";
   let clientId = sessionStorage.getItem(CLIENT_KEY);
   if (!clientId) {
     clientId = (crypto.randomUUID?.() || Math.random().toString(36).slice(2)) + Date.now().toString(36);
@@ -8,6 +9,16 @@
   }
 
   function roomFromUrl() { return new URL(location.href).searchParams.get("room")?.trim().toUpperCase() || ""; }
+  function savedRoom(feature) {
+    try { return localStorage.getItem(ROOM_KEY_PREFIX + feature)?.trim().toUpperCase() || ""; }
+    catch { return ""; }
+  }
+  function rememberRoom(feature, code) {
+    try {
+      if (code) localStorage.setItem(ROOM_KEY_PREFIX + feature, code);
+      else localStorage.removeItem(ROOM_KEY_PREFIX + feature);
+    } catch {}
+  }
   function setRoomInUrl(code) {
     const url = new URL(location.href);
     if (code) url.searchParams.set("room", code); else url.searchParams.delete("room");
@@ -50,7 +61,7 @@
       if (!this.socket) return this.setStatus("실시간 모듈을 불러오지 못했습니다.", false);
       this.socket.on("connect", () => {
         this.setStatus(this.code ? "실시간 연결됨" : "방을 만들거나 참여해 주세요.", true);
-        const requested = this.code || roomFromUrl();
+        const requested = this.code || roomFromUrl() || savedRoom(this.feature);
         if (requested) this.join(requested, true);
       });
       this.socket.on("disconnect", () => this.setStatus("연결이 끊겨 재접속 중…", false));
@@ -82,6 +93,7 @@
       this.input.value = this.code;
       this.roomPanel.hidden = false;
       this.root.querySelector(".collaboration-code").textContent = `방 ${this.code}`;
+      rememberRoom(this.feature, this.code);
       setRoomInUrl(this.code);
       this.applyState(result.state, { remote: true, joined: true });
       this.setStatus("실시간 연결됨", true);
@@ -104,7 +116,11 @@
       this.socket.emit("room:join", { feature: this.feature, code }, result => {
         this.setBusy(false);
         if (!result?.ok) {
-          if (!quiet) this.setStatus(result?.error || "방에 참여하지 못했습니다.", false);
+          if (quiet && code === savedRoom(this.feature)) {
+            rememberRoom(this.feature, "");
+            if (roomFromUrl() === code) setRoomInUrl("");
+          }
+          this.setStatus(result?.error || "방에 참여하지 못했습니다.", false);
           return;
         }
         this.activate(result);
