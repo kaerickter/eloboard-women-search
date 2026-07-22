@@ -19,8 +19,17 @@ function avatarMarkup(name, className = "matchup-photo") {
   return '<span class="' + className + '">' + (image ? '<img src="' + safe(image) + '" alt="' + safe(name) + ' 프로필 사진">' : '') + '<b aria-hidden="true">' + safe(initial) + '</b></span>';
 }
 
+function duelPlayerMarkup(name) {
+  const p = player(name);
+  const initial = Array.from(String(name || "?").trim())[0] || "?";
+  const image = state.photos[name];
+  return '<figure class="duel-player"><span class="duel-photo"><b>' + safe(initial) + '</b>'
+    + (image ? '<img src="' + safe(image) + '" alt="' + safe(name) + ' 선수 사진">' : '')
+    + '</span><figcaption>' + safe(name) + '<em>' + safe(p.race) + '</em></figcaption></figure>';
+}
+
 function bindImageFallbacks(root = document) {
-  root.querySelectorAll(".matchup-photo img").forEach((image) => {
+  root.querySelectorAll(".matchup-photo img,.duel-photo img,.duel-logo img").forEach((image) => {
     const fallback = () => { image.hidden = true; };
     image.addEventListener("error", fallback);
     if (image.complete && !image.naturalWidth) fallback();
@@ -220,15 +229,20 @@ function renderResults() {
   byId("recordRows").innerHTML = rows.length ? rows.map((row) => {
     const record = state.range === "all" ? row.total : row.recent;
     const rate = pct(record);
-    const p = player(row.opponent);
     const key = row.main + "|" + row.opponent;
     const recentRate = pct(row.recent);
-    const playerLabel = safe(group ? row.main + " vs " + row.opponent : row.opponent);
-    const identity = group
-      ? '<span class="matchup-pair-identity"><span>' + avatarMarkup(row.main) + '<b>' + safe(row.main) + '</b></span><em>VS</em><span>' + avatarMarkup(row.opponent) + '<b>' + safe(row.opponent) + '</b></span></span>'
-      : '<span class="matchup-player">' + avatarMarkup(row.opponent) + '<span><b>' + playerLabel + '</b><small>' + raceName[p.race] + '</small></span></span>';
+    const opponentRate = record[0] + record[1] ? Math.round((record[1] / (record[0] + record[1])) * 1000) / 10 : 0;
     const detail = state.expanded === key ? '<div class="match-detail">' + (row.maps.length ? row.maps.map((match) => '<span><b class="' + (match.result === "승" ? "win" : "loss") + '">' + match.result + '</b>' + safe(match.date) + ' · ' + safe(match.map) + '</span>').join("") : "등록된 맞대결이 없습니다.") + '</div>' : "";
-    return '<article class="record-graph-card"><div class="graph-card-head">' + identity + '<span class="last-played">최근 경기 <b>' + safe(row.lastPlayed) + '</b></span></div><div class="graph-card-body"><div class="donut" style="--rate:' + rate + '"><div><strong>' + rate + '%</strong><small>승률</small></div></div><div class="graph-stats"><div class="score-pair"><span><small>WIN</small><strong>' + record[0] + '<em>승</em></strong></span><i></i><span class="loss"><small>LOSS</small><strong>' + record[1] + '<em>패</em></strong></span></div><div class="battle-bar" aria-label="승률 ' + rate + '%"><i class="win-bar" style="width:' + rate + '%"></i><i class="loss-bar" style="width:' + (100-rate) + '%"></i></div><div class="bar-labels"><span>승리 ' + rate + '%</span><span>패배 ' + (100-rate) + '%</span></div></div></div><div class="recent-panel"><div><span>최근 90일</span><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패</strong></div><div class="recent-meter"><i style="width:' + recentRate + '%"></i></div><b>' + recentRate + '%</b><button class="details" type="button" data-detail="' + safe(key) + '" aria-label="상세 경기 ' + (state.expanded === key ? "닫기" : "열기") + '">' + (state.expanded === key ? "−" : "+") + '</button></div>' + detail + '</article>';
+    return '<article class="men-duel-card matchup-duel-card"><div class="duel-stage">'
+      + duelPlayerMarkup(row.main)
+      + '<div class="duel-score duel-score-one"><strong>' + record[0] + '</strong><span>' + rate + '% WINS</span><small>' + record[0] + '승</small></div>'
+      + '<div class="duel-logo"><img src="https://eloboard.com/men/img/vs_01.png" alt="VS"><b>VS</b></div>'
+      + '<div class="duel-score duel-score-two"><strong>' + record[1] + '</strong><span>' + opponentRate + '% WINS</span><small>' + record[1] + '승</small></div>'
+      + duelPlayerMarkup(row.opponent)
+      + '</div><div class="duel-record-meta"><span><small>조회 범위</small><strong>' + (state.range === "all" ? "전체 전적" : "최근 90일") + '</strong></span>'
+      + '<span><small>최근 90일</small><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패 · ' + recentRate + '%</strong></span>'
+      + '<span><small>최근 경기</small><strong>' + safe(row.lastPlayed) + '</strong></span>'
+      + '<button class="details duel-detail-button" type="button" data-detail="' + safe(key) + '" aria-label="상세 경기 ' + (state.expanded === key ? "닫기" : "열기") + '">' + (state.expanded === key ? "상세 닫기 −" : "상세 보기 +") + '</button></div>' + detail + '</article>';
   }).join("") : '<div class="empty-row">검색 결과가 없습니다.</div>';
   bindImageFallbacks(byId("recordRows"));
   bindImageFallbacks(byId("resultAvatar"));
