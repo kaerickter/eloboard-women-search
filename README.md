@@ -86,7 +86,21 @@ npm start
 
 ### Render 배포
 
-기존 Render 서비스에 이 폴더를 반영한 뒤 다시 배포합니다. Build Command는 비워 두거나 `npm install`, Start Command는 `npm start`로 설정합니다. 서버는 Render가 제공하는 `PORT` 환경 변수를 자동으로 사용합니다. 별도의 데이터베이스나 비밀키는 필요하지 않습니다.
+기존 Render 서비스에 이 폴더를 반영한 뒤 다시 배포합니다. Build Command는 `npm install`, Start Command는 `npm start`로 설정합니다. 서버는 Render가 제공하는 `PORT` 환경 변수를 자동으로 사용합니다.
+
+저장 데이터가 재배포나 무료 인스턴스 절전 뒤에도 유지되게 하려면 PostgreSQL 연결이 필요합니다. 저장소의 `render.yaml`을 Blueprint로 적용하면 웹 서비스와 `elo-kitten-rooms` 데이터베이스, `DATABASE_URL` 연결이 함께 설정됩니다. 기존 서비스를 직접 관리한다면 Render PostgreSQL을 만든 다음 Internal Database URL을 웹 서비스의 `DATABASE_URL` 환경 변수로 등록해도 됩니다. `DATABASE_URL`이 없는 로컬 개발 환경에서는 `data/collaboration-rooms.json`을 사용합니다.
+
+Render 무료 PostgreSQL은 생성 후 30일에 만료되므로 장기 운영 시 데이터베이스만 유료 플랜으로 올리거나, 호환되는 외부 PostgreSQL의 연결 주소를 `DATABASE_URL`에 설정해야 합니다.
+
+### 실시간 공동 편집 사용법
+
+`빙고판 열기`, `킬 내기`, `매치 점수판` 상단에서 **새 방 만들기**를 누른 뒤 표시되는 6자리 방 코드나 **링크 복사**로 다른 사람을 초대합니다. 초대받은 사람은 링크를 열거나 같은 기능 화면에서 코드를 입력하고 **참여**를 누릅니다.
+
+- 세 기능은 서로 다른 상태 공간을 사용하므로 같은 코드가 우연히 겹쳐도 데이터가 섞이지 않습니다.
+- 새 참여자는 서버에 저장된 최신 상태를 즉시 불러옵니다.
+- 입력 필드 변경은 항목별로 동기화되고, 킬 수 증감은 동시 클릭을 합산합니다.
+- **방 초기화**는 해당 방의 모든 참여자에게 즉시 적용됩니다.
+- 방을 만들기 전에는 기존처럼 이 브라우저에 자동 저장됩니다.
 
 추가된 API:
 

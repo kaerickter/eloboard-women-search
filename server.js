@@ -2,6 +2,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const { Server: SocketIOServer } = require("socket.io");
+const { setupCollaboration } = require("./collaboration-server");
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
@@ -645,7 +647,7 @@ function lanUrls(port) {
   }
   return urls;
 }
-http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, "");
   if (url.pathname === "/api/universities" && req.method === "GET") {
@@ -811,8 +813,21 @@ http.createServer(async (req, res) => {
     }
   }
   serveStatic(req, res);
-}).listen(PORT, "0.0.0.0", () => {
-  console.log("ELOBoard board search app: http://localhost:" + PORT);
-  for (const url of lanUrls(PORT)) console.log("LAN: " + url);
 });
+
+const io = new SocketIOServer(server, {
+  cors: { origin: true, methods: ["GET", "POST"] },
+  maxHttpBufferSize: 200000,
+  transports: ["polling", "websocket"]
+});
+
+setupCollaboration(io)
+  .then(() => server.listen(PORT, "0.0.0.0", () => {
+    console.log("ELOBoard board search app: http://localhost:" + PORT);
+    for (const url of lanUrls(PORT)) console.log("LAN: " + url);
+  }))
+  .catch((error) => {
+    console.error("Collaborative storage initialization failed:", error);
+    process.exitCode = 1;
+  });
 

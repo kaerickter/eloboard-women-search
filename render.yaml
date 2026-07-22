@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: elo-kitten
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: elo-kitten-rooms
+          property: connectionString
+
+databases:
+  - name: elo-kitten-rooms
+    plan: free
+    databaseName: elo_kitten_rooms
+    user: elo_kitten
