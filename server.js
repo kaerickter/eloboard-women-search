@@ -27,6 +27,13 @@ function decodeEntities(value) {
 function cleanText(value) {
   return decodeEntities(value).replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
+function profileImageFromHtml(html) {
+  const tagged = html.match(/<img\b[^>]*itemprop=["']image["'][^>]*>/i)?.[0] || "";
+  const candidate = tagged.match(/(?:content|src)=["']([^"']+)["']/i)?.[1]
+    || html.match(/<img\b[^>]*src=["']([^"']*\/data\/file\/bj_list\/[^"']+)["']/i)?.[1]
+    || "";
+  return candidate ? absoluteUrl(candidate.replace(/&amp;/g, "&")) : "";
+}
 function normalizeName(name) {
   return String(name || "").replace(/\s+/g, "").trim().toLowerCase();
 }
@@ -255,6 +262,7 @@ function parseProfile(html, wrId) {
     wrId: String(wrId),
     name,
     url: playerUrl(wrId),
+    image: profileImageFromHtml(html),
     info,
     total,
     women,
@@ -354,6 +362,24 @@ async function findMatchupProfile(name) {
   const wrId = html.match(/(?:&amp;|&)wr_id=(\d+)/i)?.[1] || "";
   return wrId ? loadProfile(wrId) : null;
 }
+async function loadMatchupPhotos(rawNames) {
+  const names = [...new Set((rawNames || []).map((name) => String(name || "").trim()).filter(Boolean))].slice(0, 24);
+  const photos = {};
+  let cursor = 0;
+  async function worker() {
+    while (cursor < names.length) {
+      const name = names[cursor++];
+      try {
+        const profile = await findMatchupProfile(name);
+        photos[name] = profile?.image || "";
+      } catch {
+        photos[name] = "";
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, names.length) }, () => worker()));
+  return photos;
+}
 function recentOpponentRecommendations(profile, days = 90) {
   const rows = profile?.matches || [];
   const cutoff = new Date();
@@ -437,6 +463,19 @@ http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ main: profile.name || main, recommendations, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "최근 상대 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/matchup/photos" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const names = Array.isArray(body.names) ? body.names : [];
+      if (!names.length || names.length > 24) {
+        return send(res, 400, JSON.stringify({ error: "사진을 조회할 선수는 최대 24명까지 선택할 수 있습니다." }), "application/json; charset=utf-8");
+      }
+      const photos = await loadMatchupPhotos(names);
+      return send(res, 200, JSON.stringify({ photos, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "선수 사진을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/matchup/records" && req.method === "POST") {
