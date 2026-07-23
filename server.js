@@ -19,6 +19,33 @@ const SOOP_LIVE_SEARCH_API = "https://sch.sooplive.co.kr/api.php";
 const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
+const PINNED_SOOP_ALIASES = {
+  "려원님": {
+    broadcastId: "fudnjs0235",
+    searchName: "려원♡",
+    stationNames: ["려원♡", "려원기획사"]
+  },
+  "려워님": {
+    broadcastId: "fudnjs0235",
+    searchName: "려원♡",
+    stationNames: ["려원♡", "려원기획사"]
+  },
+  "려원": {
+    broadcastId: "fudnjs0235",
+    searchName: "려원♡",
+    stationNames: ["려원♡", "려원기획사"]
+  },
+  "임조이": {
+    broadcastId: "dlaguswl501",
+    searchName: "임조이1111",
+    stationNames: ["임조이1111", "Imzoe"]
+  },
+  "임조이님": {
+    broadcastId: "dlaguswl501",
+    searchName: "임조이1111",
+    stationNames: ["임조이1111", "Imzoe"]
+  }
+};
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
@@ -50,6 +77,7 @@ try {
 } catch {
   channelAliases = {};
 }
+channelAliases = { ...channelAliases, ...PINNED_SOOP_ALIASES };
 
 try {
   const savedTierRoster = JSON.parse(fs.readFileSync(TIER_ROSTER_FILE, "utf8"));
@@ -104,6 +132,7 @@ function allowedSoopNames(name) {
   const alias = manualSoopAlias(name);
   return [...new Set([
     name,
+    alias?.searchName,
     ...(Array.isArray(alias?.stationNames) ? alias.stationNames : [])
   ].map(normalizeSoopName).filter(Boolean))];
 }
@@ -828,7 +857,9 @@ async function fetchSoopLiveStatus(name, force = false) {
       data?.station?.station_name,
       data?.station?.user_nick
     ].map(normalizeSoopName).filter(Boolean);
-    if (stationNames.length && !stationNames.some((stationName) => acceptedNames.includes(stationName))) {
+    const pinnedBroadcastId = String(manualSoopAlias(name)?.broadcastId || "");
+    const usesPinnedChannel = Boolean(pinnedBroadcastId) && pinnedBroadcastId === channel.broadcastId;
+    if (!usesPinnedChannel && stationNames.length && !stationNames.some((stationName) => acceptedNames.includes(stationName))) {
       const key = normalizePlayerName(name);
       channelRegistry[key] = null;
       channelCache.delete(key);
@@ -996,7 +1027,16 @@ const server = http.createServer(async (req, res) => {
       if (!names.length || names.length > 200) {
         return send(res, 400, JSON.stringify({ error: "방송 상태는 선수 1~200명까지 조회할 수 있습니다." }), "application/json; charset=utf-8");
       }
-      const statuses = await mapConcurrent(names, 24, (name) => fetchSoopLiveStatus(name, force));
+      const prioritizedNames = [...names].sort((nameA, nameB) => {
+        return Number(Boolean(manualSoopAlias(nameB))) - Number(Boolean(manualSoopAlias(nameA)));
+      });
+      const prioritizedStatuses = await mapConcurrent(prioritizedNames, 24, (name) => fetchSoopLiveStatus(name, force));
+      const statusByName = new Map(prioritizedStatuses.map((status) => [normalizePlayerName(status.name), status]));
+      const statuses = names.map((name) => statusByName.get(normalizePlayerName(name)) || {
+        name,
+        available: false,
+        isLive: false
+      });
       return send(res, 200, JSON.stringify({
         statuses,
         cacheSeconds: Math.round(LIVE_CACHE_MS / 1000),
