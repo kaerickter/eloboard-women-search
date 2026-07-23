@@ -186,11 +186,25 @@ async function loadRoster(force = false) {
     state.players = Array.isArray(data.players) ? data.players : [];
     render();
     await loadLive();
+    if (data.refreshing) await syncDailyRoster();
   } catch (error) {
     board.innerHTML = '<div class="empty-card">' + escapeHtml(error.message) + "</div>";
     statusLine.textContent = "잠시 후 새로고침해 주세요.";
   } finally {
     refreshButton.disabled = false;
+  }
+}
+
+async function syncDailyRoster() {
+  try {
+    const response = await fetch("/api/tiers?wait=1");
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.players) || !data.players.length) return;
+    state.players = data.players;
+    render();
+    await loadLive();
+  } catch {
+    // 저장된 명단은 이미 표시 중이므로 다음 방문에서 다시 시도합니다.
   }
 }
 
