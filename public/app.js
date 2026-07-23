@@ -120,6 +120,24 @@ function periodStats(rows) {
   return { games, wins, losses, rate };
 }
 
+function currentMatchDay(now = new Date()) {
+  const korea = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  const beforeReset = korea.getUTCHours() < 6
+    || (korea.getUTCHours() === 6 && korea.getUTCMinutes() === 0);
+  if (beforeReset) korea.setUTCDate(korea.getUTCDate() - 1);
+  const year = korea.getUTCFullYear();
+  const month = String(korea.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(korea.getUTCDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function setPeriodValues(prefix, stats) {
+  $(prefix + "Games").textContent = stats.games;
+  $(prefix + "Wins").textContent = stats.wins;
+  $(prefix + "Losses").textContent = stats.losses;
+  $(prefix + "Rate").textContent = stats.rate + "%";
+}
+
 function setSelectOptions(select, values, suffix) {
   select.innerHTML = values.map((value) => '<option value="' + value + '">' + value + suffix + '</option>').join("");
 }
@@ -191,14 +209,9 @@ function renderPeriod(data) {
     $("periodLabel").textContent = TXT.noPeriod;
     $("yearRowLabel").textContent = "\ud574\ub2f9\ub144\ub3c4";
     $("monthRowLabel").textContent = "\ub2f9\uc6d4";
-    $("yearGames").textContent = "0";
-    $("yearWins").textContent = "0";
-    $("yearLosses").textContent = "0";
-    $("yearRate").textContent = "0%";
-    $("monthGames").textContent = "0";
-    $("monthWins").textContent = "0";
-    $("monthLosses").textContent = "0";
-    $("monthRate").textContent = "0%";
+    setPeriodValues("year", { games: 0, wins: 0, losses: 0, rate: 0 });
+    setPeriodValues("month", { games: 0, wins: 0, losses: 0, rate: 0 });
+    setPeriodValues("day", { games: 0, wins: 0, losses: 0, rate: 0 });
     return;
   }
 
@@ -215,18 +228,17 @@ function renderPeriod(data) {
 
   const yearRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-"));
   const monthRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-" + state.selectedMonth));
+  const matchDay = currentMatchDay();
+  const dayRows = rows.filter((row) => String(row.date || "") === matchDay);
   const year = periodStats(yearRows);
   const month = periodStats(monthRows);
+  const day = periodStats(dayRows);
 
   $("periodLabel").textContent = (data.profile.name || state.query) + " \u00b7 " + TXT.periodBasis;
-  $("yearGames").textContent = year.games;
-  $("yearWins").textContent = year.wins;
-  $("yearLosses").textContent = year.losses;
-  $("yearRate").textContent = year.rate + "%";
-  $("monthGames").textContent = month.games;
-  $("monthWins").textContent = month.wins;
-  $("monthLosses").textContent = month.losses;
-  $("monthRate").textContent = month.rate + "%";
+  $("dayRowLabel").title = matchDay + " 06:01부터 다음 날 06:00까지";
+  setPeriodValues("year", year);
+  setPeriodValues("month", month);
+  setPeriodValues("day", day);
 }
 
 function renderProfile(data) {
