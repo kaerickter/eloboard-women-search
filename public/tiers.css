@@ -168,7 +168,6 @@ h1 {
 }
 
 .race-heading strong { font-size: 14px; font-weight: 950; }
-.race-heading span { font-size: 10px; font-weight: 800; opacity: .82; }
 .race-terran > .race-heading { background: #3974bf; }
 .race-protoss > .race-heading { background: #d98027; }
 .race-zerg > .race-heading { background: #ce4c58; }

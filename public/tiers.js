@@ -80,7 +80,7 @@ function raceSection(players, race) {
   if (!racePlayers.length) return "";
   return [
     '<section class="race-group race-' + race.className + '" aria-label="' + race.label + '">',
-    '<header class="race-heading"><strong>' + race.label + '</strong><span>' + racePlayers.length + "명</span></header>",
+    '<header class="race-heading"><strong>' + race.label + "</strong></header>",
     '<div class="tier-cards">' + racePlayers.map(playerCard).join("") + "</div>",
     "</section>"
   ].join("");
@@ -104,7 +104,7 @@ function render() {
     const unknownPlayers = players.filter((player) => !RACE_GROUPS.some((race) => race.code === player.race));
     const unknownSection = unknownPlayers.length
       ? '<section class="race-group race-unknown" aria-label="종족 미확인">' +
-        '<header class="race-heading"><strong>미확인</strong><span>' + unknownPlayers.length + "명</span></header>" +
+        '<header class="race-heading"><strong>미확인</strong></header>' +
         '<div class="tier-cards">' + unknownPlayers.map(playerCard).join("") + "</div></section>"
       : "";
 
@@ -190,18 +190,11 @@ async function loadLive() {
   countdown.textContent = "LIVE 확인 중";
   try {
     const names = state.players.map((player) => player.name);
-    const batches = [];
-    for (let index = 0; index < names.length; index += 24) batches.push(names.slice(index, index + 24));
+    const response = await fetch("/api/live-status?refresh=1&names=" + encodeURIComponent(names.join(",")));
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
     const nextStatuses = new Map();
-    for (let index = 0; index < batches.length; index += 1) {
-      countdown.textContent = "LIVE 확인 " + (index + 1) + "/" + batches.length;
-      const response = await fetch("/api/live-status?refresh=1&names=" + encodeURIComponent(batches[index].join(",")));
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
-      for (const item of data.statuses || []) nextStatuses.set(keyOf(item.name), item);
-      state.liveByName = new Map(nextStatuses);
-      render();
-    }
+    for (const item of data.statuses || []) nextStatuses.set(keyOf(item.name), item);
     state.liveByName = nextStatuses;
     const liveCount = [...state.liveByName.values()].filter((item) => item.isLive).length;
     statusLine.textContent = liveCount
