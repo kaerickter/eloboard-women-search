@@ -14,6 +14,7 @@ const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
 const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_list";
 const MEN_SEARCH_URL = "https://eloboard.com/men/bbs/search_bj_list.php";
 const UNIVERSITY_LIST_URL = "https://eloboard.com/univ/bbs/board.php?bo_table=all_bj_list";
+const SOOP_STATION_API = "https://chapi.sooplive.co.kr/api";
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
@@ -22,7 +23,12 @@ let playerIndexCache = null;
 let profileCache = new Map();
 let universityCache = null;
 let universityRosterCache = new Map();
+let tierRosterCache = null;
+let channelCache = new Map();
+let liveStatusCache = new Map();
 const CACHE_MS = 1000 * 60 * 3;
+const LIVE_CACHE_MS = 1000 * 45;
+const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 
 function send(res, status, body, type = "text/plain; charset=utf-8") {
   res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" });
@@ -41,8 +47,17 @@ function profileImageFromHtml(html) {
     || "";
   return candidate ? absoluteUrl(candidate.replace(/&amp;/g, "&")) : "";
 }
+function soopChannelFromHtml(html) {
+  const match = String(html || "").match(/https?:\/\/(?:bj\.afreecatv\.com|ch\.sooplive\.co\.kr|play\.sooplive\.co\.kr)\/([a-z0-9_-]+)/i);
+  if (!match) return null;
+  const broadcastId = match[1];
+  return { broadcastId, broadcastUrl: "https://play.sooplive.co.kr/" + encodeURIComponent(broadcastId) };
+}
 function normalizeName(name) {
   return String(name || "").replace(/\s+/g, "").trim().toLowerCase();
+}
+function normalizePlayerName(name) {
+  return normalizeName(name).replace(/[tzp]$/i, "");
 }
 function absoluteUrl(href) {
   if (!href) return "";
@@ -265,11 +280,14 @@ function parseProfile(html, wrId) {
   if (eloMatch) info.womenElo = eloMatch[1];
   if (ladderMatch) info.ladder = ladderMatch[1];
   if (univMatch) info.university = univMatch[1];
+  const soop = soopChannelFromHtml(html);
   return {
     wrId: String(wrId),
     name,
     url: playerUrl(wrId),
     image: profileImageFromHtml(html),
+    broadcastId: soop?.broadcastId || "",
+    broadcastUrl: soop?.broadcastUrl || "",
     info,
     total,
     women,
@@ -517,10 +535,19 @@ function parseUniversityRoster(html, university) {
     const tier = tierMatch?.[1]?.trim() || "";
     if (!name || !tier || seen.has(name)) continue;
     const image = anchor.match(/<img\b[^>]*src=["']([^"']+)["']/i)?.[1] || "";
+    const href = anchor.match(/\bhref=["']([^"']+)["']/i)?.[1] || "";
     const division = /\/men\//i.test(image) ? "men" : /\/women\//i.test(image) ? "women" : "unknown";
     const race = (anchor.match(/\b(?:Terran|Zerg|Protoss)\b/i)?.[0] || "").slice(0, 1).toUpperCase();
     seen.add(name);
-    players.push({ name, tier, division, race, university });
+    players.push({
+      name,
+      tier,
+      division,
+      race,
+      university,
+      image: absoluteUrl(image.replace(/&amp;/g, "&")),
+      profileUrl: absoluteUrl(href.replace(/&amp;/g, "&"))
+    });
   }
   return players;
 }
@@ -547,6 +574,86 @@ async function loadUniversityRoster(name, force = false) {
   if (!players.length) throw new Error(name + " 소속 선수를 찾지 못했습니다.");
   universityRosterCache.set(name, { cacheTime: Date.now(), players });
   return players;
+}
+
+async function loadTierRoster(force = false) {
+  if (!force && tierRosterCache && Date.now() - tierRosterCache.cacheTime < CACHE_MS * 10) return tierRosterCache.players;
+  const universities = await loadUniversities(force);
+  const rosters = await mapConcurrent(universities, 5, (university) => loadUniversityRoster(university.name, force));
+  const players = new Map();
+  for (const player of rosters.flat()) {
+    if (!/^\d+$/.test(player.tier) || player.division === "men") continue;
+    const key = normalizeName(player.name);
+    const current = players.get(key);
+    if (!current) {
+      players.set(key, { ...player, universities: [player.university] });
+    } else if (!current.universities.includes(player.university)) {
+      current.universities.push(player.university);
+    }
+  }
+  const data = [...players.values()].sort((a, b) => Number(a.tier) - Number(b.tier) || a.name.localeCompare(b.name, "ko"));
+  tierRosterCache = { cacheTime: Date.now(), players: data };
+  return data;
+}
+
+async function discoverSoopChannel(name) {
+  const key = normalizePlayerName(name);
+  const cached = channelCache.get(key);
+  if (cached && Date.now() - cached.cacheTime < CHANNEL_CACHE_MS) return cached.channel;
+  try {
+    const players = await loadPlayerIndex();
+    const player = players.find((item) => normalizePlayerName(item.name) === key);
+    const profile = player ? await loadProfile(player.wrId) : null;
+    const channel = profile?.broadcastId
+      ? { broadcastId: profile.broadcastId, broadcastUrl: profile.broadcastUrl }
+      : null;
+    channelCache.set(key, { cacheTime: Date.now(), channel });
+    return channel;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchSoopLiveStatus(name) {
+  const channel = await discoverSoopChannel(name);
+  if (!channel) return { name, available: false, isLive: false };
+  const cached = liveStatusCache.get(channel.broadcastId);
+  if (cached && Date.now() - cached.cacheTime < LIVE_CACHE_MS) return { name, ...cached.status };
+  try {
+    const response = await fetch(SOOP_STATION_API + "/" + encodeURIComponent(channel.broadcastId) + "/station", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 elo-kitten live-status",
+        "Accept": "application/json",
+        "Referer": "https://ch.sooplive.co.kr/"
+      }
+    });
+    if (!response.ok) throw new Error("SOOP status " + response.status);
+    const data = await response.json();
+    const broad = data?.broad || null;
+    const broadNo = String(broad?.broad_no || broad?.bno || "");
+    const status = {
+      available: true,
+      isLive: Boolean(broadNo),
+      broadcastId: channel.broadcastId,
+      broadcastUrl: broadNo
+        ? "https://play.sooplive.co.kr/" + encodeURIComponent(channel.broadcastId) + "/" + encodeURIComponent(broadNo)
+        : channel.broadcastUrl,
+      title: String(broad?.broad_title || broad?.title || ""),
+      viewerCount: Number(broad?.current_sum_viewer || broad?.current_viewer || broad?.viewer_count || 0),
+      thumbnail: broadNo ? "https://liveimg.sooplive.co.kr/m/" + encodeURIComponent(broadNo) : "",
+      profileImage: String(data?.profile_image || "")
+    };
+    liveStatusCache.set(channel.broadcastId, { cacheTime: Date.now(), status });
+    return { name, ...status };
+  } catch {
+    return {
+      name,
+      available: false,
+      isLive: false,
+      broadcastId: channel.broadcastId,
+      broadcastUrl: channel.broadcastUrl
+    };
+  }
 }
 
 function compactDate(value) {
@@ -650,6 +757,38 @@ function lanUrls(port) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname === "/api/tiers" && req.method === "GET") {
+    try {
+      const force = url.searchParams.get("refresh") === "1";
+      const players = await loadTierRoster(force);
+      return send(res, 200, JSON.stringify({
+        players,
+        source: UNIVERSITY_LIST_URL,
+        updatedAt: new Date().toISOString()
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "티어 명단을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/live-status" && req.method === "GET") {
+    try {
+      const names = [...new Set(String(url.searchParams.get("names") || "")
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean))];
+      if (!names.length || names.length > 200) {
+        return send(res, 400, JSON.stringify({ error: "방송 상태는 선수 1~200명까지 조회할 수 있습니다." }), "application/json; charset=utf-8");
+      }
+      const statuses = await mapConcurrent(names, 6, fetchSoopLiveStatus);
+      return send(res, 200, JSON.stringify({
+        statuses,
+        cacheSeconds: Math.round(LIVE_CACHE_MS / 1000),
+        updatedAt: new Date().toISOString()
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "방송 상태를 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/universities" && req.method === "GET") {
     try {
       const force = url.searchParams.get("refresh") === "1";
