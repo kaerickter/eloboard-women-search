@@ -17,6 +17,7 @@ const UNIVERSITY_LIST_URL = "https://eloboard.com/univ/bbs/board.php?bo_table=al
 const SOOP_STATION_API = "https://chapi.sooplive.co.kr/api";
 const SOOP_LIVE_SEARCH_API = "https://sch.sooplive.co.kr/api.php";
 const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
+const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
@@ -27,6 +28,7 @@ let profileCache = new Map();
 let universityCache = null;
 let universityRosterCache = new Map();
 let tierRosterCache = null;
+let tierRosterPromise = null;
 let channelCache = new Map();
 let liveStatusCache = new Map();
 let channelRegistry = {};
@@ -34,11 +36,24 @@ let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 45;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
+const TIER_CACHE_MS = 1000 * 60 * 30;
 
 try {
   channelRegistry = JSON.parse(fs.readFileSync(SOOP_CHANNEL_FILE, "utf8"));
 } catch {
   channelRegistry = {};
+}
+
+try {
+  const savedTierRoster = JSON.parse(fs.readFileSync(TIER_ROSTER_FILE, "utf8"));
+  if (Array.isArray(savedTierRoster?.players) && savedTierRoster.players.length) {
+    tierRosterCache = {
+      cacheTime: Number(new Date(savedTierRoster.updatedAt)) || 0,
+      players: savedTierRoster.players
+    };
+  }
+} catch {
+  tierRosterCache = null;
 }
 
 function send(res, status, body, type = "text/plain; charset=utf-8") {
@@ -69,6 +84,11 @@ function normalizeName(name) {
 }
 function normalizePlayerName(name) {
   return normalizeName(name).replace(/[tzp]$/i, "");
+}
+function normalizeSoopName(name) {
+  return normalizePlayerName(name)
+    .replace(/^(?:bj|af|soop)+/i, "")
+    .replace(/[^0-9a-z가-힣]/gi, "");
 }
 function absoluteUrl(href) {
   if (!href) return "";
@@ -604,11 +624,10 @@ async function loadUniversityRoster(name, force = false) {
   return players;
 }
 
-async function loadTierRoster(force = false) {
-  if (!force && tierRosterCache && Date.now() - tierRosterCache.cacheTime < CACHE_MS * 10) return tierRosterCache.players;
-  const universities = await loadUniversities(force);
+async function refreshTierRoster() {
+  const universities = await loadUniversities(true);
   const tierUniversities = [...universities, { name: "연합팀", label: "FA" }];
-  const rosters = await mapConcurrent(tierUniversities, 6, (university) => loadUniversityRoster(university.name, force));
+  const rosters = await mapConcurrent(tierUniversities, 4, (university) => loadUniversityRoster(university.name, true));
   const players = new Map();
   for (const player of rosters.flat()) {
     if ((!/^\d+$/.test(player.tier) && player.tier !== "FA") || player.division !== "women") continue;
@@ -623,7 +642,33 @@ async function loadTierRoster(force = false) {
   const tierRank = (tier) => tier === "FA" ? Number.MAX_SAFE_INTEGER : Number(tier);
   const data = [...players.values()].sort((a, b) => tierRank(a.tier) - tierRank(b.tier) || a.name.localeCompare(b.name, "ko"));
   tierRosterCache = { cacheTime: Date.now(), players: data };
+  try {
+    fs.mkdirSync(path.dirname(TIER_ROSTER_FILE), { recursive: true });
+    fs.writeFileSync(TIER_ROSTER_FILE, JSON.stringify({
+      updatedAt: new Date(tierRosterCache.cacheTime).toISOString(),
+      players: data
+    }, null, 2) + "\n");
+  } catch {
+    // 읽기 전용 배포 환경에서도 메모리 캐시는 계속 사용합니다.
+  }
   return data;
+}
+
+async function loadTierRoster(force = false) {
+  if (!force && tierRosterCache?.players?.length) {
+    if (Date.now() - tierRosterCache.cacheTime >= TIER_CACHE_MS && !tierRosterPromise) {
+      tierRosterPromise = refreshTierRoster().catch(() => tierRosterCache.players).finally(() => {
+        tierRosterPromise = null;
+      });
+    }
+    return tierRosterCache.players;
+  }
+  if (!tierRosterPromise) {
+    tierRosterPromise = refreshTierRoster().finally(() => {
+      tierRosterPromise = null;
+    });
+  }
+  return tierRosterPromise;
 }
 
 function scheduleChannelRegistrySave() {
@@ -690,11 +735,18 @@ async function searchSoopLiveStatus(name) {
       ...(Array.isArray(data?.SCRAP_BROAD) ? data.SCRAP_BROAD : []),
       ...(Array.isArray(data?.EXTRA_BROAD) ? data.EXTRA_BROAD : [])
     ];
-    const requestedName = normalizePlayerName(name);
+    const requestedName = normalizeSoopName(name);
     const broad = broadcasts.find((item) => {
-      const stationName = normalizePlayerName(item?.station_name);
-      const userNick = normalizePlayerName(item?.user_nick);
-      return stationName === requestedName || userNick === requestedName;
+      const candidateNames = [
+        item?.station_name,
+        item?.user_nick,
+        ...(Array.isArray(item?.hash_tags) ? item.hash_tags : []),
+        ...(Array.isArray(item?.auto_hash_tags) ? item.auto_hash_tags : [])
+      ].map(normalizeSoopName).filter(Boolean);
+      return candidateNames.some((candidate) =>
+        candidate === requestedName ||
+        (requestedName.length >= 2 && (candidate.includes(requestedName) || requestedName.includes(candidate)))
+      );
     });
     const broadcastId = String(broad?.user_id || "");
     const broadNo = String(broad?.broad_no || "");
@@ -760,8 +812,14 @@ async function fetchSoopLiveStatus(name, force = false) {
       profileImage: String(data?.profile_image || "")
     };
     liveStatusCache.set(channel.broadcastId, { cacheTime: Date.now(), status });
+    if (!status.isLive && force) {
+      const searchedStatus = await searchSoopLiveStatus(name);
+      if (searchedStatus) return searchedStatus;
+    }
     return { name, ...status };
   } catch {
+    const searchedStatus = await searchSoopLiveStatus(name);
+    if (searchedStatus) return searchedStatus;
     return {
       name,
       available: false,
@@ -896,7 +954,7 @@ const server = http.createServer(async (req, res) => {
       if (!names.length || names.length > 200) {
         return send(res, 400, JSON.stringify({ error: "방송 상태는 선수 1~200명까지 조회할 수 있습니다." }), "application/json; charset=utf-8");
       }
-      const statuses = await mapConcurrent(names, 18, (name) => fetchSoopLiveStatus(name, force));
+      const statuses = await mapConcurrent(names, 24, (name) => fetchSoopLiveStatus(name, force));
       return send(res, 200, JSON.stringify({
         statuses,
         cacheSeconds: Math.round(LIVE_CACHE_MS / 1000),
