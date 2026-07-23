@@ -51,6 +51,41 @@ function popover(live) {
   ].join("");
 }
 
+const RACE_GROUPS = [
+  { code: "T", label: "테란", className: "terran" },
+  { code: "P", label: "프로토스", className: "protoss" },
+  { code: "Z", label: "저그", className: "zerg" }
+];
+
+function playerCard(player) {
+  const live = state.liveByName.get(keyOf(player.name));
+  const href = live?.broadcastUrl || player.profileUrl || "#";
+  const raceClass = RACE_GROUPS.find((item) => item.code === player.race)?.className || "unknown";
+  return [
+    '<article class="player-card race-' + raceClass + (live?.isLive ? " is-live" : "") + '"',
+    ' tabindex="0" role="link"',
+    ' data-href="' + escapeHtml(href) + '"',
+    ' data-player="' + escapeHtml(keyOf(player.name)) + '"',
+    ' aria-label="' + escapeHtml(player.name + (live?.isLive ? " LIVE, 방송 정보 보기" : " 프로필 열기")) + '">',
+    '<span class="live-badge">LIVE</span>',
+    avatar(player),
+    '<span class="player-name">' + escapeHtml(player.name) + "</span>",
+    popover(live),
+    "</article>"
+  ].join("");
+}
+
+function raceSection(players, race) {
+  const racePlayers = players.filter((player) => player.race === race.code);
+  if (!racePlayers.length) return "";
+  return [
+    '<section class="race-group race-' + race.className + '" aria-label="' + race.label + '">',
+    '<header class="race-heading"><strong>' + race.label + '</strong><span>' + racePlayers.length + "명</span></header>",
+    '<div class="tier-cards">' + racePlayers.map(playerCard).join("") + "</div>",
+    "</section>"
+  ].join("");
+}
+
 function render() {
   if (!state.players.length) {
     board.innerHTML = '<div class="empty-card">표시할 티어 선수가 없습니다.</div>';
@@ -65,28 +100,19 @@ function render() {
 
   board.innerHTML = [...groups.entries()].map(([tier, players]) => {
     const tierLabel = tier === "FA" ? "FA" : tier + "티어";
-    const cards = players.map((player) => {
-      const live = state.liveByName.get(keyOf(player.name));
-      const href = live?.broadcastUrl || player.profileUrl || "#";
-      return [
-        '<article class="player-card' + (live?.isLive ? " is-live" : "") + '"',
-        ' tabindex="0" role="link"',
-        ' data-href="' + escapeHtml(href) + '"',
-        ' data-player="' + escapeHtml(keyOf(player.name)) + '"',
-        ' aria-label="' + escapeHtml(player.name + (live?.isLive ? " LIVE, 방송 정보 보기" : " 프로필 열기")) + '">',
-        '<span class="live-badge">LIVE</span>',
-        avatar(player),
-        '<span class="player-name">' + escapeHtml(player.name) + "</span>",
-        popover(live),
-        "</article>"
-      ].join("");
-    }).join("");
+    const raceSections = RACE_GROUPS.map((race) => raceSection(players, race)).join("");
+    const unknownPlayers = players.filter((player) => !RACE_GROUPS.some((race) => race.code === player.race));
+    const unknownSection = unknownPlayers.length
+      ? '<section class="race-group race-unknown" aria-label="종족 미확인">' +
+        '<header class="race-heading"><strong>미확인</strong><span>' + unknownPlayers.length + "명</span></header>" +
+        '<div class="tier-cards">' + unknownPlayers.map(playerCard).join("") + "</div></section>"
+      : "";
 
     return [
       '<section class="tier-row" aria-labelledby="tier-' + escapeHtml(tier) + '">',
       '<header class="tier-label"><div><strong id="tier-' + escapeHtml(tier) + '">' + escapeHtml(tierLabel) + "</strong>",
       '<span>' + players.length + "명</span></div></header>",
-      '<div class="tier-cards">' + cards + "</div>",
+      '<div class="tier-races">' + raceSections + unknownSection + "</div>",
       "</section>"
     ].join("");
   }).join("");

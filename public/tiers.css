@@ -142,6 +142,38 @@ h1 {
   font-weight: 800;
 }
 
+.tier-races {
+  min-width: 0;
+}
+
+.race-group {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  border-bottom: 1px solid var(--theme-line);
+}
+
+.race-group:last-child { border-bottom: 0; }
+
+.race-heading {
+  min-height: 100%;
+  margin: 12px 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+  color: #fff;
+  text-align: center;
+}
+
+.race-heading strong { font-size: 14px; font-weight: 950; }
+.race-heading span { font-size: 10px; font-weight: 800; opacity: .82; }
+.race-terran > .race-heading { background: #3974bf; }
+.race-protoss > .race-heading { background: #d98027; }
+.race-zerg > .race-heading { background: #ce4c58; }
+.race-unknown > .race-heading { background: #7c8491; }
+
 .tier-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
@@ -206,10 +238,31 @@ h1 {
 .player-name {
   max-width: 100%;
   overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.player-card.race-terran .player-name {
+  border-color: #91b7e8;
+  background: #e7f1ff;
+  color: #245b9e;
+}
+
+.player-card.race-protoss .player-name {
+  border-color: #e8ac68;
+  background: #fff0df;
+  color: #975b1c;
+}
+
+.player-card.race-zerg .player-name {
+  border-color: #e399a1;
+  background: #ffe7ea;
+  color: #9f3340;
 }
 
 .live-badge {
@@ -377,6 +430,13 @@ h1 {
   }
   .tier-label strong { font-size: 21px; }
   .tier-label span { margin: 0; }
+  .race-group { grid-template-columns: 1fr; }
+  .race-heading {
+    min-height: 36px;
+    margin: 10px 10px 0;
+    flex-direction: row;
+    gap: 7px;
+  }
   .tier-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px; }
   .player-card { min-height: 108px; padding-inline: 5px; }
   .player-avatar { width: 55px; height: 55px; }
