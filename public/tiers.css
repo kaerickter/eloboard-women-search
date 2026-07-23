@@ -184,18 +184,26 @@ h1 {
   min-width: 0;
   min-height: 154px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 11px;
-  padding: 15px 10px 12px;
+  padding: 0;
   border: 1px solid var(--theme-line);
   border-radius: 10px;
-  background: #fff;
+  background: linear-gradient(145deg, #dce9aa, #809600);
   color: var(--theme-ink);
   text-align: center;
   text-decoration: none;
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.player-card::after {
+  position: absolute;
+  inset: 42% 0 0;
+  z-index: 1;
+  border-radius: 0 0 9px 9px;
+  background: linear-gradient(to bottom, transparent, rgba(7, 13, 24, .16) 34%, rgba(7, 13, 24, .82));
+  content: "";
+  pointer-events: none;
 }
 
 .player-card:hover, .player-card:focus-visible, .player-card.is-open {
@@ -207,20 +215,16 @@ h1 {
 }
 
 .player-avatar {
-  position: relative;
-  width: 78px;
-  height: 78px;
-  flex: none;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   display: grid;
   place-items: center;
-  border: 3px solid #fff;
-  border-radius: 50%;
+  border-radius: 9px;
   background: linear-gradient(145deg, #dce9aa, #809600);
   color: #fff;
-  box-shadow: 0 4px 15px rgba(23, 33, 58, .18);
-  font-size: 23px;
-  font-weight: 900;
+  font-size: 34px;
+  font-weight: 950;
 }
 
 .player-avatar img {
@@ -229,41 +233,61 @@ h1 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 18%;
   background: #eef1e8;
 }
 
 .player-name {
-  max-width: 100%;
+  position: absolute;
+  right: 8px;
+  bottom: 9px;
+  left: 8px;
+  z-index: 3;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
   overflow: hidden;
-  padding: 4px 8px;
+  padding: 5px 12px 6px;
   border: 1px solid transparent;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 900;
+  border-radius: 7px;
+  box-shadow: 0 4px 12px rgba(3, 19, 45, .28);
+  font-size: 16px;
+  font-weight: 950;
+  line-height: 1.1;
+  letter-spacing: -.025em;
+  text-align: center;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .36);
   white-space: nowrap;
 }
 
 .player-card.race-terran .player-name {
-  border-color: #91b7e8;
-  background: #e7f1ff;
-  color: #245b9e;
+  border-color: rgba(145, 183, 232, .96);
+  background: rgba(31, 83, 148, .9);
+  color: #f4f9ff;
 }
 
 .player-card.race-protoss .player-name {
-  border-color: #e8ac68;
-  background: #fff0df;
-  color: #975b1c;
+  border-color: rgba(240, 174, 98, .96);
+  background: rgba(158, 83, 20, .9);
+  color: #fff8ef;
 }
 
 .player-card.race-zerg .player-name {
-  border-color: #e399a1;
-  background: #ffe7ea;
-  color: #9f3340;
+  border-color: rgba(235, 142, 153, .96);
+  background: rgba(157, 43, 57, .9);
+  color: #fff5f6;
+}
+
+.player-card.race-unknown .player-name {
+  border-color: rgba(206, 212, 221, .96);
+  background: rgba(59, 69, 84, .9);
+  color: #fff;
 }
 
 .live-badge {
   position: absolute;
+  z-index: 3;
   top: 7px;
   right: 7px;
   display: none;
@@ -434,8 +458,23 @@ h1 {
   .tier-refresh { min-height: 34px; padding-inline: 10px; }
   .tier-races { gap: 9px; padding: 10px; }
   .tier-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .player-card { min-height: 108px; padding-inline: 5px; }
-  .player-avatar { width: 55px; height: 55px; }
+  .player-card { min-height: 108px; }
+  .player-avatar { font-size: 27px; }
+  .player-name {
+    right: 5px;
+    bottom: 6px;
+    left: 5px;
+    max-width: calc(100% - 10px);
+    padding: 4px 8px 5px;
+    font-size: 13px;
+  }
+  .live-badge {
+    top: 5px;
+    right: 5px;
+    min-height: 20px;
+    padding-inline: 6px;
+    font-size: 9px;
+  }
   .live-popover {
     --popover-x: -50%;
     position: fixed;
@@ -457,6 +496,7 @@ h1 {
 @media (max-width: 430px) {
   .live-key { display: none; }
   .tier-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .player-card { min-height: 132px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
