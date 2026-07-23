@@ -6,7 +6,6 @@ const countdown = document.getElementById("refreshCountdown");
 const state = {
   players: [],
   liveByName: new Map(),
-  seconds: 45,
   loadingLive: false,
   openCard: null
 };
@@ -65,25 +64,27 @@ function render() {
   }
 
   board.innerHTML = [...groups.entries()].map(([tier, players]) => {
+    const tierLabel = tier === "FA" ? "FA" : tier + "티어";
     const cards = players.map((player) => {
       const live = state.liveByName.get(keyOf(player.name));
       const href = live?.broadcastUrl || player.profileUrl || "#";
       return [
-        '<a class="player-card' + (live?.isLive ? " is-live" : "") + '"',
-        ' href="' + escapeHtml(href) + '"',
+        '<article class="player-card' + (live?.isLive ? " is-live" : "") + '"',
+        ' tabindex="0" role="link"',
+        ' data-href="' + escapeHtml(href) + '"',
         ' data-player="' + escapeHtml(keyOf(player.name)) + '"',
         ' aria-label="' + escapeHtml(player.name + (live?.isLive ? " LIVE, 방송 정보 보기" : " 프로필 열기")) + '">',
         '<span class="live-badge">LIVE</span>',
         avatar(player),
         '<span class="player-name">' + escapeHtml(player.name) + "</span>",
         popover(live),
-        "</a>"
+        "</article>"
       ].join("");
     }).join("");
 
     return [
       '<section class="tier-row" aria-labelledby="tier-' + escapeHtml(tier) + '">',
-      '<header class="tier-label"><div><strong id="tier-' + escapeHtml(tier) + '">' + escapeHtml(tier) + "티어</strong>",
+      '<header class="tier-label"><div><strong id="tier-' + escapeHtml(tier) + '">' + escapeHtml(tierLabel) + "</strong>",
       '<span>' + players.length + "명</span></div></header>",
       '<div class="tier-cards">' + cards + "</div>",
       "</section>"
@@ -99,16 +100,38 @@ function bindCards() {
   });
 
   board.querySelectorAll(".player-card").forEach((card) => {
+    const openDestination = () => {
+      const href = card.dataset.href;
+      if (href && href !== "#") window.open(href, "_blank", "noopener,noreferrer");
+    };
     card.addEventListener("click", (event) => {
       if (event.target.closest(".watch-link")) return;
-      if (!card.classList.contains("is-live") || !matchMedia("(pointer: coarse)").matches) return;
-      if (!card.classList.contains("is-open")) {
+      const canPreview = card.classList.contains("is-live");
+      if (canPreview && !card.classList.contains("is-open")) {
         event.preventDefault();
         closeOpenCard();
         card.classList.add("is-open");
         state.openCard = card;
+        return;
       }
+      openDestination();
     });
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      const canPreview = card.classList.contains("is-live");
+      if (canPreview && !card.classList.contains("is-open")) {
+        closeOpenCard();
+        card.classList.add("is-open");
+        state.openCard = card;
+        return;
+      }
+      openDestination();
+    });
+    card.addEventListener("mouseenter", () => {
+      if (card.classList.contains("is-live")) card.classList.add("is-hovered");
+    });
+    card.addEventListener("mouseleave", () => card.classList.remove("is-hovered"));
   });
 }
 
@@ -146,7 +169,7 @@ async function loadLive() {
     const nextStatuses = new Map();
     for (let index = 0; index < batches.length; index += 1) {
       countdown.textContent = "LIVE 확인 " + (index + 1) + "/" + batches.length;
-      const response = await fetch("/api/live-status?names=" + encodeURIComponent(batches[index].join(",")));
+      const response = await fetch("/api/live-status?refresh=1&names=" + encodeURIComponent(batches[index].join(",")));
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
       for (const item of data.statuses || []) nextStatuses.set(keyOf(item.name), item);
@@ -162,27 +185,17 @@ async function loadLive() {
   } catch {
     statusLine.textContent = "LIVE 상태 확인이 지연되고 있습니다. 티어 명단은 정상적으로 볼 수 있습니다.";
   } finally {
-    state.seconds = 45;
+    countdown.textContent = "페이지를 열 때 갱신";
     state.loadingLive = false;
   }
 }
 
-refreshButton.addEventListener("click", () => loadRoster(true));
+refreshButton.addEventListener("click", () => window.location.reload());
 document.addEventListener("click", (event) => {
   if (state.openCard && !state.openCard.contains(event.target)) closeOpenCard();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeOpenCard();
 });
-
-setInterval(() => {
-  if (state.loadingLive) return;
-  state.seconds -= 1;
-  if (state.seconds <= 0) {
-    loadLive();
-  } else {
-    countdown.textContent = state.seconds + "초 후 갱신";
-  }
-}, 1000);
 
 loadRoster();

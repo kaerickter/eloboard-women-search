@@ -6,6 +6,8 @@
 
 * { box-sizing: border-box; }
 
+body { overflow-x: clip; }
+
 .tier-shell {
   width: min(1240px, calc(100% - 32px));
   margin: 0 auto;
@@ -92,11 +94,19 @@ h1 {
 .refresh-button:disabled { cursor: wait; opacity: .6; }
 
 .tier-board {
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--theme-line);
   border-radius: 12px;
   background: var(--theme-surface);
   box-shadow: var(--theme-shadow);
+}
+
+.tier-row:first-child {
+  border-radius: 12px 12px 0 0;
+}
+
+.tier-row:last-child {
+  border-radius: 0 0 12px 12px;
 }
 
 .tier-row {
@@ -239,7 +249,7 @@ h1 {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 10px);
-  z-index: 20;
+  z-index: 100;
   width: 286px;
   overflow: hidden;
   visibility: hidden;
@@ -256,12 +266,18 @@ h1 {
 }
 
 .player-card.is-live:hover .live-popover,
+.player-card.is-live.is-hovered .live-popover,
 .player-card.is-live:focus-within .live-popover,
 .player-card.is-live.is-open .live-popover {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, 0);
+}
+
+.tier-row:first-child .live-popover {
+  top: calc(100% + 10px);
+  bottom: auto;
 }
 
 .popover-thumb {
