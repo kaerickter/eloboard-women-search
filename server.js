@@ -36,7 +36,6 @@ let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 45;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
-const TIER_CACHE_MS = 1000 * 60 * 30;
 
 try {
   channelRegistry = JSON.parse(fs.readFileSync(SOOP_CHANNEL_FILE, "utf8"));
@@ -89,6 +88,9 @@ function normalizeSoopName(name) {
   return normalizePlayerName(name)
     .replace(/^(?:bj|af|soop)+/i, "")
     .replace(/[^0-9a-z가-힣]/gi, "");
+}
+function koreaDateKey(timestamp = Date.now()) {
+  return new Date(Number(timestamp) + 1000 * 60 * 60 * 9).toISOString().slice(0, 10);
 }
 function absoluteUrl(href) {
   if (!href) return "";
@@ -656,7 +658,7 @@ async function refreshTierRoster() {
 
 async function loadTierRoster(force = false) {
   if (!force && tierRosterCache?.players?.length) {
-    if (Date.now() - tierRosterCache.cacheTime >= TIER_CACHE_MS && !tierRosterPromise) {
+    if (koreaDateKey(tierRosterCache.cacheTime) !== koreaDateKey() && !tierRosterPromise) {
       tierRosterPromise = refreshTierRoster().catch(() => tierRosterCache.players).finally(() => {
         tierRosterPromise = null;
       });
@@ -739,14 +741,9 @@ async function searchSoopLiveStatus(name) {
     const broad = broadcasts.find((item) => {
       const candidateNames = [
         item?.station_name,
-        item?.user_nick,
-        ...(Array.isArray(item?.hash_tags) ? item.hash_tags : []),
-        ...(Array.isArray(item?.auto_hash_tags) ? item.auto_hash_tags : [])
+        item?.user_nick
       ].map(normalizeSoopName).filter(Boolean);
-      return candidateNames.some((candidate) =>
-        candidate === requestedName ||
-        (requestedName.length >= 2 && (candidate.includes(requestedName) || requestedName.includes(candidate)))
-      );
+      return candidateNames.some((candidate) => candidate === requestedName);
     });
     const broadcastId = String(broad?.user_id || "");
     const broadNo = String(broad?.broad_no || "");
@@ -799,6 +796,20 @@ async function fetchSoopLiveStatus(name, force = false) {
     const data = await response.json();
     const broad = data?.broad || null;
     const broadNo = String(broad?.broad_no || broad?.bno || "");
+    const requestedName = normalizeSoopName(name);
+    const stationNames = [
+      data?.station?.station_name,
+      data?.station?.user_nick
+    ].map(normalizeSoopName).filter(Boolean);
+    if (stationNames.length && !stationNames.includes(requestedName)) {
+      const key = normalizePlayerName(name);
+      channelRegistry[key] = null;
+      channelCache.delete(key);
+      liveStatusCache.delete(channel.broadcastId);
+      scheduleChannelRegistrySave();
+      const searchedStatus = await searchSoopLiveStatus(name);
+      return searchedStatus || { name, available: false, isLive: false };
+    }
     const status = {
       available: true,
       isLive: Boolean(broadNo),
@@ -934,11 +945,15 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/api/tiers" && req.method === "GET") {
     try {
       const force = url.searchParams.get("refresh") === "1";
-      const players = await loadTierRoster(force);
+      let players = await loadTierRoster(force);
+      if (!force && url.searchParams.get("wait") === "1" && tierRosterPromise) {
+        players = await tierRosterPromise;
+      }
       return send(res, 200, JSON.stringify({
         players,
         source: UNIVERSITY_LIST_URL,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date(tierRosterCache?.cacheTime || Date.now()).toISOString(),
+        refreshing: Boolean(tierRosterPromise)
       }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "티어 명단을 불러오지 못했습니다." }), "application/json; charset=utf-8");
