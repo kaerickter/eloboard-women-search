@@ -15,20 +15,30 @@ const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_lis
 const MEN_SEARCH_URL = "https://eloboard.com/men/bbs/search_bj_list.php";
 const UNIVERSITY_LIST_URL = "https://eloboard.com/univ/bbs/board.php?bo_table=all_bj_list";
 const SOOP_STATION_API = "https://chapi.sooplive.co.kr/api";
+const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
 let cache = new Map();
 let playerIndexCache = null;
+let playerIndexPromise = null;
 let profileCache = new Map();
 let universityCache = null;
 let universityRosterCache = new Map();
 let tierRosterCache = null;
 let channelCache = new Map();
 let liveStatusCache = new Map();
+let channelRegistry = {};
+let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 45;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
+
+try {
+  channelRegistry = JSON.parse(fs.readFileSync(SOOP_CHANNEL_FILE, "utf8"));
+} catch {
+  channelRegistry = {};
+}
 
 function send(res, status, body, type = "text/plain; charset=utf-8") {
   res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" });
@@ -167,17 +177,25 @@ function parseBjListPlayers(html) {
 }
 async function loadPlayerIndex(force = false) {
   if (!force && playerIndexCache && Date.now() - playerIndexCache.cacheTime < CACHE_MS * 10) return playerIndexCache.players;
-  const firstHtml = await fetchBjListPage(1);
-  const maxPages = Math.min(parsePageCount(firstHtml) || 1, 30);
-  const players = new Map();
-  for (const player of parseBjListPlayers(firstHtml)) addPlayer(players, player.name, player.wrId, player.url, player.source);
-  for (let page = 2; page <= maxPages; page += 1) {
-    const html = await fetchBjListPage(page);
-    for (const player of parseBjListPlayers(html)) addPlayer(players, player.name, player.wrId, player.url, player.source);
+  if (playerIndexPromise) return playerIndexPromise;
+  playerIndexPromise = (async () => {
+    const firstHtml = await fetchBjListPage(1);
+    const maxPages = Math.min(parsePageCount(firstHtml) || 1, 30);
+    const players = new Map();
+    for (const player of parseBjListPlayers(firstHtml)) addPlayer(players, player.name, player.wrId, player.url, player.source);
+    for (let page = 2; page <= maxPages; page += 1) {
+      const html = await fetchBjListPage(page);
+      for (const player of parseBjListPlayers(html)) addPlayer(players, player.name, player.wrId, player.url, player.source);
+    }
+    const data = [...players.values()];
+    playerIndexCache = { cacheTime: Date.now(), players: data };
+    return data;
+  })();
+  try {
+    return await playerIndexPromise;
+  } finally {
+    playerIndexPromise = null;
   }
-  const data = [...players.values()];
-  playerIndexCache = { cacheTime: Date.now(), players: data };
-  return data;
 }
 function findPlayers(query, matches, indexedPlayers) {
   const key = normalizeName(query);
@@ -532,11 +550,17 @@ function parseUniversityRoster(html, university) {
     const display = cleanText(anchor);
     const tierMatch = display.match(/\(([^()]+)\)\s*$/);
     const name = decodeEntities(value || display.replace(/\s*\([^()]+\)\s*$/, "")).trim();
-    const tier = tierMatch?.[1]?.trim() || "";
+    const tier = tierMatch?.[1]?.trim() || (university === "연합팀" ? "FA" : "");
     if (!name || !tier || seen.has(name)) continue;
     const image = anchor.match(/<img\b[^>]*src=["']([^"']+)["']/i)?.[1] || "";
     const href = anchor.match(/\bhref=["']([^"']+)["']/i)?.[1] || "";
-    const division = /\/men\//i.test(image) ? "men" : /\/women\//i.test(image) ? "women" : "unknown";
+    const division = /\/men\//i.test(image)
+      ? "men"
+      : /\/women\/data\/file\/bj_list\//i.test(image)
+        ? "women"
+        : /\/women\/data\/file\/bj_m_list\//i.test(image)
+          ? "mixed"
+          : "unknown";
     const race = (anchor.match(/\b(?:Terran|Zerg|Protoss)\b/i)?.[0] || "").slice(0, 1).toUpperCase();
     seen.add(name);
     players.push({
@@ -579,10 +603,11 @@ async function loadUniversityRoster(name, force = false) {
 async function loadTierRoster(force = false) {
   if (!force && tierRosterCache && Date.now() - tierRosterCache.cacheTime < CACHE_MS * 10) return tierRosterCache.players;
   const universities = await loadUniversities(force);
-  const rosters = await mapConcurrent(universities, 5, (university) => loadUniversityRoster(university.name, force));
+  const tierUniversities = [...universities, { name: "연합팀", label: "FA" }];
+  const rosters = await mapConcurrent(tierUniversities, 6, (university) => loadUniversityRoster(university.name, force));
   const players = new Map();
   for (const player of rosters.flat()) {
-    if (!/^\d+$/.test(player.tier) || player.division === "men") continue;
+    if ((!/^\d+$/.test(player.tier) && player.tier !== "FA") || player.division !== "women") continue;
     const key = normalizeName(player.name);
     const current = players.get(key);
     if (!current) {
@@ -591,13 +616,34 @@ async function loadTierRoster(force = false) {
       current.universities.push(player.university);
     }
   }
-  const data = [...players.values()].sort((a, b) => Number(a.tier) - Number(b.tier) || a.name.localeCompare(b.name, "ko"));
+  const tierRank = (tier) => tier === "FA" ? Number.MAX_SAFE_INTEGER : Number(tier);
+  const data = [...players.values()].sort((a, b) => tierRank(a.tier) - tierRank(b.tier) || a.name.localeCompare(b.name, "ko"));
   tierRosterCache = { cacheTime: Date.now(), players: data };
   return data;
 }
 
+function scheduleChannelRegistrySave() {
+  if (channelRegistrySaveTimer) return;
+  channelRegistrySaveTimer = setTimeout(() => {
+    channelRegistrySaveTimer = null;
+    fs.mkdir(path.dirname(SOOP_CHANNEL_FILE), { recursive: true }, (mkdirError) => {
+      if (mkdirError) return;
+      fs.writeFile(SOOP_CHANNEL_FILE, JSON.stringify(channelRegistry, null, 2) + "\n", () => {});
+    });
+  }, 300);
+}
+
 async function discoverSoopChannel(name) {
   const key = normalizePlayerName(name);
+  const hasRegisteredChannel = Object.prototype.hasOwnProperty.call(channelRegistry, key);
+  const registeredId = String(channelRegistry[key] || "");
+  if (/^[a-z0-9_-]+$/i.test(registeredId)) {
+    return {
+      broadcastId: registeredId,
+      broadcastUrl: "https://play.sooplive.co.kr/" + encodeURIComponent(registeredId)
+    };
+  }
+  if (hasRegisteredChannel && channelRegistry[key] === null) return null;
   const cached = channelCache.get(key);
   if (cached && Date.now() - cached.cacheTime < CHANNEL_CACHE_MS) return cached.channel;
   try {
@@ -607,6 +653,8 @@ async function discoverSoopChannel(name) {
     const channel = profile?.broadcastId
       ? { broadcastId: profile.broadcastId, broadcastUrl: profile.broadcastUrl }
       : null;
+    channelRegistry[key] = channel?.broadcastId || null;
+    scheduleChannelRegistrySave();
     channelCache.set(key, { cacheTime: Date.now(), channel });
     return channel;
   } catch {
@@ -614,11 +662,11 @@ async function discoverSoopChannel(name) {
   }
 }
 
-async function fetchSoopLiveStatus(name) {
+async function fetchSoopLiveStatus(name, force = false) {
   const channel = await discoverSoopChannel(name);
   if (!channel) return { name, available: false, isLive: false };
   const cached = liveStatusCache.get(channel.broadcastId);
-  if (cached && Date.now() - cached.cacheTime < LIVE_CACHE_MS) return { name, ...cached.status };
+  if (!force && cached && Date.now() - cached.cacheTime < LIVE_CACHE_MS) return { name, ...cached.status };
   try {
     const response = await fetch(SOOP_STATION_API + "/" + encodeURIComponent(channel.broadcastId) + "/station", {
       headers: {
@@ -736,7 +784,7 @@ function readJsonBody(req) {
 }
 function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
-  const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
+  const pathname = url.pathname === "/" ? "/tiers.html" : url.pathname;
   const file = path.normalize(path.join(PUBLIC, pathname));
   if (!file.startsWith(PUBLIC)) return send(res, 403, "Forbidden");
   fs.readFile(file, (err, data) => {
@@ -772,6 +820,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/live-status" && req.method === "GET") {
     try {
+      const force = url.searchParams.get("refresh") === "1";
       const names = [...new Set(String(url.searchParams.get("names") || "")
         .split(",")
         .map((name) => name.trim())
@@ -779,7 +828,7 @@ const server = http.createServer(async (req, res) => {
       if (!names.length || names.length > 200) {
         return send(res, 400, JSON.stringify({ error: "방송 상태는 선수 1~200명까지 조회할 수 있습니다." }), "application/json; charset=utf-8");
       }
-      const statuses = await mapConcurrent(names, 6, fetchSoopLiveStatus);
+      const statuses = await mapConcurrent(names, 18, (name) => fetchSoopLiveStatus(name, force));
       return send(res, 200, JSON.stringify({
         statuses,
         cacheSeconds: Math.round(LIVE_CACHE_MS / 1000),
