@@ -17,6 +17,7 @@ const UNIVERSITY_LIST_URL = "https://eloboard.com/univ/bbs/board.php?bo_table=al
 const SOOP_STATION_API = "https://chapi.sooplive.co.kr/api";
 const SOOP_LIVE_SEARCH_API = "https://sch.sooplive.co.kr/api.php";
 const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
+const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
@@ -32,6 +33,7 @@ let tierRosterPromise = null;
 let channelCache = new Map();
 let liveStatusCache = new Map();
 let channelRegistry = {};
+let channelAliases = {};
 let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 45;
@@ -41,6 +43,12 @@ try {
   channelRegistry = JSON.parse(fs.readFileSync(SOOP_CHANNEL_FILE, "utf8"));
 } catch {
   channelRegistry = {};
+}
+
+try {
+  channelAliases = JSON.parse(fs.readFileSync(SOOP_ALIAS_FILE, "utf8"));
+} catch {
+  channelAliases = {};
 }
 
 try {
@@ -88,6 +96,16 @@ function normalizeSoopName(name) {
   return normalizePlayerName(name)
     .replace(/^(?:bj|af|soop)+/i, "")
     .replace(/[^0-9a-z가-힣]/gi, "");
+}
+function manualSoopAlias(name) {
+  return channelAliases[normalizePlayerName(name)] || null;
+}
+function allowedSoopNames(name) {
+  const alias = manualSoopAlias(name);
+  return [...new Set([
+    name,
+    ...(Array.isArray(alias?.stationNames) ? alias.stationNames : [])
+  ].map(normalizeSoopName).filter(Boolean))];
 }
 function koreaDateKey(timestamp = Date.now()) {
   return new Date(Number(timestamp) + 1000 * 60 * 60 * 9).toISOString().slice(0, 10);
@@ -686,6 +704,13 @@ function scheduleChannelRegistrySave() {
 
 async function discoverSoopChannel(name) {
   const key = normalizePlayerName(name);
+  const aliasId = String(manualSoopAlias(name)?.broadcastId || "");
+  if (/^[a-z0-9_-]+$/i.test(aliasId)) {
+    return {
+      broadcastId: aliasId,
+      broadcastUrl: "https://play.sooplive.co.kr/" + encodeURIComponent(aliasId)
+    };
+  }
   const hasRegisteredChannel = Object.prototype.hasOwnProperty.call(channelRegistry, key);
   const registeredId = String(channelRegistry[key] || "");
   if (/^[a-z0-9_-]+$/i.test(registeredId)) {
@@ -715,10 +740,12 @@ async function discoverSoopChannel(name) {
 
 async function searchSoopLiveStatus(name) {
   try {
+    const alias = manualSoopAlias(name);
+    const searchName = String(alias?.searchName || name);
     const url = new URL(SOOP_LIVE_SEARCH_API);
     url.searchParams.set("m", "liveSearch");
     url.searchParams.set("v", "1.0");
-    url.searchParams.set("szKeyword", name);
+    url.searchParams.set("szKeyword", searchName);
     url.searchParams.set("nPageNo", "1");
     url.searchParams.set("nListCnt", "10");
     url.searchParams.set("szOrder", "score");
@@ -737,13 +764,13 @@ async function searchSoopLiveStatus(name) {
       ...(Array.isArray(data?.SCRAP_BROAD) ? data.SCRAP_BROAD : []),
       ...(Array.isArray(data?.EXTRA_BROAD) ? data.EXTRA_BROAD : [])
     ];
-    const requestedName = normalizeSoopName(name);
+    const acceptedNames = allowedSoopNames(name);
     const broad = broadcasts.find((item) => {
       const candidateNames = [
         item?.station_name,
         item?.user_nick
       ].map(normalizeSoopName).filter(Boolean);
-      return candidateNames.some((candidate) => candidate === requestedName);
+      return candidateNames.some((candidate) => acceptedNames.includes(candidate));
     });
     const broadcastId = String(broad?.user_id || "");
     const broadNo = String(broad?.broad_no || "");
@@ -796,12 +823,12 @@ async function fetchSoopLiveStatus(name, force = false) {
     const data = await response.json();
     const broad = data?.broad || null;
     const broadNo = String(broad?.broad_no || broad?.bno || "");
-    const requestedName = normalizeSoopName(name);
+    const acceptedNames = allowedSoopNames(name);
     const stationNames = [
       data?.station?.station_name,
       data?.station?.user_nick
     ].map(normalizeSoopName).filter(Boolean);
-    if (stationNames.length && !stationNames.includes(requestedName)) {
+    if (stationNames.length && !stationNames.some((stationName) => acceptedNames.includes(stationName))) {
       const key = normalizePlayerName(name);
       channelRegistry[key] = null;
       channelCache.delete(key);
