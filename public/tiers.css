@@ -9,9 +9,9 @@
 body { overflow-x: clip; }
 
 .tier-shell {
-  width: min(1240px, calc(100% - 32px));
+  width: min(1440px, calc(100% - 40px));
   margin: 0 auto;
-  padding: 38px 0 56px;
+  padding: 34px 0 64px;
 }
 
 .tier-hero {
@@ -95,102 +95,100 @@ h1 {
 
 .tier-board {
   overflow: visible;
-  border: 1px solid var(--theme-line);
-  border-radius: 12px;
-  background: var(--theme-surface);
-  box-shadow: var(--theme-shadow);
-}
-
-.tier-row:first-child {
-  border-radius: 12px 12px 0 0;
-}
-
-.tier-row:last-child {
-  border-radius: 0 0 12px 12px;
+  display: grid;
+  gap: 26px;
 }
 
 .tier-row {
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  min-height: 154px;
-  border-bottom: 1px solid var(--theme-line);
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid var(--theme-line);
+  border-radius: 14px;
+  background: var(--theme-surface);
+  box-shadow: 0 10px 26px rgba(23, 33, 58, .08);
 }
 
-.tier-row:last-child { border-bottom: 0; }
+.tier-header {
+  min-height: 64px;
+  padding: 13px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--theme-line);
+  background: var(--theme-surface-soft);
+  border-radius: 14px 14px 0 0;
+}
 
 .tier-label {
-  display: grid;
-  place-items: center;
-  padding: 16px 10px;
-  border-right: 1px solid var(--theme-line);
-  background: var(--theme-surface-soft);
-  text-align: center;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
 }
 
 .tier-label strong {
-  display: block;
-  font-size: 27px;
+  font-size: 26px;
   font-weight: 950;
   letter-spacing: -.04em;
 }
 
 .tier-label span {
-  display: block;
-  margin-top: 5px;
   color: var(--theme-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
 }
 
+.tier-refresh {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--theme-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.tier-refresh:hover, .tier-refresh:focus-visible {
+  border-color: var(--theme-accent-deep);
+  outline: 0;
+  box-shadow: 0 5px 14px rgba(23, 33, 58, .1);
+  transform: translateY(-1px);
+}
+
+.tier-refresh:disabled { cursor: wait; opacity: .58; transform: none; }
+
 .tier-races {
   min-width: 0;
+  display: grid;
+  gap: 13px;
+  padding: 20px;
 }
 
 .race-group {
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  border-bottom: 1px solid var(--theme-line);
+  min-width: 0;
 }
-
-.race-group:last-child { border-bottom: 0; }
-
-.race-heading {
-  min-height: 100%;
-  margin: 12px 0 12px 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border-radius: 8px;
-  color: #fff;
-  text-align: center;
-}
-
-.race-heading strong { font-size: 14px; font-weight: 950; }
-.race-terran > .race-heading { background: #3974bf; }
-.race-protoss > .race-heading { background: #d98027; }
-.race-zerg > .race-heading { background: #ce4c58; }
-.race-unknown > .race-heading { background: #7c8491; }
 
 .tier-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   align-content: start;
-  gap: 14px;
-  padding: 16px;
+  gap: 16px;
 }
 
 .player-card {
   position: relative;
   min-width: 0;
-  min-height: 120px;
+  min-height: 154px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 8px 10px;
+  gap: 11px;
+  padding: 15px 10px 12px;
   border: 1px solid var(--theme-line);
   border-radius: 10px;
   background: #fff;
@@ -210,8 +208,8 @@ h1 {
 
 .player-avatar {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 78px;
+  height: 78px;
   flex: none;
   overflow: hidden;
   display: grid;
@@ -418,25 +416,12 @@ h1 {
   .tier-shell { width: min(100% - 20px, 620px); padding-top: 24px; }
   .tier-hero { align-items: stretch; flex-direction: column; gap: 16px; }
   .live-toolbar { min-width: 0; justify-content: space-between; }
-  .tier-row { grid-template-columns: 1fr; }
-  .tier-label {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 11px 14px;
-    border-right: 0;
-    border-bottom: 1px solid var(--theme-line);
-  }
+  .tier-board { gap: 18px; }
+  .tier-header { min-height: 56px; padding: 10px 12px; }
   .tier-label strong { font-size: 21px; }
-  .tier-label span { margin: 0; }
-  .race-group { grid-template-columns: 1fr; }
-  .race-heading {
-    min-height: 36px;
-    margin: 10px 10px 0;
-    flex-direction: row;
-    gap: 7px;
-  }
-  .tier-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+  .tier-refresh { min-height: 34px; padding-inline: 10px; }
+  .tier-races { gap: 9px; padding: 10px; }
+  .tier-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .player-card { min-height: 108px; padding-inline: 5px; }
   .player-avatar { width: 55px; height: 55px; }
   .live-popover {

@@ -7,6 +7,7 @@ const state = {
   players: [],
   liveByName: new Map(),
   loadingLive: false,
+  refreshingTiers: new Set(),
   openCard: null
 };
 
@@ -80,7 +81,6 @@ function raceSection(players, race) {
   if (!racePlayers.length) return "";
   return [
     '<section class="race-group race-' + race.className + '" aria-label="' + race.label + '">',
-    '<header class="race-heading"><strong>' + race.label + "</strong></header>",
     '<div class="tier-cards">' + racePlayers.map(playerCard).join("") + "</div>",
     "</section>"
   ].join("");
@@ -104,14 +104,20 @@ function render() {
     const unknownPlayers = players.filter((player) => !RACE_GROUPS.some((race) => race.code === player.race));
     const unknownSection = unknownPlayers.length
       ? '<section class="race-group race-unknown" aria-label="종족 미확인">' +
-        '<header class="race-heading"><strong>미확인</strong></header>' +
         '<div class="tier-cards">' + unknownPlayers.map(playerCard).join("") + "</div></section>"
       : "";
+    const refreshing = state.refreshingTiers.has(String(tier));
 
     return [
       '<section class="tier-row" aria-labelledby="tier-' + escapeHtml(tier) + '">',
-      '<header class="tier-label"><div><strong id="tier-' + escapeHtml(tier) + '">' + escapeHtml(tierLabel) + "</strong>",
-      '<span>' + players.length + "명</span></div></header>",
+      '<header class="tier-header">',
+      '<div class="tier-label"><strong id="tier-' + escapeHtml(tier) + '">' + escapeHtml(tierLabel) + "</strong>",
+      '<span>' + players.length + "명</span></div>",
+      '<button class="tier-refresh" type="button" data-tier="' + escapeHtml(tier) + '"' +
+        (refreshing ? " disabled" : "") +
+        ' aria-label="' + escapeHtml(tierLabel + " LIVE 새로고침") + '">' +
+        (refreshing ? "확인 중…" : "↻ 새로고침") + "</button>",
+      "</header>",
       '<div class="tier-races">' + raceSections + unknownSection + "</div>",
       "</section>"
     ].join("");
@@ -121,6 +127,10 @@ function render() {
 }
 
 function bindCards() {
+  board.querySelectorAll(".tier-refresh").forEach((button) => {
+    button.addEventListener("click", () => refreshTierLive(button.dataset.tier));
+  });
+
   board.querySelectorAll(".player-avatar img").forEach((image) => {
     image.addEventListener("error", () => { image.hidden = true; }, { once: true });
   });
@@ -190,12 +200,7 @@ async function loadLive() {
   countdown.textContent = "LIVE 확인 중";
   try {
     const names = state.players.map((player) => player.name);
-    const response = await fetch("/api/live-status?refresh=1&names=" + encodeURIComponent(names.join(",")));
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
-    const nextStatuses = new Map();
-    for (const item of data.statuses || []) nextStatuses.set(keyOf(item.name), item);
-    state.liveByName = nextStatuses;
+    state.liveByName = await fetchLiveStatuses(names);
     const liveCount = [...state.liveByName.values()].filter((item) => item.isLive).length;
     statusLine.textContent = liveCount
       ? "현재 " + liveCount + "명이 방송 중입니다."
@@ -206,6 +211,38 @@ async function loadLive() {
   } finally {
     countdown.textContent = "페이지를 열 때 갱신";
     state.loadingLive = false;
+  }
+}
+
+async function fetchLiveStatuses(names) {
+  const response = await fetch("/api/live-status?refresh=1&names=" + encodeURIComponent(names.join(",")));
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
+  const statuses = new Map();
+  for (const item of data.statuses || []) statuses.set(keyOf(item.name), item);
+  return statuses;
+}
+
+async function refreshTierLive(tier) {
+  const tierKey = String(tier || "");
+  if (!tierKey || state.loadingLive || state.refreshingTiers.has(tierKey)) return;
+  const players = state.players.filter((player) => String(player.tier) === tierKey);
+  if (!players.length) return;
+
+  state.refreshingTiers.add(tierKey);
+  render();
+  try {
+    const statuses = await fetchLiveStatuses(players.map((player) => player.name));
+    for (const [name, status] of statuses) state.liveByName.set(name, status);
+    const tierLiveCount = [...statuses.values()].filter((item) => item.isLive).length;
+    const tierLabel = tierKey === "FA" ? "FA" : tierKey + "티어";
+    statusLine.textContent = tierLabel + " LIVE 상태를 갱신했습니다" +
+      (tierLiveCount ? " · 현재 " + tierLiveCount + "명 방송 중" : "") + ".";
+  } catch {
+    statusLine.textContent = "해당 티어의 LIVE 상태를 갱신하지 못했습니다. 잠시 후 다시 눌러 주세요.";
+  } finally {
+    state.refreshingTiers.delete(tierKey);
+    render();
   }
 }
 
