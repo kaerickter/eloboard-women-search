@@ -544,8 +544,10 @@ function parseUniversities(html) {
 function parseUniversityRoster(html, university) {
   const players = [];
   const seen = new Set();
-  const anchors = html.match(/<a\b[^>]*class=["'][^"']*p_name[^"']*["'][^>]*>[\s\S]*?<\/a>/gi) || [];
-  for (const anchor of anchors) {
+  const rows = html.match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
+  for (const row of rows) {
+    const anchor = row.match(/<a\b[^>]*class=["'][^"']*p_name[^"']*["'][^>]*>[\s\S]*?<\/a>/i)?.[0] || "";
+    if (!anchor) continue;
     const value = anchor.match(/\bvalue=["']([^"']+)["']/i)?.[1];
     const display = cleanText(anchor);
     const tierMatch = display.match(/\(([^()]+)\)\s*$/);
@@ -561,7 +563,8 @@ function parseUniversityRoster(html, university) {
         : /\/women\/data\/file\/bj_m_list\//i.test(image)
           ? "mixed"
           : "unknown";
-    const race = (anchor.match(/\b(?:Terran|Zerg|Protoss)\b/i)?.[0] || "").slice(0, 1).toUpperCase();
+    const raceName = row.match(/\b(Terran|Protoss|Zerg)\b/i)?.[1]?.toLowerCase() || "";
+    const race = { terran: "T", protoss: "P", zerg: "Z" }[raceName] || "";
     seen.add(name);
     players.push({
       name,
