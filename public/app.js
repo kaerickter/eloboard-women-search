@@ -277,13 +277,20 @@ function renderProfile(data) {
   const periodTitle = state.selectedYear && state.selectedMonth
     ? state.selectedYear + TXT.yearSuffix + " " + state.selectedMonth + TXT.monthSuffix + " " + TXT.profileMatches
     : TXT.profileMatches;
+  const renderMatchRow = (match) => {
+    const resultClass = match.elo >= 0 ? "result-win" : "result-loss";
+    const deltaClass = match.elo >= 0 ? "delta-plus" : "delta-minus";
+    const memo = escapeHtml(match.memo || "-");
+    return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="ELO" class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
+  };
+  const matchDay = currentMatchDay();
+  const dayRows = periodRows.filter((match) => String(match.date || "") === matchDay);
+  const otherRows = periodRows.filter((match) => String(match.date || "") !== matchDay);
+  const dayGroup = dayRows.length
+    ? '<section class="profile-day-group" aria-label="당일 전적"><div class="profile-day-group-title"><strong>당일 전적</strong><small>' + matchDay + ' · 06:01 ~ 익일 06:00</small></div>' + dayRows.map(renderMatchRow).join("") + '</section>'
+    : "";
   const rows = periodRows.length
-    ? periodRows.map((match) => {
-      const resultClass = match.elo >= 0 ? "result-win" : "result-loss";
-      const deltaClass = match.elo >= 0 ? "delta-plus" : "delta-minus";
-      const memo = escapeHtml(match.memo || "-");
-      return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="ELO" class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
-    }).join("")
+    ? dayGroup + otherRows.map(renderMatchRow).join("")
     : '<div class="empty">' + TXT.noData + '</div>';
 
   const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>ELO</span><span>경기방식</span><span>메모</span></div>';
