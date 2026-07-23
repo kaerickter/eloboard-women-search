@@ -15,6 +15,7 @@ const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_lis
 const MEN_SEARCH_URL = "https://eloboard.com/men/bbs/search_bj_list.php";
 const UNIVERSITY_LIST_URL = "https://eloboard.com/univ/bbs/board.php?bo_table=all_bj_list";
 const SOOP_STATION_API = "https://chapi.sooplive.co.kr/api";
+const SOOP_LIVE_SEARCH_API = "https://sch.sooplive.co.kr/api.php";
 const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
@@ -665,9 +666,73 @@ async function discoverSoopChannel(name) {
   }
 }
 
+async function searchSoopLiveStatus(name) {
+  try {
+    const url = new URL(SOOP_LIVE_SEARCH_API);
+    url.searchParams.set("m", "liveSearch");
+    url.searchParams.set("v", "1.0");
+    url.searchParams.set("szKeyword", name);
+    url.searchParams.set("nPageNo", "1");
+    url.searchParams.set("nListCnt", "10");
+    url.searchParams.set("szOrder", "score");
+    url.searchParams.set("c", "UTF-8");
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 elo-kitten live-search",
+        "Accept": "application/json",
+        "Referer": "https://www.sooplive.co.kr/"
+      }
+    });
+    if (!response.ok) throw new Error("SOOP live search " + response.status);
+    const data = await response.json();
+    const broadcasts = [
+      ...(Array.isArray(data?.REAL_BROAD) ? data.REAL_BROAD : []),
+      ...(Array.isArray(data?.SCRAP_BROAD) ? data.SCRAP_BROAD : []),
+      ...(Array.isArray(data?.EXTRA_BROAD) ? data.EXTRA_BROAD : [])
+    ];
+    const requestedName = normalizePlayerName(name);
+    const broad = broadcasts.find((item) => {
+      const stationName = normalizePlayerName(item?.station_name);
+      const userNick = normalizePlayerName(item?.user_nick);
+      return stationName === requestedName || userNick === requestedName;
+    });
+    const broadcastId = String(broad?.user_id || "");
+    const broadNo = String(broad?.broad_no || "");
+    if (!broadcastId || !broadNo) return null;
+    const broadcastUrl = "https://play.sooplive.co.kr/" + encodeURIComponent(broadcastId) + "/" + encodeURIComponent(broadNo);
+    const status = {
+      available: true,
+      isLive: true,
+      broadcastId,
+      broadcastUrl,
+      title: String(broad?.broad_title || broad?.b_broad_title || ""),
+      viewerCount: Number(
+        broad?.total_view_cnt ||
+        (Number(broad?.current_view_cnt || 0) + Number(broad?.mobile_view_cnt || broad?.m_current_view_cnt || 0))
+      ),
+      thumbnail: String(broad?.broad_img || broad?.sn_url || ("https://liveimg.sooplive.co.kr/m/" + encodeURIComponent(broadNo))),
+      profileImage: ""
+    };
+    const key = normalizePlayerName(name);
+    channelRegistry[key] = broadcastId;
+    channelCache.set(key, {
+      cacheTime: Date.now(),
+      channel: { broadcastId, broadcastUrl: "https://play.sooplive.co.kr/" + encodeURIComponent(broadcastId) }
+    });
+    liveStatusCache.set(broadcastId, { cacheTime: Date.now(), status });
+    scheduleChannelRegistrySave();
+    return { name, ...status };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchSoopLiveStatus(name, force = false) {
   const channel = await discoverSoopChannel(name);
-  if (!channel) return { name, available: false, isLive: false };
+  if (!channel) {
+    const searchedStatus = await searchSoopLiveStatus(name);
+    return searchedStatus || { name, available: false, isLive: false };
+  }
   const cached = liveStatusCache.get(channel.broadcastId);
   if (!force && cached && Date.now() - cached.cacheTime < LIVE_CACHE_MS) return { name, ...cached.status };
   try {
