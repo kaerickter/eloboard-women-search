@@ -12,6 +12,20 @@ function recordText(record) {
   return record.games ? record.wins + "승 " + record.losses + "패" : "전적 없음";
 }
 
+function playerPortrait(player, side) {
+  const initial = String(player?.name || "?").trim().slice(0, 1);
+  const image = player?.image
+    ? '<img src="' + universitySafe(player.image) + '" alt="' + universitySafe(player.name) + ' 프로필 사진" loading="lazy">'
+    : "";
+  return '<span class="university-player-photo photo-' + side + '"><span aria-hidden="true">' + universitySafe(initial) + '</span>' + image + '</span>';
+}
+
+function bindPlayerImages() {
+  universityById("tierResults").querySelectorAll(".university-player-photo img").forEach((image) => {
+    image.addEventListener("error", () => { image.hidden = true; }, { once: true });
+  });
+}
+
 function renderRoster(side, name, players) {
   universityById("roster" + side + "Title").textContent = name ? name + " · " + players.length + "명" : "대학 " + side + " 선수";
   universityById("roster" + side).innerHTML = players.length
@@ -51,9 +65,9 @@ function renderPair(row, universityA, universityB) {
   const rateB = totalGames ? Math.round(row.total[1] / totalGames * 1000) / 10 : 0;
   const recentRate = recentGames ? Math.round(row.recent[0] / recentGames * 1000) / 10 : 0;
   return '<article class="university-duel-card"><div class="university-duel-stage">'
-    + '<div class="university-duel-side side-a"><small>' + universitySafe(universityA) + ' · ' + universitySafe(row.tier) + '티어</small><strong class="university-player-name">' + universitySafe(row.playerA.name) + '</strong><b class="university-duel-wins">' + row.total[0] + '</b><span>' + rateA + '% WINS</span></div>'
+    + '<div class="university-duel-side side-a"><small>' + universitySafe(universityA) + ' · ' + universitySafe(row.tier) + '티어</small>' + playerPortrait(row.playerA, "a") + '<strong class="university-player-name">' + universitySafe(row.playerA.name) + '</strong><b class="university-duel-wins">' + row.total[0] + '</b><span>' + rateA + '% WINS</span></div>'
     + '<div class="university-duel-center"><div class="university-vs-logo"><b>VS</b></div><div class="university-duel-recent"><span>최근 90일</span><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패</strong><em>' + recentRate + '%</em></div></div>'
-    + '<div class="university-duel-side side-b"><small>' + universitySafe(universityB) + ' · ' + universitySafe(row.tier) + '티어</small><strong class="university-player-name">' + universitySafe(row.playerB.name) + '</strong><b class="university-duel-wins">' + row.total[1] + '</b><span>' + rateB + '% WINS</span></div>'
+    + '<div class="university-duel-side side-b"><small>' + universitySafe(universityB) + ' · ' + universitySafe(row.tier) + '티어</small>' + playerPortrait(row.playerB, "b") + '<strong class="university-player-name">' + universitySafe(row.playerB.name) + '</strong><b class="university-duel-wins">' + row.total[1] + '</b><span>' + rateB + '% WINS</span></div>'
     + '</div><footer class="university-duel-meta"><span>전체 전적 <strong>' + (totalGames ? row.total[0] + '승 ' + row.total[1] + '패' : '전적 없음') + '</strong></span><span>최근 경기 <strong>' + universitySafe(row.lastPlayed) + '</strong></span></footer></article>';
 }
 
@@ -70,6 +84,7 @@ function renderResults(data) {
     const rows = data.rows.filter((row) => row.tier === tier.tier);
     return '<article class="tier-card"><header class="tier-head"><span class="tier-badge">' + universitySafe(tier.tier) + '</span><div><h3>' + universitySafe(tier.tier) + '티어 대결</h3><small>' + tier.pairCount + '개 교차 조합</small></div><div class="tier-totals"><span>총 전적<b>' + recordText(tier.total) + '</b></span><span>최근 90일<b>' + recordText(tier.recent) + '</b></span></div></header><div class="university-duel-list">' + rows.map((row) => renderPair(row, data.universityA, data.universityB)).join("") + '</div></article>';
   }).join("") : '<div class="university-empty">동일 티어 선수 조합이 없습니다.</div>';
+  bindPlayerImages();
 }
 
 async function searchUniversities() {
