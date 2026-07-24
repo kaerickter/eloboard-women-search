@@ -27,6 +27,23 @@ function normalizeTier(value) {
   return /^(?:[0-9]|FA)$/.test(tier) ? tier : "";
 }
 
+function normalizeRace(value) {
+  const race = String(value ?? "").trim().toUpperCase();
+  return /^(?:T|P|Z)$/.test(race) ? race : "";
+}
+
+function normalizeBroadcastId(value) {
+  const broadcastId = String(value ?? "").trim();
+  return /^[a-z0-9_-]{2,40}$/i.test(broadcastId) ? broadcastId : "";
+}
+
+function soopProfileImage(broadcastId) {
+  if (!broadcastId) return "";
+  return "https://profile.img.sooplive.co.kr/LOGO/" +
+    encodeURIComponent(broadcastId.slice(0, 2).toLowerCase()) + "/" +
+    encodeURIComponent(broadcastId) + "/" + encodeURIComponent(broadcastId) + ".jpg";
+}
+
 function parseCookies(req) {
   const cookies = {};
   for (const part of String(req?.headers?.cookie || "").split(";")) {
@@ -74,14 +91,24 @@ class TierAdmin {
         universities JSONB NOT NULL,
         tier TEXT,
         promotion_light BOOLEAN NOT NULL DEFAULT FALSE,
+        is_custom BOOLEAN NOT NULL DEFAULT FALSE,
+        race TEXT,
+        broadcast_id TEXT,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )`);
       await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS tier TEXT");
       await this.pool.query(
         "ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS promotion_light BOOLEAN NOT NULL DEFAULT FALSE"
       );
+      await this.pool.query(
+        "ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS is_custom BOOLEAN NOT NULL DEFAULT FALSE"
+      );
+      await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS race TEXT");
+      await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS broadcast_id TEXT");
       const result = await this.pool.query(
-        "SELECT player_key, player_name, universities, tier, promotion_light, updated_at FROM tier_university_overrides"
+        `SELECT player_key, player_name, universities, tier, promotion_light,
+          is_custom, race, broadcast_id, updated_at
+         FROM tier_university_overrides`
       );
       for (const row of result.rows) {
         this.overrides.set(row.player_key, {
@@ -89,6 +116,9 @@ class TierAdmin {
           universities: normalizeUniversities(row.universities),
           tier: normalizeTier(row.tier) || null,
           promotionLight: Boolean(row.promotion_light),
+          isCustom: Boolean(row.is_custom),
+          race: normalizeRace(row.race) || null,
+          broadcastId: normalizeBroadcastId(row.broadcast_id) || null,
           updatedAt: row.updated_at
         });
       }
@@ -104,6 +134,9 @@ class TierAdmin {
           universities: normalizeUniversities(value.universities),
           tier: normalizeTier(value.tier) || null,
           promotionLight: Boolean(value.promotionLight),
+          isCustom: Boolean(value.isCustom),
+          race: normalizeRace(value.race) || null,
+          broadcastId: normalizeBroadcastId(value.broadcastId) || null,
           updatedAt: value.updatedAt || null
         });
       }
@@ -114,7 +147,9 @@ class TierAdmin {
   }
 
   applyOverrides(players) {
-    return (Array.isArray(players) ? players : []).map((player) => {
+    const seen = new Set();
+    const result = (Array.isArray(players) ? players : []).map((player) => {
+      seen.add(playerKey(player.name));
       const override = this.overrides.get(playerKey(player.name));
       if (!override) return player;
       const universities = [...override.universities];
@@ -124,16 +159,48 @@ class TierAdmin {
         universities,
         tier: override.tier || player.tier,
         promotionLight: Boolean(override.promotionLight),
+        race: override.race || player.race,
+        broadcastId: override.broadcastId || player.broadcastId,
+        customPlayer: Boolean(override.isCustom),
         universityOverride: true,
         tierOverride: Boolean(override.tier)
       };
     });
+    for (const [key, override] of this.overrides) {
+      if (!override.isCustom || seen.has(key)) continue;
+      const universities = [...override.universities];
+      result.push({
+        name: override.playerName,
+        tier: override.tier || "FA",
+        division: "women",
+        race: override.race || "T",
+        university: universities[0] || "연합팀",
+        universities,
+        broadcastId: override.broadcastId || "",
+        image: soopProfileImage(override.broadcastId),
+        profileUrl: override.broadcastId
+          ? "https://play.sooplive.co.kr/" + encodeURIComponent(override.broadcastId)
+          : "",
+        promotionLight: Boolean(override.promotionLight),
+        universityOverride: true,
+        tierOverride: true,
+        customPlayer: true
+      });
+    }
+    const tierRank = (tier) => tier === "FA" ? Number.MAX_SAFE_INTEGER : Number(tier);
+    return result.sort((playerA, playerB) =>
+      tierRank(playerA.tier) - tierRank(playerB.tier) || playerA.name.localeCompare(playerB.name, "ko"));
   }
 
   listOverrides() {
     return [...this.overrides.values()]
       .map((item) => ({ ...item, universities: [...item.universities] }))
       .sort((itemA, itemB) => itemA.playerName.localeCompare(itemB.playerName, "ko"));
+  }
+
+  getOverride(playerName) {
+    const item = this.overrides.get(playerKey(playerName));
+    return item ? { ...item, universities: [...item.universities] } : null;
   }
 
   async setOverride(playerName, values) {
@@ -145,27 +212,53 @@ class TierAdmin {
     if (payload.tier != null && payload.tier !== "" && !tier) {
       throw new Error("티어는 0~9 또는 FA 중에서 선택해 주세요.");
     }
+    const current = this.overrides.get(key);
+    const isCustom = payload.isCustom == null ? Boolean(current?.isCustom) : Boolean(payload.isCustom);
+    const race = normalizeRace(payload.race ?? current?.race);
+    const broadcastId = normalizeBroadcastId(payload.broadcastId ?? current?.broadcastId);
+    if (isCustom && !tier) throw new Error("새 선수의 티어를 선택해 주세요.");
+    if (isCustom && !race) throw new Error("새 선수의 종족을 선택해 주세요.");
+    if (payload.broadcastId && !broadcastId) {
+      throw new Error("SOOP 아이디는 영문, 숫자, 밑줄 또는 하이픈만 입력해 주세요.");
+    }
     const item = {
       playerName: normalizedName,
       universities: normalizeUniversities(payload.universities),
       tier,
       promotionLight: tier === "FA" ? false : Boolean(payload.promotionLight),
+      isCustom,
+      race: race || null,
+      broadcastId: broadcastId || null,
       updatedAt: new Date().toISOString()
     };
     this.overrides.set(key, item);
     if (this.pool) {
       await this.pool.query(
         `INSERT INTO tier_university_overrides(
-           player_key, player_name, universities, tier, promotion_light, updated_at
+           player_key, player_name, universities, tier, promotion_light,
+           is_custom, race, broadcast_id, updated_at
          )
-         VALUES($1,$2,$3,$4,$5,$6)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT(player_key) DO UPDATE SET
            player_name=EXCLUDED.player_name,
            universities=EXCLUDED.universities,
            tier=EXCLUDED.tier,
            promotion_light=EXCLUDED.promotion_light,
+           is_custom=EXCLUDED.is_custom,
+           race=EXCLUDED.race,
+           broadcast_id=EXCLUDED.broadcast_id,
            updated_at=EXCLUDED.updated_at`,
-        [key, item.playerName, JSON.stringify(item.universities), item.tier, item.promotionLight, item.updatedAt]
+        [
+          key,
+          item.playerName,
+          JSON.stringify(item.universities),
+          item.tier,
+          item.promotionLight,
+          item.isCustom,
+          item.race,
+          item.broadcastId,
+          item.updatedAt
+        ]
       );
     } else {
       await this.persistFile();
@@ -276,6 +369,8 @@ class TierAdmin {
 
 module.exports = {
   TierAdmin,
+  normalizeBroadcastId,
+  normalizeRace,
   normalizeTier,
   normalizeUniversities,
   playerKey

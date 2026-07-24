@@ -180,6 +180,13 @@ function normalizeSoopName(name) {
 function manualSoopAlias(name) {
   return channelAliases[normalizePlayerName(name)] || null;
 }
+function pinnedBroadcastIdFor(name) {
+  return String(
+    manualSoopAlias(name)?.broadcastId ||
+    tierAdmin.getOverride(name)?.broadcastId ||
+    ""
+  );
+}
 function allowedSoopNames(name) {
   const alias = manualSoopAlias(name);
   return [...new Set([
@@ -839,8 +846,9 @@ function scheduleChannelRegistrySave() {
 }
 
 function tierProfileAssets(player) {
+  if (player?.customPlayer) return {};
   const key = normalizePlayerName(player?.name);
-  const pinnedId = String(manualSoopAlias(player?.name)?.broadcastId || "").trim();
+  const pinnedId = pinnedBroadcastIdFor(player?.name).trim();
   const registeredId = String(channelRegistry[key] || "").trim();
   const broadcastId = pinnedId || registeredId;
   if (!/^[a-z0-9_-]+$/i.test(broadcastId)) return {};
@@ -857,7 +865,7 @@ function addTierProfileAssets(players) {
 
 async function discoverSoopChannel(name) {
   const key = normalizePlayerName(name);
-  const aliasId = String(manualSoopAlias(name)?.broadcastId || "");
+  const aliasId = pinnedBroadcastIdFor(name);
   if (/^[a-z0-9_-]+$/i.test(aliasId)) {
     return {
       broadcastId: aliasId,
@@ -918,7 +926,7 @@ async function searchSoopLiveStatus(name) {
       ...(Array.isArray(data?.EXTRA_BROAD) ? data.EXTRA_BROAD : [])
     ];
     const acceptedNames = allowedSoopNames(name);
-    const pinnedBroadcastId = String(alias?.broadcastId || "");
+    const pinnedBroadcastId = pinnedBroadcastIdFor(name);
     const broad = broadcasts.find((item) => {
       const candidateId = String(item?.user_id || "");
       if (pinnedBroadcastId) return candidateId === pinnedBroadcastId;
@@ -984,7 +992,7 @@ async function querySoopLiveStatus(name, force = false) {
       data?.station?.station_name,
       data?.station?.user_nick
     ].map(normalizeSoopName).filter(Boolean);
-    const pinnedBroadcastId = String(manualSoopAlias(name)?.broadcastId || "");
+    const pinnedBroadcastId = pinnedBroadcastIdFor(name);
     const usesPinnedChannel = Boolean(pinnedBroadcastId) && pinnedBroadcastId === channel.broadcastId;
     if (!usesPinnedChannel && stationNames.length && !stationNames.some((stationName) => acceptedNames.includes(stationName))) {
       const key = normalizePlayerName(name);
@@ -1210,6 +1218,38 @@ const server = http.createServer(async (req, res) => {
       csrf: session.csrf
     }), "application/json; charset=utf-8");
   }
+  if (url.pathname === "/api/admin/tier-players" && req.method === "POST") {
+    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+      return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const body = await readJsonBody(req);
+      const playerName = String(body.playerName || "").replace(/\s+/g, " ").trim().slice(0, 40);
+      const sourcePlayers = await loadTierRoster(false);
+      const exists = tierAdmin.applyOverrides(sourcePlayers).some((player) =>
+        normalizeName(player.name) === normalizeName(playerName));
+      if (!playerName) {
+        return send(res, 400, JSON.stringify({ error: "새 선수 이름을 입력해 주세요." }), "application/json; charset=utf-8");
+      }
+      if (exists) {
+        return send(res, 409, JSON.stringify({ error: "이미 등록된 선수 이름입니다." }), "application/json; charset=utf-8");
+      }
+      const channelFromUrl = soopChannelFromHtml(String(body.broadcastId || ""));
+      const override = await tierAdmin.setOverride(playerName, {
+        universities: Array.isArray(body.universities) ? body.universities : [body.university],
+        tier: body.tier,
+        promotionLight: body.promotionLight === true,
+        isCustom: true,
+        race: body.race,
+        broadcastId: channelFromUrl?.broadcastId || body.broadcastId
+      });
+      const player = tierAdmin.applyOverrides(sourcePlayers).find((item) =>
+        normalizeName(item.name) === normalizeName(playerName));
+      return send(res, 201, JSON.stringify({ ok: true, override, player }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 400, JSON.stringify({ error: error.message || "새 선수를 등록하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/tier-memberships" && (req.method === "PUT" || req.method === "DELETE")) {
     if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
       return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
@@ -1217,22 +1257,25 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const playerName = String(body.playerName || "").trim();
-      const sourcePlayer = tierRosterCache?.players?.find((player) =>
+      const sourcePlayers = await loadTierRoster(false);
+      const currentPlayer = tierAdmin.applyOverrides(sourcePlayers).find((player) =>
         normalizeName(player.name) === normalizeName(playerName));
-      if (!sourcePlayer) {
+      if (!currentPlayer) {
         return send(res, 404, JSON.stringify({ error: "현재 티어 명단에서 선수를 찾지 못했습니다." }), "application/json; charset=utf-8");
       }
       if (req.method === "DELETE") {
         await tierAdmin.deleteOverride(playerName);
         return send(res, 200, JSON.stringify({ ok: true, reverted: true }), "application/json; charset=utf-8");
       }
-      const currentPlayer = tierAdmin.applyOverrides([sourcePlayer])[0];
       const override = await tierAdmin.setOverride(playerName, {
         universities: Array.isArray(body.universities) ? body.universities : currentPlayer.universities,
         tier: body.tier == null ? currentPlayer.tier : body.tier,
         promotionLight: body.promotionLight == null
           ? Boolean(currentPlayer.promotionLight)
-          : body.promotionLight === true
+          : body.promotionLight === true,
+        isCustom: Boolean(currentPlayer.customPlayer),
+        race: currentPlayer.race,
+        broadcastId: currentPlayer.broadcastId
       });
       return send(res, 200, JSON.stringify({ ok: true, override }), "application/json; charset=utf-8");
     } catch (error) {
