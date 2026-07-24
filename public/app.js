@@ -1,7 +1,15 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_NAME = "\uc774\uc544\uae7d";
 const DEFAULT_WR_ID = "780";
-const state = { query: "", data: null, selectedYear: "", selectedMonth: "", opponentQuery: "", requestId: 0 };
+const state = {
+  query: "",
+  data: null,
+  selectedYear: "",
+  selectedMonth: "",
+  opponentQuery: "",
+  requestId: 0,
+  activeController: null
+};
 
 const TXT = {
   win: "\uc2b9",
@@ -50,9 +58,82 @@ function escapeHtml(value) {
   return String(value || "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
 }
 
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value || ""), window.location.href);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function setSearchState(kind, message) {
+  const status = $("status");
+  status.dataset.state = kind;
+  status.textContent = message;
+  $("profile").setAttribute("aria-busy", kind === "loading" ? "true" : "false");
+  $("searchButton").disabled = kind === "loading";
+  $("refreshButton").disabled = kind === "loading";
+}
+
+function validateSearchResponse(data) {
+  if (!data || typeof data !== "object") throw new Error("검색 응답 형식이 올바르지 않습니다.");
+  if (!Array.isArray(data.matches) || !Array.isArray(data.players)) {
+    throw new Error("검색 결과에 필요한 항목이 없습니다.");
+  }
+  if (data.profile != null && (typeof data.profile !== "object" || !String(data.profile.name || "").trim())) {
+    throw new Error("선수 프로필 응답이 올바르지 않습니다.");
+  }
+  if (!String(data.fetchedAt || "").trim()) throw new Error("검색 결과의 갱신 시각이 없습니다.");
+  return data;
+}
+
+async function fetchSearchJson(url, signal, attempts = 2) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const timeoutController = new AbortController();
+    const abortFromCaller = () => timeoutController.abort();
+    signal.addEventListener("abort", abortFromCaller, { once: true });
+    const timeout = setTimeout(() => timeoutController.abort(), 15000);
+    try {
+      const response = await fetch(url, {
+        signal: timeoutController.signal,
+        headers: { "Accept": "application/json" }
+      });
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("서버가 올바른 JSON 응답을 보내지 않았습니다.");
+      }
+      if (response.ok) return validateSearchResponse(data);
+      const error = new Error(data.error || TXT.loadFail);
+      if (![502, 503, 504].includes(response.status) || attempt === attempts - 1) throw error;
+      lastError = error;
+    } catch (error) {
+      if (signal.aborted) throw new DOMException("요청이 취소되었습니다.", "AbortError");
+      lastError = error;
+      if (attempt === attempts - 1) {
+        if (error?.name === "AbortError") {
+          throw new Error("검색 요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        if (error instanceof TypeError) {
+          throw new Error("검색 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        throw error;
+      }
+    } finally {
+      clearTimeout(timeout);
+      signal.removeEventListener("abort", abortFromCaller);
+    }
+  }
+  throw lastError || new Error(TXT.loadFail);
+}
+
 function avatarMarkup(name, image) {
   const initial = Array.from(String(name || "?").trim())[0] || "?";
-  const img = image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(name) + ' 프로필 사진">' : "";
+  const imageUrl = safeExternalUrl(image);
+  const img = imageUrl ? '<img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(name) + ' 프로필 사진">' : "";
   return '<span class="player-photo">' + img + '<b aria-hidden="true">' + escapeHtml(initial) + '</b></span>';
 }
 
@@ -136,6 +217,24 @@ function setPeriodValues(prefix, stats) {
   $(prefix + "Wins").textContent = stats.wins;
   $(prefix + "Losses").textContent = stats.losses;
   $(prefix + "Rate").textContent = stats.rate + "%";
+}
+
+function resetResultPanels(message, className = "") {
+  state.data = null;
+  state.selectedYear = "";
+  state.selectedMonth = "";
+  $("yearSelect").innerHTML = "";
+  $("monthSelect").innerHTML = "";
+  $("periodLabel").textContent = message;
+  $("yearRowLabel").textContent = "해당년도";
+  $("monthRowLabel").textContent = "당월";
+  setPeriodValues("year", { games: 0, wins: 0, losses: 0, rate: 0 });
+  setPeriodValues("month", { games: 0, wins: 0, losses: 0, rate: 0 });
+  setPeriodValues("day", { games: 0, wins: 0, losses: 0, rate: 0 });
+  setOpponentStats({ games: 0, wins: 0, losses: 0, rate: 0 }, TXT.opponentReady);
+  $("profileLink").innerHTML = "";
+  $("playerChoices").innerHTML = "";
+  $("profile").innerHTML = '<div class="empty ' + escapeHtml(className) + '">' + escapeHtml(message) + '</div>';
 }
 
 function setSelectOptions(select, values, suffix) {
@@ -261,7 +360,10 @@ function renderProfile(data) {
     return;
   }
 
-  $("profileLink").innerHTML = '<a class="detail-link" href="' + profile.url + '" target="_blank" rel="noreferrer">' + TXT.profileOpen + '</a>';
+  const profileUrl = safeExternalUrl(profile.url);
+  $("profileLink").innerHTML = profileUrl
+    ? '<a class="detail-link" href="' + escapeHtml(profileUrl) + '" target="_blank" rel="noreferrer">' + TXT.profileOpen + '</a>'
+    : "";
   const cards = [
     profile.total ? [TXT.total, profile.total.games + TXT.gameWord, profile.total.wins + TXT.win + " " + profile.total.losses + TXT.loss + " \u00b7 " + profile.total.rate + "%"] : null,
     profile.women ? [TXT.women, profile.women.games + TXT.gameWord, profile.women.wins + TXT.win + " " + profile.women.losses + TXT.loss + " \u00b7 " + profile.women.rate + "%"] : null,
@@ -270,7 +372,13 @@ function renderProfile(data) {
   ].filter(Boolean);
 
   const most = (profile.mostMatches || []).length
-    ? '<div class="profile-section"><h3>' + TXT.most + '</h3><div class="pill-row">' + profile.mostMatches.map((item) => '<a class="pill" href="' + item.url + '" target="_blank" rel="noreferrer">' + escapeHtml(item.name) + ' ' + item.wins + TXT.win + ' ' + item.losses + TXT.loss + '</a>').join("") + '</div></div>'
+    ? '<div class="profile-section"><h3>' + TXT.most + '</h3><div class="pill-row">' + profile.mostMatches.map((item) => {
+      const itemUrl = safeExternalUrl(item.url);
+      const label = escapeHtml(item.name) + ' ' + item.wins + TXT.win + ' ' + item.losses + TXT.loss;
+      return itemUrl
+        ? '<a class="pill" href="' + escapeHtml(itemUrl) + '" target="_blank" rel="noreferrer">' + label + '</a>'
+        : '<span class="pill">' + label + '</span>';
+    }).join("") + '</div></div>'
     : "";
 
   const periodRows = selectedMonthRows(profile.matches || []);
@@ -309,10 +417,14 @@ function render(data) {
 }
 
 async function load(name = "", refresh = false) {
+  if (state.activeController) state.activeController.abort();
+  const controller = new AbortController();
+  state.activeController = controller;
   const requestId = state.requestId + 1;
   state.requestId = requestId;
   const pages = 10;
-  $("status").textContent = refresh ? TXT.refreshing : TXT.loading;
+  setSearchState("loading", refresh ? TXT.refreshing : TXT.loading);
+  resetResultPanels("검색 결과를 확인하고 있습니다.", "search-loading");
   const params = new URLSearchParams({ pages: String(pages) });
   if (name) params.set("name", name);
   if (refresh) params.set("refresh", "1");
@@ -321,25 +433,41 @@ async function load(name = "", refresh = false) {
     params.set("wr_id", DEFAULT_WR_ID);
   }
 
-  const response = await fetch("/api/data?" + params.toString());
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || TXT.loadFail);
+  const data = await fetchSearchJson("/api/data?" + params.toString(), controller.signal);
   if (requestId !== state.requestId) return;
 
   state.query = name;
   state.data = data;
   render(data);
   const when = new Date(data.fetchedAt).toLocaleString("ko-KR");
-  $("status").textContent = data.profileOnly
-    ? when + " " + TXT.basis + " \u00b7 " + (data.profile?.name || name) + " \ud504\ub85c\ud544 \uc804\uc801\uc744 \uc77d\uc5c8\uc2b5\ub2c8\ub2e4."
-    : when + " " + TXT.basis + " \u00b7 " + TXT.pagesFrom + " " + data.pagesLoaded + TXT.pagesUnit + " " + data.matches.length + TXT.readUnit;
+  if (name && (!data.profile || data.resultState === "empty")) {
+    setSearchState("empty", TXT.noResult);
+  } else {
+    setSearchState("success", data.profileOnly
+      ? when + " " + TXT.basis + " \u00b7 " + (data.profile?.name || name) + " \ud504\ub85c\ud544 \uc804\uc801\uc744 \uc77d\uc5c8\uc2b5\ub2c8\ub2e4."
+      : when + " " + TXT.basis + " \u00b7 " + TXT.pagesFrom + " " + data.pagesLoaded + TXT.pagesUnit + " " + data.matches.length + TXT.readUnit);
+  }
 }
 
 async function search(refresh = false) {
+  const expectedRequestId = state.requestId + 1;
   try {
     await load($("nameInput").value.trim(), refresh);
   } catch (error) {
-    $("status").textContent = error.message;
+    if (error?.name === "AbortError") return;
+    if (expectedRequestId !== state.requestId) return;
+    const errorMessage = error.message || TXT.loadFail;
+    setSearchState("error", errorMessage);
+    resetResultPanels(errorMessage);
+    $("profile").innerHTML = '<div class="empty search-error">' +
+      escapeHtml(errorMessage) +
+      '<button id="retrySearch" class="ghost" type="button">다시 시도</button></div>';
+    $("retrySearch").addEventListener("click", () => search(true), { once: true });
+  } finally {
+    if (expectedRequestId === state.requestId) {
+      $("searchButton").disabled = false;
+      $("refreshButton").disabled = false;
+    }
   }
 }
 
@@ -360,6 +488,4 @@ $("monthSelect").addEventListener("change", (event) => {
   render(state.data);
 });
 if (!$("nameInput").value.trim()) $("nameInput").value = DEFAULT_NAME;
-load($("nameInput").value.trim() || DEFAULT_NAME).catch((error) => {
-  $("status").textContent = error.message;
-});
+search(false);

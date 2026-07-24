@@ -2,6 +2,8 @@ const board = document.getElementById("tierBoard");
 const statusLine = document.getElementById("boardStatus");
 const refreshButton = document.getElementById("refreshButton");
 const countdown = document.getElementById("refreshCountdown");
+const LIVE_POLL_MS = 15000;
+let livePollTimer = null;
 
 const state = {
   players: [],
@@ -25,29 +27,41 @@ function escapeHtml(value) {
   }[char]));
 }
 
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value || ""), window.location.href);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
 function formatViewers(value) {
   return new Intl.NumberFormat("ko-KR").format(Number(value || 0)) + "명 시청";
 }
 
 function avatar(player) {
   const initial = Array.from(player.name || "?")[0] || "?";
-  const image = player.image
-    ? '<img src="' + escapeHtml(player.image) + '" alt="" loading="lazy">'
+  const imageUrl = safeExternalUrl(player.image);
+  const image = imageUrl
+    ? '<img src="' + escapeHtml(imageUrl) + '" alt="" loading="lazy">'
     : "";
   return '<span class="player-avatar">' + escapeHtml(initial) + image + "</span>";
 }
 
 function popover(live) {
   if (!live?.isLive) return "";
-  const image = live.thumbnail
-    ? '<img src="' + escapeHtml(live.thumbnail) + '" alt="현재 방송 썸네일" loading="lazy">'
+  const thumbnailUrl = safeExternalUrl(live.thumbnail);
+  const broadcastUrl = safeExternalUrl(live.broadcastUrl);
+  const image = thumbnailUrl
+    ? '<img src="' + escapeHtml(thumbnailUrl) + '" alt="현재 방송 썸네일" loading="lazy">'
     : "";
   return [
     '<aside class="live-popover" aria-label="현재 방송 정보">',
     '<div class="popover-thumb" data-viewers="' + escapeHtml(formatViewers(live.viewerCount)) + '">' + image + "</div>",
     '<div class="popover-copy">',
     '<p class="popover-title">' + escapeHtml(live.title || "현재 방송 중입니다.") + "</p>",
-    '<a class="watch-link" href="' + escapeHtml(live.broadcastUrl) + '" target="_blank" rel="noreferrer">방송 보러가기</a>',
+    broadcastUrl ? '<a class="watch-link" href="' + escapeHtml(broadcastUrl) + '" target="_blank" rel="noreferrer">방송 보러가기</a>' : "",
     "</div></aside>"
   ].join("");
 }
@@ -60,7 +74,7 @@ const RACE_GROUPS = [
 
 function playerCard(player) {
   const live = state.liveByName.get(keyOf(player.name));
-  const href = live?.broadcastUrl || player.profileUrl || "#";
+  const href = safeExternalUrl(live?.broadcastUrl || player.profileUrl) || "#";
   const raceClass = RACE_GROUPS.find((item) => item.code === player.race)?.className || "unknown";
   return [
     '<article class="player-card race-' + raceClass + (live?.isLive ? " is-live" : "") + '"',
@@ -208,30 +222,64 @@ async function syncDailyRoster() {
   }
 }
 
-async function loadLive() {
+function statusSignature(status) {
+  return JSON.stringify([
+    Boolean(status?.isLive),
+    status?.broadcastUrl || "",
+    status?.title || "",
+    Number(status?.viewerCount || 0),
+    status?.thumbnail || ""
+  ]);
+}
+
+function mergeLiveStatuses(statuses) {
+  let changed = 0;
+  for (const [name, status] of statuses) {
+    if (statusSignature(state.liveByName.get(name)) !== statusSignature(status)) changed += 1;
+    state.liveByName.set(name, status);
+  }
+  return changed;
+}
+
+function scheduleLivePoll() {
+  clearTimeout(livePollTimer);
+  livePollTimer = setTimeout(() => {
+    if (document.visibilityState === "visible") loadLive(false);
+    else scheduleLivePoll();
+  }, LIVE_POLL_MS);
+}
+
+async function loadLive(force = false) {
   if (state.loadingLive || !state.players.length) return;
   state.loadingLive = true;
   countdown.textContent = "LIVE 확인 중";
   try {
     const names = state.players.map((player) => player.name);
-    state.liveByName = await fetchLiveStatuses(names);
+    const statuses = await fetchLiveStatuses(names, force);
+    const changed = mergeLiveStatuses(statuses);
     const liveCount = [...state.liveByName.values()].filter((item) => item.isLive).length;
     statusLine.textContent = liveCount
       ? "현재 " + liveCount + "명이 방송 중입니다."
       : "현재 확인된 LIVE 방송이 없습니다.";
-    render();
+    if (changed) render();
   } catch {
     statusLine.textContent = "LIVE 상태 확인이 지연되고 있습니다. 티어 명단은 정상적으로 볼 수 있습니다.";
   } finally {
-    countdown.textContent = "페이지를 열 때 갱신";
+    countdown.textContent = "15초마다 자동 갱신";
     state.loadingLive = false;
+    scheduleLivePoll();
   }
 }
 
-async function fetchLiveStatuses(names) {
-  const response = await fetch("/api/live-status?refresh=1&names=" + encodeURIComponent(names.join(",")));
+async function fetchLiveStatuses(names, force = false) {
+  const params = new URLSearchParams({ names: names.join(",") });
+  if (force) params.set("refresh", "1");
+  const response = await fetch("/api/live-status?" + params.toString(), {
+    headers: { "Accept": "application/json" }
+  });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
+  if (!Array.isArray(data.statuses)) throw new Error("LIVE 상태 응답 형식이 올바르지 않습니다.");
   const statuses = new Map();
   for (const item of data.statuses || []) statuses.set(keyOf(item.name), item);
   return statuses;
@@ -246,8 +294,8 @@ async function refreshTierLive(tier) {
   state.refreshingTiers.add(tierKey);
   render();
   try {
-    const statuses = await fetchLiveStatuses(players.map((player) => player.name));
-    for (const [name, status] of statuses) state.liveByName.set(name, status);
+    const statuses = await fetchLiveStatuses(players.map((player) => player.name), true);
+    mergeLiveStatuses(statuses);
     const tierLiveCount = [...statuses.values()].filter((item) => item.isLive).length;
     const tierLabel = tierKey === "FA" ? "FA" : tierKey + "티어";
     statusLine.textContent = tierLabel + " LIVE 상태를 갱신했습니다" +
@@ -260,7 +308,10 @@ async function refreshTierLive(tier) {
   }
 }
 
-refreshButton.addEventListener("click", () => window.location.reload());
+refreshButton.addEventListener("click", () => loadRoster(true));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") loadLive(false);
+});
 document.addEventListener("click", (event) => {
   if (state.openCard && !state.openCard.contains(event.target)) closeOpenCard();
 });
