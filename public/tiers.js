@@ -13,6 +13,14 @@ const tierAdminManager = document.getElementById("tierAdminManager");
 const tierAdminHeader = tierAdminDialog.querySelector(".tier-admin-header");
 const tierAdminPlayerSearch = document.getElementById("tierAdminPlayerSearch");
 const tierAdminPlayerSuggestions = document.getElementById("tierAdminPlayerSuggestions");
+const tierAdminCreatePlayer = document.getElementById("tierAdminCreatePlayer");
+const tierAdminNewName = document.getElementById("tierAdminNewName");
+const tierAdminNewTier = document.getElementById("tierAdminNewTier");
+const tierAdminNewRace = document.getElementById("tierAdminNewRace");
+const tierAdminNewUniversity = document.getElementById("tierAdminNewUniversity");
+const tierAdminNewBroadcastId = document.getElementById("tierAdminNewBroadcastId");
+const tierAdminCreateConfirm = document.getElementById("tierAdminCreateConfirm");
+const tierAdminCreateCancel = document.getElementById("tierAdminCreateCancel");
 const tierAdminTier = document.getElementById("tierAdminTier");
 const tierAdminPromotion = document.getElementById("tierAdminPromotion");
 const tierAdminMemberships = document.getElementById("tierAdminMemberships");
@@ -270,10 +278,11 @@ function hideTierAdminSuggestions() {
 }
 
 function renderTierAdminSuggestions() {
+  const query = String(tierAdminPlayerSearch.value || "").replace(/\s+/g, " ").trim();
   const players = matchingAdminPlayers(tierAdminPlayerSearch.value);
+  const hasExact = state.players.some((player) => keyOf(player.name) === keyOf(query));
   tierAdminSuggestionIndex = players.length ? 0 : -1;
-  tierAdminPlayerSuggestions.innerHTML = players.length
-    ? players.map((player, index) => [
+  const playerButtons = players.map((player, index) => [
         '<button id="tierAdminSuggestion-' + index + '" class="tier-admin-player-suggestion',
         index === 0 ? " is-active" : "",
         '" type="button" role="option" aria-selected="' + String(index === 0) + '"',
@@ -281,11 +290,34 @@ function renderTierAdminSuggestions() {
         '<strong>' + escapeHtml(player.name) + "</strong>",
         '<span>' + escapeHtml(player.tier === "FA" ? "FA" : player.tier + "티어") + "</span>",
         "</button>"
-      ].join(""))
-    : '<p class="tier-admin-no-results">비슷한 이름의 선수를 찾지 못했습니다.</p>';
+      ].join("")).join("");
+  const createButton = query && !hasExact
+    ? '<button class="tier-admin-create-suggestion" type="button" data-create-player="' +
+      escapeHtml(query) + '"><strong>＋ ' + escapeHtml(query) +
+      '</strong><span>새 선수로 등록</span></button>'
+    : "";
+  tierAdminPlayerSuggestions.innerHTML = playerButtons + createButton ||
+    '<p class="tier-admin-no-results">등록된 선수가 없습니다.</p>';
   tierAdminPlayerSuggestions.hidden = false;
   tierAdminPlayerSearch.setAttribute("aria-expanded", "true");
   if (players.length) tierAdminPlayerSearch.setAttribute("aria-activedescendant", "tierAdminSuggestion-0");
+}
+
+function openTierAdminCreatePlayer(name) {
+  tierAdminSelectedName = "";
+  tierAdminNewName.value = String(name || tierAdminPlayerSearch.value || "").replace(/\s+/g, " ").trim();
+  tierAdminNewTier.value = "6";
+  tierAdminNewRace.value = "T";
+  tierAdminNewUniversity.value = "";
+  tierAdminNewBroadcastId.value = "";
+  tierAdminCreatePlayer.hidden = false;
+  hideTierAdminSuggestions();
+  renderTierAdminMemberships();
+  tierAdminNewName.focus();
+}
+
+function closeTierAdminCreatePlayer() {
+  tierAdminCreatePlayer.hidden = true;
 }
 
 function moveTierAdminSuggestion(direction) {
@@ -307,6 +339,7 @@ function selectTierAdminPlayer(name) {
   if (!player) return;
   tierAdminSelectedName = player.name;
   tierAdminPlayerSearch.value = player.name;
+  closeTierAdminCreatePlayer();
   hideTierAdminSuggestions();
   renderTierAdminMemberships();
 }
@@ -324,6 +357,7 @@ function renderTierAdminEditor(preferredName = "") {
   const selected = players.find((player) => keyOf(player.name) === keyOf(currentName)) || players[0];
   tierAdminSelectedName = selected?.name || "";
   tierAdminPlayerSearch.value = tierAdminSelectedName;
+  closeTierAdminCreatePlayer();
   hideTierAdminSuggestions();
 
   tierAdminUniversityOptions.innerHTML = universityOptions().map((item) =>
@@ -344,6 +378,7 @@ function renderTierAdminMemberships() {
   tierAdminTier.value = String(player.tier || "FA");
   tierAdminPromotion.checked = Boolean(player.promotionLight);
   tierAdminPromotion.disabled = tierAdminTier.value === "FA";
+  tierAdminRevert.textContent = player.customPlayer ? "등록 선수 삭제" : "모든 변경 원본으로 되돌리기";
   const universities = playerUniversities(player);
   tierAdminMemberships.innerHTML = universities.length
     ? universities.map((university) => [
@@ -359,6 +394,13 @@ function renderTierAdminMemberships() {
 function setTierAdminControlsDisabled(disabled) {
   [
     tierAdminPlayerSearch,
+    tierAdminNewName,
+    tierAdminNewTier,
+    tierAdminNewRace,
+    tierAdminNewUniversity,
+    tierAdminNewBroadcastId,
+    tierAdminCreateConfirm,
+    tierAdminCreateCancel,
     tierAdminTier,
     tierAdminPromotion,
     tierAdminUniversity,
@@ -446,13 +488,58 @@ function saveTierAdminMemberships(universities, successMessage) {
   return saveTierAdminPlayer({ universities }, successMessage);
 }
 
+async function createTierAdminPlayer() {
+  if (tierAdminSaving) return;
+  const playerName = String(tierAdminNewName.value || "").replace(/\s+/g, " ").trim();
+  const university = String(tierAdminNewUniversity.value || "").replace(/\s+/g, " ").trim();
+  if (!playerName) {
+    tierAdminStatus.textContent = "새 선수 이름을 입력해 주세요.";
+    tierAdminNewName.focus();
+    return;
+  }
+  tierAdminSaving = true;
+  setTierAdminControlsDisabled(true);
+  tierAdminStatus.textContent = playerName + " 선수를 등록하고 있습니다.";
+  try {
+    const response = await fetch("/api/admin/tier-players", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-CSRF-Token": tierAdminCsrf
+      },
+      body: JSON.stringify({
+        playerName,
+        tier: tierAdminNewTier.value,
+        race: tierAdminNewRace.value,
+        university,
+        universities: university ? [university] : [],
+        broadcastId: tierAdminNewBroadcastId.value
+      })
+    });
+    await readAdminResponse(response);
+    await loadRoster(false);
+    tierAdminSelectedName = playerName;
+    renderTierAdminEditor(playerName);
+    tierAdminStatus.textContent = playerName + " 선수를 새 명단에 등록했습니다.";
+  } catch (error) {
+    tierAdminStatus.textContent = error.message;
+  } finally {
+    tierAdminSaving = false;
+    if (!tierAdminManager.hidden) setTierAdminControlsDisabled(false);
+  }
+}
+
 async function revertTierAdminMembership() {
   const player = adminSelectedPlayer();
   if (!player || tierAdminSaving) return;
   const playerName = player.name;
+  const customPlayer = Boolean(player.customPlayer);
   tierAdminSaving = true;
   setTierAdminControlsDisabled(true);
-  tierAdminStatus.textContent = "가져온 원본 명단으로 되돌리고 있습니다.";
+  tierAdminStatus.textContent = customPlayer
+    ? "등록한 선수를 명단에서 삭제하고 있습니다."
+    : "가져온 원본 명단으로 되돌리고 있습니다.";
   try {
     const response = await fetch("/api/admin/tier-memberships", {
       method: "DELETE",
@@ -465,8 +552,11 @@ async function revertTierAdminMembership() {
     });
     await readAdminResponse(response);
     await loadRoster(false);
-    renderTierAdminEditor(playerName);
-    tierAdminStatus.textContent = playerName + " 선수의 티어·승급불·소속을 가져온 원본으로 되돌렸습니다.";
+    tierAdminSelectedName = "";
+    renderTierAdminEditor();
+    tierAdminStatus.textContent = customPlayer
+      ? playerName + " 등록 선수를 명단에서 삭제했습니다."
+      : playerName + " 선수의 티어·승급불·소속을 가져온 원본으로 되돌렸습니다.";
   } catch (error) {
     tierAdminStatus.textContent = error.message;
   } finally {
@@ -847,6 +937,7 @@ tierAdminLogin.addEventListener("submit", async (event) => {
 });
 tierAdminPlayerSearch.addEventListener("focus", renderTierAdminSuggestions);
 tierAdminPlayerSearch.addEventListener("input", () => {
+  closeTierAdminCreatePlayer();
   const exact = state.players.find((player) => keyOf(player.name) === keyOf(tierAdminPlayerSearch.value));
   tierAdminSelectedName = exact?.name || "";
   renderTierAdminMemberships();
@@ -865,6 +956,12 @@ tierAdminPlayerSearch.addEventListener("keydown", (event) => {
     if (selected) {
       event.preventDefault();
       selectTierAdminPlayer(selected.dataset.playerName);
+    } else {
+      const createButton = tierAdminPlayerSuggestions.querySelector("[data-create-player]");
+      if (createButton) {
+        event.preventDefault();
+        openTierAdminCreatePlayer(createButton.dataset.createPlayer);
+      }
     }
     return;
   }
@@ -872,7 +969,18 @@ tierAdminPlayerSearch.addEventListener("keydown", (event) => {
 });
 tierAdminPlayerSuggestions.addEventListener("click", (event) => {
   const button = event.target.closest("[data-player-name]");
-  if (button) selectTierAdminPlayer(button.dataset.playerName);
+  if (button) {
+    selectTierAdminPlayer(button.dataset.playerName);
+    return;
+  }
+  const createButton = event.target.closest("[data-create-player]");
+  if (createButton) openTierAdminCreatePlayer(createButton.dataset.createPlayer);
+});
+tierAdminCreateConfirm.addEventListener("click", createTierAdminPlayer);
+tierAdminCreateCancel.addEventListener("click", () => {
+  closeTierAdminCreatePlayer();
+  tierAdminPlayerSearch.focus();
+  renderTierAdminSuggestions();
 });
 tierAdminTier.addEventListener("change", () => {
   const player = adminSelectedPlayer();

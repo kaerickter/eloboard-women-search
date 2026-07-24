@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>여성 선수 티어표 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./tiers.css?v=20260724-admin-search">
+    <link rel="stylesheet" href="./tiers.css?v=20260724-custom-player">
   </head>
   <body>
     <nav class="site-nav" aria-label="페이지 이동">
@@ -80,7 +80,7 @@
           <div class="tier-admin-player-search">
             <input
               id="tierAdminPlayerSearch"
-              type="search"
+              type="text"
               placeholder="선수 이름 일부를 입력하세요"
               autocomplete="off"
               role="combobox"
@@ -89,6 +89,55 @@
               aria-expanded="false">
             <div id="tierAdminPlayerSuggestions" class="tier-admin-player-suggestions" role="listbox" hidden></div>
           </div>
+
+          <section id="tierAdminCreatePlayer" class="tier-admin-create-player" hidden>
+            <div class="tier-admin-create-heading">
+              <strong>새 선수 등록</strong>
+              <span>외부 명단에 없어도 티어표에 바로 추가됩니다.</span>
+            </div>
+            <div class="tier-admin-create-grid">
+              <label for="tierAdminNewName">
+                <span>선수 이름</span>
+                <input id="tierAdminNewName" type="text" maxlength="40" placeholder="표시할 이름">
+              </label>
+              <label for="tierAdminNewTier">
+                <span>티어</span>
+                <select id="tierAdminNewTier">
+                  <option value="0">0티어</option>
+                  <option value="1">1티어</option>
+                  <option value="2">2티어</option>
+                  <option value="3">3티어</option>
+                  <option value="4">4티어</option>
+                  <option value="5">5티어</option>
+                  <option value="6" selected>6티어</option>
+                  <option value="7">7티어</option>
+                  <option value="8">8티어</option>
+                  <option value="9">9티어</option>
+                  <option value="FA">FA</option>
+                </select>
+              </label>
+              <label for="tierAdminNewRace">
+                <span>종족</span>
+                <select id="tierAdminNewRace">
+                  <option value="T">테란</option>
+                  <option value="P">프로토스</option>
+                  <option value="Z">저그</option>
+                </select>
+              </label>
+              <label for="tierAdminNewUniversity">
+                <span>대학</span>
+                <input id="tierAdminNewUniversity" type="text" list="tierAdminUniversityOptions" maxlength="40" placeholder="없으면 비워두기">
+              </label>
+              <label class="tier-admin-create-channel" for="tierAdminNewBroadcastId">
+                <span>SOOP 아이디 또는 방송 주소</span>
+                <input id="tierAdminNewBroadcastId" type="text" maxlength="120" placeholder="예: nreupne 또는 SOOP 주소">
+              </label>
+            </div>
+            <div class="tier-admin-create-actions">
+              <button id="tierAdminCreateConfirm" type="button">새 선수 등록</button>
+              <button id="tierAdminCreateCancel" type="button">취소</button>
+            </div>
+          </section>
 
           <div class="tier-admin-player-settings">
             <label for="tierAdminTier">
@@ -137,6 +186,6 @@
         <p id="tierAdminStatus" class="tier-admin-status" role="status"></p>
       </dialog>
     </main>
-    <script src="./tiers.js?v=20260724-admin-search"></script>
+    <script src="./tiers.js?v=20260724-custom-player"></script>
   </body>
 </html>

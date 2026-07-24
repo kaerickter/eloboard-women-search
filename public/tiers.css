@@ -293,6 +293,8 @@ h1 {
 
 .tier-admin-login input,
 .tier-admin-player-search input,
+.tier-admin-create-player input,
+.tier-admin-create-player select,
 .tier-admin-manager select,
 .tier-admin-add-row input {
   width: 100%;
@@ -365,6 +367,42 @@ h1 {
   font-weight: 900;
 }
 
+.tier-admin-create-suggestion {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 5px;
+  padding: 0 12px;
+  border: 1px dashed rgba(31, 83, 148, .42);
+  border-radius: 8px;
+  background: rgba(232, 241, 252, .7);
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.tier-admin-create-suggestion:hover,
+.tier-admin-create-suggestion:focus-visible {
+  border-style: solid;
+  border-color: #1f5394;
+  outline: 0;
+}
+
+.tier-admin-create-suggestion strong {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.tier-admin-create-suggestion span {
+  color: #1f5394;
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .tier-admin-no-results {
   margin: 0;
   padding: 13px 10px;
@@ -372,6 +410,79 @@ h1 {
   font-size: 12px;
   font-weight: 800;
   text-align: center;
+}
+
+.tier-admin-create-player {
+  display: grid;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid rgba(31, 83, 148, .25);
+  border-radius: 10px;
+  background: rgba(241, 247, 255, .72);
+}
+
+.tier-admin-create-player[hidden] {
+  display: none;
+}
+
+.tier-admin-create-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.tier-admin-create-heading strong {
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.tier-admin-create-heading span {
+  color: var(--theme-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tier-admin-create-grid {
+  display: grid;
+  grid-template-columns: 1.2fr .8fr .8fr 1fr;
+  gap: 10px;
+}
+
+.tier-admin-create-grid label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--theme-ink);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tier-admin-create-channel {
+  grid-column: 1 / -1;
+}
+
+.tier-admin-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tier-admin-create-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--theme-ink);
+  border-radius: 8px;
+  background: var(--theme-ink);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tier-admin-create-actions button:last-child {
+  border-color: var(--theme-line);
+  background: var(--theme-surface);
+  color: var(--theme-ink);
 }
 
 .tier-admin-player-settings {
@@ -653,23 +764,23 @@ h1 {
 }
 
 .player-card.is-promotion {
-  border: 2px solid #ff3559;
+  border: 1px solid rgba(211, 91, 117, .86);
   box-shadow:
-    0 0 7px rgba(255, 35, 72, .95),
-    0 0 18px rgba(255, 35, 72, .72),
-    0 0 32px rgba(214, 17, 53, .42);
-  animation: promotion-neon 1.9s ease-in-out infinite;
+    0 0 5px rgba(218, 91, 119, .48),
+    0 0 13px rgba(218, 91, 119, .3),
+    0 0 23px rgba(177, 72, 99, .16);
+  animation: promotion-neon 2.4s ease-in-out infinite;
 }
 
 .player-card.is-promotion .player-avatar::after {
   position: absolute;
   inset: 0;
   z-index: 2;
-  border: 3px solid rgba(255, 61, 93, .96);
+  border: 1px solid rgba(224, 116, 139, .82);
   border-radius: 8px;
   box-shadow:
-    inset 0 0 10px rgba(255, 34, 70, .92),
-    inset 0 0 24px rgba(211, 10, 49, .46);
+    inset 0 0 7px rgba(218, 91, 119, .44),
+    inset 0 0 16px rgba(177, 72, 99, .2);
   content: "";
   pointer-events: none;
 }
@@ -677,19 +788,19 @@ h1 {
 .player-card.is-promotion:hover,
 .player-card.is-promotion:focus-visible,
 .player-card.is-promotion.is-open {
-  border-color: #ff6680;
+  border-color: rgba(224, 116, 139, .94);
   box-shadow:
-    0 0 9px rgba(255, 35, 72, 1),
-    0 0 24px rgba(255, 35, 72, .82),
-    0 16px 34px rgba(130, 7, 29, .3);
+    0 0 7px rgba(218, 91, 119, .58),
+    0 0 17px rgba(218, 91, 119, .36),
+    0 14px 30px rgba(105, 38, 56, .18);
 }
 
 @keyframes promotion-neon {
   50% {
     box-shadow:
-      0 0 10px rgba(255, 69, 98, 1),
-      0 0 25px rgba(255, 35, 72, .88),
-      0 0 42px rgba(214, 17, 53, .58);
+      0 0 6px rgba(224, 116, 139, .58),
+      0 0 16px rgba(218, 91, 119, .36),
+      0 0 28px rgba(177, 72, 99, .2);
   }
 }
 
@@ -798,15 +909,15 @@ h1 {
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
-  border: 1px solid rgba(255, 203, 211, .88);
+  border: 1px solid rgba(244, 205, 214, .9);
   border-radius: 999px;
-  background: linear-gradient(135deg, #b70e2d, #ff3559);
+  background: linear-gradient(135deg, #a94f67, #d87c91);
   color: #fff;
-  box-shadow: 0 0 12px rgba(255, 35, 72, .72);
+  box-shadow: 0 0 8px rgba(184, 82, 106, .38);
   font-size: 12px;
   font-weight: 950;
   letter-spacing: .03em;
-  text-shadow: 0 1px 2px rgba(73, 0, 12, .42);
+  text-shadow: 0 1px 2px rgba(73, 24, 37, .3);
 }
 
 .live-badge::before {
@@ -967,6 +1078,8 @@ h1 {
   .tier-refresh { min-height: 34px; padding-inline: 10px; }
   .tier-races { gap: 9px; padding: 10px; }
   .tier-cards { gap: 8px; }
+  .tier-admin-create-grid { grid-template-columns: 1fr 1fr; }
+  .tier-admin-create-channel { grid-column: 1 / -1; }
   .player-card {
     width: calc((100% - 16px) / 3);
     height: auto;
@@ -1049,6 +1162,8 @@ h1 {
 @media (max-width: 430px) {
   .live-key { display: none; }
   .tier-admin-player-settings { grid-template-columns: 1fr; }
+  .tier-admin-create-grid { grid-template-columns: 1fr; }
+  .tier-admin-create-channel { grid-column: auto; }
   .player-card {
     width: calc((100% - 8px) / 2);
     min-height: 0;
