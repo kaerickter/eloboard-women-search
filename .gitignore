@@ -1,4 +1,7 @@
 node_modules/
-data/
+data/*
+!data/soop-aliases.json
+!data/soop-channels.json
+!data/tier-roster.json
 work/
 .env
