@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>여성 선수 티어표 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./tiers.css?v=20260724-animated-profiles">
+    <link rel="stylesheet" href="./tiers.css?v=20260724-tier-promotion">
   </head>
   <body>
     <nav class="site-nav" aria-label="페이지 이동">
@@ -53,12 +53,79 @@
             </button>
           </div>
           <p class="university-filter-note">명단 변경 시 대학과 인원수가 자동 반영됩니다.</p>
+          <button id="tierAdminOpen" class="tier-admin-open" type="button">선수 명단 관리</button>
         </aside>
       </div>
 
       <p id="boardStatus" class="board-status" role="status"></p>
       <p class="source-note">대학 소속 및 FA 선수를 모두 포함하며, LIVE 정보는 페이지 진입 즉시 확인한 뒤 15초마다 자동 갱신됩니다.</p>
+
+      <dialog id="tierAdminDialog" class="tier-admin-dialog" aria-labelledby="tierAdminTitle">
+        <div class="tier-admin-header">
+          <div>
+            <strong id="tierAdminTitle">티어표 선수 관리</strong>
+            <span>관리자만 변경할 수 있습니다.</span>
+          </div>
+          <button id="tierAdminClose" class="tier-admin-close" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <form id="tierAdminLogin" class="tier-admin-login">
+          <label for="tierAdminPassword">관리자 비밀번호</label>
+          <input id="tierAdminPassword" type="password" autocomplete="current-password" maxlength="200" required>
+          <button type="submit">로그인</button>
+        </form>
+
+        <section id="tierAdminManager" class="tier-admin-manager" hidden>
+          <label for="tierAdminPlayer">선수 선택</label>
+          <select id="tierAdminPlayer"></select>
+
+          <div class="tier-admin-player-settings">
+            <label for="tierAdminTier">
+              <span>현재 티어</span>
+              <select id="tierAdminTier">
+                <option value="0">0티어</option>
+                <option value="1">1티어</option>
+                <option value="2">2티어</option>
+                <option value="3">3티어</option>
+                <option value="4">4티어</option>
+                <option value="5">5티어</option>
+                <option value="6">6티어</option>
+                <option value="7">7티어</option>
+                <option value="8">8티어</option>
+                <option value="9">9티어</option>
+                <option value="FA">FA</option>
+              </select>
+            </label>
+            <label class="tier-admin-promotion">
+              <input id="tierAdminPromotion" type="checkbox">
+              <span><strong>승급불 지정</strong><small>사진 테두리에 붉은 네온을 표시합니다.</small></span>
+            </label>
+          </div>
+
+          <div class="tier-admin-membership-heading">
+            <strong>현재 소속</strong>
+            <span>소속을 모두 빼면 FA로 표시됩니다.</span>
+          </div>
+          <div id="tierAdminMemberships" class="tier-admin-memberships"></div>
+
+          <div class="tier-admin-add-row">
+            <label for="tierAdminUniversity">추가할 대학</label>
+            <div>
+              <input id="tierAdminUniversity" type="text" list="tierAdminUniversityOptions" maxlength="40" placeholder="대학 이름">
+              <datalist id="tierAdminUniversityOptions"></datalist>
+              <button id="tierAdminAdd" type="button">추가</button>
+            </div>
+          </div>
+
+          <div class="tier-admin-actions">
+            <button id="tierAdminMakeFa" type="button">FA로 변경</button>
+            <button id="tierAdminRevert" type="button">모든 변경 원본으로 되돌리기</button>
+            <button id="tierAdminLogout" type="button">로그아웃</button>
+          </div>
+        </section>
+        <p id="tierAdminStatus" class="tier-admin-status" role="status"></p>
+      </dialog>
     </main>
-    <script src="./tiers.js?v=20260724-animated-profiles"></script>
+    <script src="./tiers.js?v=20260724-tier-promotion"></script>
   </body>
 </html>

@@ -109,8 +109,10 @@ h1 {
 .university-filter-panel {
   position: sticky;
   top: 18px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
   min-width: 0;
-  padding-left: 20px;
+  padding: 0 4px 4px 20px;
   border-left: 1px solid var(--theme-line);
 }
 
@@ -177,6 +179,276 @@ h1 {
 .university-filter-note {
   margin: 12px 0 0;
   line-height: 1.5;
+}
+
+.tier-admin-open {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 13px;
+  border: 1px solid var(--theme-ink);
+  border-radius: 8px;
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tier-admin-open:hover,
+.tier-admin-open:focus-visible {
+  background: var(--theme-ink);
+  color: #fff;
+  outline: 0;
+}
+
+.tier-admin-dialog {
+  width: min(520px, calc(100% - 28px));
+  max-height: min(760px, calc(100vh - 28px));
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--theme-line);
+  border-radius: 14px;
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+  box-shadow: 0 24px 70px rgba(23, 33, 58, .24);
+}
+
+.tier-admin-dialog::backdrop {
+  background: rgba(23, 33, 58, .55);
+}
+
+.tier-admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 18px;
+  border-bottom: 1px solid var(--theme-line);
+  background: var(--theme-surface);
+}
+
+.tier-admin-header div {
+  display: grid;
+  gap: 3px;
+}
+
+.tier-admin-header strong {
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.tier-admin-header span,
+.tier-admin-membership-heading span {
+  color: var(--theme-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tier-admin-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--theme-line);
+  border-radius: 50%;
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 22px;
+}
+
+.tier-admin-login,
+.tier-admin-manager {
+  padding: 18px;
+}
+
+.tier-admin-login {
+  display: grid;
+  gap: 10px;
+}
+
+.tier-admin-login label,
+.tier-admin-manager > label,
+.tier-admin-add-row > label,
+.tier-admin-player-settings label {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tier-admin-login input,
+.tier-admin-manager select,
+.tier-admin-add-row input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--theme-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--theme-ink);
+  font: inherit;
+}
+
+.tier-admin-player-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.tier-admin-player-settings > label:first-child {
+  display: grid;
+  gap: 7px;
+}
+
+.tier-admin-promotion {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid rgba(231, 54, 77, .38);
+  border-radius: 8px;
+  background: rgba(255, 238, 241, .72);
+  cursor: pointer;
+}
+
+.tier-admin-promotion input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: #e22e48;
+}
+
+.tier-admin-promotion span {
+  display: grid;
+  gap: 3px;
+}
+
+.tier-admin-promotion strong {
+  color: #b51f37;
+}
+
+.tier-admin-promotion small {
+  color: var(--theme-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.tier-admin-promotion:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: .52;
+}
+
+.tier-admin-login button,
+.tier-admin-add-row button,
+.tier-admin-actions button {
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--theme-ink);
+  border-radius: 8px;
+  background: var(--theme-ink);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tier-admin-manager[hidden],
+.tier-admin-login[hidden] {
+  display: none;
+}
+
+.tier-admin-manager {
+  display: grid;
+  gap: 14px;
+}
+
+.tier-admin-membership-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.tier-admin-memberships {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--theme-line);
+  border-radius: 8px;
+  background: var(--theme-surface-soft);
+}
+
+.tier-admin-membership {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--theme-line);
+  border-radius: 999px;
+  background: var(--theme-surface);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tier-admin-membership button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--theme-surface-soft);
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.tier-admin-fa-label {
+  color: var(--theme-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tier-admin-add-row {
+  display: grid;
+  gap: 8px;
+}
+
+.tier-admin-add-row > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.tier-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.tier-admin-actions button {
+  border-color: var(--theme-line);
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+}
+
+.tier-admin-status {
+  min-height: 20px;
+  margin: 0;
+  padding: 0 18px 18px;
+  color: var(--theme-muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .tier-row {
@@ -297,6 +569,47 @@ h1 {
   transform: translateY(-2px);
 }
 
+.player-card.is-promotion {
+  border: 2px solid #ff3559;
+  box-shadow:
+    0 0 7px rgba(255, 35, 72, .95),
+    0 0 18px rgba(255, 35, 72, .72),
+    0 0 32px rgba(214, 17, 53, .42);
+  animation: promotion-neon 1.9s ease-in-out infinite;
+}
+
+.player-card.is-promotion .player-avatar::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 3px solid rgba(255, 61, 93, .96);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 10px rgba(255, 34, 70, .92),
+    inset 0 0 24px rgba(211, 10, 49, .46);
+  content: "";
+  pointer-events: none;
+}
+
+.player-card.is-promotion:hover,
+.player-card.is-promotion:focus-visible,
+.player-card.is-promotion.is-open {
+  border-color: #ff6680;
+  box-shadow:
+    0 0 9px rgba(255, 35, 72, 1),
+    0 0 24px rgba(255, 35, 72, .82),
+    0 16px 34px rgba(130, 7, 29, .3);
+}
+
+@keyframes promotion-neon {
+  50% {
+    box-shadow:
+      0 0 10px rgba(255, 69, 98, 1),
+      0 0 25px rgba(255, 35, 72, .88),
+      0 0 42px rgba(214, 17, 53, .58);
+  }
+}
+
 .player-avatar {
   position: absolute;
   inset: 0;
@@ -393,6 +706,26 @@ h1 {
 
 .player-card.is-live .live-badge { display: inline-flex; }
 
+.promotion-badge {
+  position: absolute;
+  z-index: 4;
+  top: 9px;
+  left: 9px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 203, 211, .88);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #b70e2d, #ff3559);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 35, 72, .72);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .03em;
+  text-shadow: 0 1px 2px rgba(73, 0, 12, .42);
+}
+
 .live-badge::before {
   width: 7px;
   height: 7px;
@@ -404,6 +737,12 @@ h1 {
 
 @keyframes live-pulse {
   50% { opacity: .35; transform: scale(.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-card.is-promotion {
+    animation: none;
+  }
 }
 
 .live-popover {
@@ -567,6 +906,13 @@ h1 {
     padding-inline: 8px;
     font-size: 11px;
   }
+  .promotion-badge {
+    top: 5px;
+    left: 5px;
+    min-height: 24px;
+    padding-inline: 7px;
+    font-size: 10px;
+  }
   .live-popover {
     --popover-x: -50%;
     position: fixed;
@@ -593,6 +939,8 @@ h1 {
 
   .university-filter-panel {
     position: static;
+    max-height: none;
+    overflow: visible;
     grid-row: 1;
     padding: 0 0 16px;
     border-left: 0;
@@ -617,6 +965,7 @@ h1 {
 
 @media (max-width: 430px) {
   .live-key { display: none; }
+  .tier-admin-player-settings { grid-template-columns: 1fr; }
   .player-card {
     width: calc((100% - 8px) / 2);
     min-height: 0;
