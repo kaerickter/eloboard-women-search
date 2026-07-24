@@ -65,14 +65,21 @@ class TierAdmin {
     this.password = options.password ?? process.env.TIER_ADMIN_PASSWORD ?? "";
     this.filePath = options.filePath || process.env.TIER_OVERRIDE_FILE ||
       path.join(__dirname, "data", "tier-university-overrides.json");
-    const databaseUrl = options.databaseUrl ?? process.env.DATABASE_URL ?? "";
-    this.pool = databaseUrl
+    const databaseUrl = options.databaseUrl ??
+      process.env.TIER_ADMIN_DATABASE_URL ??
+      process.env.DATABASE_URL ??
+      "";
+    this.production = options.production ?? process.env.NODE_ENV === "production";
+    const durableSetting = String(process.env.TIER_ADMIN_REQUIRE_DATABASE || "").trim().toLowerCase();
+    this.requireDurable = options.requireDurable ??
+      (durableSetting ? !["0", "false", "no"].includes(durableSetting) : this.production);
+    this.pool = options.pool || (databaseUrl
       ? new Pool({
           connectionString: databaseUrl,
-          ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+          ssl: this.production ? { rejectUnauthorized: false } : undefined,
           max: 2
         })
-      : null;
+      : null);
     this.overrides = new Map();
     this.sessions = new Map();
     this.loginAttempts = new Map();
@@ -81,6 +88,28 @@ class TierAdmin {
 
   get configured() {
     return Boolean(this.password);
+  }
+
+  get storageStatus() {
+    return {
+      mode: this.pool ? "postgresql" : "local-file",
+      durable: Boolean(this.pool) || !this.production,
+      message: this.pool
+        ? "PostgreSQL에 영구 저장됩니다."
+        : (this.production
+          ? "영구 저장소가 연결되지 않았습니다. Render에 DATABASE_URL을 연결해 주세요."
+          : "로컬 JSON 파일에 저장됩니다.")
+    };
+  }
+
+  assertWritableStorage() {
+    if (!this.requireDurable || this.pool) return;
+    const error = new Error(
+      "영구 저장소가 연결되지 않아 변경하지 않았습니다. Render Environment의 DATABASE_URL에 PostgreSQL을 연결해 주세요."
+    );
+    error.statusCode = 503;
+    error.code = "DURABLE_STORAGE_REQUIRED";
+    throw error;
   }
 
   async init() {
@@ -204,6 +233,7 @@ class TierAdmin {
   }
 
   async setOverride(playerName, values) {
+    this.assertWritableStorage();
     const normalizedName = String(playerName || "").trim().slice(0, 40);
     const key = playerKey(normalizedName);
     if (!key) throw new Error("선수 이름이 필요합니다.");
@@ -231,9 +261,8 @@ class TierAdmin {
       broadcastId: broadcastId || null,
       updatedAt: new Date().toISOString()
     };
-    this.overrides.set(key, item);
     if (this.pool) {
-      await this.pool.query(
+      const result = await this.pool.query(
         `INSERT INTO tier_university_overrides(
            player_key, player_name, universities, tier, promotion_light,
            is_custom, race, broadcast_id, updated_at
@@ -247,7 +276,8 @@ class TierAdmin {
            is_custom=EXCLUDED.is_custom,
            race=EXCLUDED.race,
            broadcast_id=EXCLUDED.broadcast_id,
-           updated_at=EXCLUDED.updated_at`,
+           updated_at=EXCLUDED.updated_at
+         RETURNING player_key`,
         [
           key,
           item.playerName,
@@ -260,20 +290,40 @@ class TierAdmin {
           item.updatedAt
         ]
       );
+      if (result.rowCount !== 1 || result.rows[0]?.player_key !== key) {
+        throw new Error("PostgreSQL에서 저장 완료를 확인하지 못했습니다.");
+      }
+      this.overrides.set(key, item);
     } else {
-      await this.persistFile();
+      const previous = this.overrides.get(key);
+      this.overrides.set(key, item);
+      try {
+        await this.persistFile();
+      } catch (error) {
+        if (previous) this.overrides.set(key, previous);
+        else this.overrides.delete(key);
+        throw error;
+      }
     }
     return { ...item, universities: [...item.universities] };
   }
 
   async deleteOverride(playerName) {
+    this.assertWritableStorage();
     const key = playerKey(playerName);
     if (!key) throw new Error("선수 이름이 필요합니다.");
-    this.overrides.delete(key);
     if (this.pool) {
       await this.pool.query("DELETE FROM tier_university_overrides WHERE player_key=$1", [key]);
+      this.overrides.delete(key);
     } else {
-      await this.persistFile();
+      const previous = this.overrides.get(key);
+      this.overrides.delete(key);
+      try {
+        await this.persistFile();
+      } catch (error) {
+        if (previous) this.overrides.set(key, previous);
+        throw error;
+      }
     }
   }
 

@@ -1179,7 +1179,8 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, JSON.stringify({
       configured: tierAdmin.configured,
       authenticated: Boolean(session),
-      csrf: session?.csrf || ""
+      csrf: session?.csrf || "",
+      storage: tierAdmin.storageStatus
     }), "application/json; charset=utf-8");
   }
   if (url.pathname === "/api/admin/login" && req.method === "POST") {
@@ -1194,7 +1195,8 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, JSON.stringify({
         authenticated: true,
-        csrf: result.session.csrf
+        csrf: result.session.csrf,
+        storage: tierAdmin.storageStatus
       }), "application/json; charset=utf-8", { "Set-Cookie": result.cookie });
     } catch (error) {
       return send(res, 400, JSON.stringify({ error: error.message || "로그인 요청을 처리하지 못했습니다." }), "application/json; charset=utf-8");
@@ -1215,7 +1217,8 @@ const server = http.createServer(async (req, res) => {
     }
     return send(res, 200, JSON.stringify({
       overrides: tierAdmin.listOverrides(),
-      csrf: session.csrf
+      csrf: session.csrf,
+      storage: tierAdmin.storageStatus
     }), "application/json; charset=utf-8");
   }
   if (url.pathname === "/api/admin/tier-players" && req.method === "POST") {
@@ -1245,9 +1248,17 @@ const server = http.createServer(async (req, res) => {
       });
       const player = tierAdmin.applyOverrides(sourcePlayers).find((item) =>
         normalizeName(item.name) === normalizeName(playerName));
-      return send(res, 201, JSON.stringify({ ok: true, override, player }), "application/json; charset=utf-8");
+      return send(res, 201, JSON.stringify({
+        ok: true,
+        override,
+        player,
+        storage: tierAdmin.storageStatus
+      }), "application/json; charset=utf-8");
     } catch (error) {
-      return send(res, 400, JSON.stringify({ error: error.message || "새 선수를 등록하지 못했습니다." }), "application/json; charset=utf-8");
+      return send(res, error.statusCode || 400, JSON.stringify({
+        error: error.message || "새 선수를 등록하지 못했습니다.",
+        code: error.code || ""
+      }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/admin/tier-memberships" && (req.method === "PUT" || req.method === "DELETE")) {
@@ -1265,7 +1276,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === "DELETE") {
         await tierAdmin.deleteOverride(playerName);
-        return send(res, 200, JSON.stringify({ ok: true, reverted: true }), "application/json; charset=utf-8");
+        return send(res, 200, JSON.stringify({
+          ok: true,
+          reverted: true,
+          storage: tierAdmin.storageStatus
+        }), "application/json; charset=utf-8");
       }
       const override = await tierAdmin.setOverride(playerName, {
         universities: Array.isArray(body.universities) ? body.universities : currentPlayer.universities,
@@ -1277,9 +1292,16 @@ const server = http.createServer(async (req, res) => {
         race: currentPlayer.race,
         broadcastId: currentPlayer.broadcastId
       });
-      return send(res, 200, JSON.stringify({ ok: true, override }), "application/json; charset=utf-8");
+      return send(res, 200, JSON.stringify({
+        ok: true,
+        override,
+        storage: tierAdmin.storageStatus
+      }), "application/json; charset=utf-8");
     } catch (error) {
-      return send(res, 400, JSON.stringify({ error: error.message || "선수 정보를 변경하지 못했습니다." }), "application/json; charset=utf-8");
+      return send(res, error.statusCode || 400, JSON.stringify({
+        error: error.message || "선수 정보를 변경하지 못했습니다.",
+        code: error.code || ""
+      }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/tiers" && req.method === "GET") {
