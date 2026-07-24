@@ -3,7 +3,10 @@ const statusLine = document.getElementById("boardStatus");
 const refreshButton = document.getElementById("refreshButton");
 const countdown = document.getElementById("refreshCountdown");
 const LIVE_POLL_MS = 15000;
+const MAX_ANIMATED_PROFILES = 4;
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let livePollTimer = null;
+let profileObserver = null;
 
 const state = {
   players: [],
@@ -42,9 +45,14 @@ function formatViewers(value) {
 
 function avatar(player) {
   const initial = Array.from(player.name || "?")[0] || "?";
-  const imageUrl = safeExternalUrl(player.image);
-  const image = imageUrl
-    ? '<img src="' + escapeHtml(imageUrl) + '" alt="" loading="lazy">'
+  const fallbackUrl = safeExternalUrl(player.image);
+  const staticUrl = safeExternalUrl(player.tierStaticImage) || fallbackUrl;
+  const animatedUrl = safeExternalUrl(player.tierAnimatedImage);
+  const image = staticUrl
+    ? '<img class="player-photo" src="' + escapeHtml(staticUrl) + '" alt="" loading="lazy" decoding="async" fetchpriority="low"' +
+      ' data-static-src="' + escapeHtml(staticUrl) + '"' +
+      ' data-animated-src="' + escapeHtml(animatedUrl) + '"' +
+      ' data-fallback-src="' + escapeHtml(fallbackUrl) + '">'
     : "";
   return '<span class="player-avatar">' + escapeHtml(initial) + image + "</span>";
 }
@@ -145,8 +153,23 @@ function bindCards() {
     button.addEventListener("click", () => refreshTierLive(button.dataset.tier));
   });
 
-  board.querySelectorAll(".player-avatar img").forEach((image) => {
-    image.addEventListener("error", () => { image.hidden = true; }, { once: true });
+  board.querySelectorAll(".player-photo").forEach((image) => {
+    image.addEventListener("error", () => {
+      const failedSource = image.currentSrc || image.src;
+      const animatedSource = image.dataset.animatedSrc || "";
+      const fallbackSource = image.dataset.fallbackSrc || "";
+      if (animatedSource && failedSource === animatedSource) {
+        image.dataset.animatedSrc = "";
+        image.src = image.dataset.staticSrc || fallbackSource;
+        return;
+      }
+      if (fallbackSource && failedSource !== fallbackSource) {
+        image.dataset.staticSrc = fallbackSource;
+        image.src = fallbackSource;
+        return;
+      }
+      image.hidden = true;
+    });
   });
 
   board.querySelectorAll(".player-card").forEach((card) => {
@@ -156,12 +179,15 @@ function bindCards() {
     };
     card.addEventListener("click", (event) => {
       if (event.target.closest(".watch-link")) return;
-      const canPreview = card.classList.contains("is-live");
+      const hasAnimation = Boolean(card.querySelector(".player-photo")?.dataset.animatedSrc);
+      const touchPreview = window.matchMedia("(hover: none)").matches && hasAnimation;
+      const canPreview = card.classList.contains("is-live") || touchPreview;
       if (canPreview && !card.classList.contains("is-open")) {
         event.preventDefault();
         closeOpenCard();
         card.classList.add("is-open");
         state.openCard = card;
+        syncProfileAnimations();
         return;
       }
       openDestination();
@@ -169,25 +195,80 @@ function bindCards() {
     card.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      const canPreview = card.classList.contains("is-live");
+      const canPreview = card.classList.contains("is-live") ||
+        Boolean(card.querySelector(".player-photo")?.dataset.animatedSrc);
       if (canPreview && !card.classList.contains("is-open")) {
         closeOpenCard();
         card.classList.add("is-open");
         state.openCard = card;
+        syncProfileAnimations();
         return;
       }
       openDestination();
     });
     card.addEventListener("mouseenter", () => {
-      if (card.classList.contains("is-live")) card.classList.add("is-hovered");
+      card.classList.add("is-hovered");
+      syncProfileAnimations();
     });
-    card.addEventListener("mouseleave", () => card.classList.remove("is-hovered"));
+    card.addEventListener("mouseleave", () => {
+      card.classList.remove("is-hovered");
+      syncProfileAnimations();
+    });
+    card.addEventListener("focusin", syncProfileAnimations);
+    card.addEventListener("focusout", () => requestAnimationFrame(syncProfileAnimations));
   });
+
+  observeProfilePhotos();
 }
 
 function closeOpenCard() {
   if (state.openCard) state.openCard.classList.remove("is-open");
   state.openCard = null;
+  syncProfileAnimations();
+}
+
+function observeProfilePhotos() {
+  profileObserver?.disconnect();
+  if (!("IntersectionObserver" in window)) {
+    board.querySelectorAll(".player-photo").forEach((image) => { image.dataset.inView = "1"; });
+    syncProfileAnimations();
+    return;
+  }
+  profileObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) entry.target.dataset.inView = entry.isIntersecting ? "1" : "0";
+    syncProfileAnimations();
+  }, { rootMargin: "80px 0px", threshold: 0.01 });
+  board.querySelectorAll(".player-photo").forEach((image) => profileObserver.observe(image));
+}
+
+function syncProfileAnimations() {
+  const photos = [...board.querySelectorAll(".player-photo")];
+  const canAnimate = document.visibilityState === "visible" && !reducedMotion.matches;
+  const candidates = canAnimate
+    ? photos.filter((image) => {
+        if (image.dataset.inView !== "1" || !image.dataset.animatedSrc) return false;
+        const card = image.closest(".player-card");
+        return card?.classList.contains("is-live") ||
+          card?.classList.contains("is-open") ||
+          card?.classList.contains("is-hovered") ||
+          card?.matches(":focus-within");
+      }).sort((imageA, imageB) => {
+        const cardA = imageA.closest(".player-card");
+        const cardB = imageB.closest(".player-card");
+        const selectedA = Number(cardA?.classList.contains("is-open") || cardA?.classList.contains("is-hovered") || cardA?.matches(":focus-within"));
+        const selectedB = Number(cardB?.classList.contains("is-open") || cardB?.classList.contains("is-hovered") || cardB?.matches(":focus-within"));
+        return selectedB - selectedA;
+      }).slice(0, MAX_ANIMATED_PROFILES)
+    : [];
+  const animated = new Set(candidates);
+
+  for (const image of photos) {
+    const shouldAnimate = animated.has(image);
+    const target = shouldAnimate ? image.dataset.animatedSrc : image.dataset.staticSrc;
+    image.classList.toggle("is-animated", shouldAnimate);
+    if (!target || (image.currentSrc || image.src) === target) continue;
+    image.src = target;
+  }
 }
 
 async function loadRoster(force = false) {
@@ -310,8 +391,10 @@ async function refreshTierLive(tier) {
 
 refreshButton.addEventListener("click", () => loadRoster(true));
 document.addEventListener("visibilitychange", () => {
+  syncProfileAnimations();
   if (document.visibilityState === "visible") loadLive(false);
 });
+reducedMotion.addEventListener?.("change", syncProfileAnimations);
 document.addEventListener("click", (event) => {
   if (state.openCard && !state.openCard.contains(event.target)) closeOpenCard();
 });
