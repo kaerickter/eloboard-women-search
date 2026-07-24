@@ -645,6 +645,15 @@ h1 {
   font-weight: 800;
 }
 
+.tier-admin-dialog.has-storage-warning .tier-admin-status {
+  margin: 0 18px 18px;
+  padding: 10px 12px;
+  border: 1px solid rgba(190, 82, 82, .28);
+  border-radius: 9px;
+  background: rgba(190, 82, 82, .08);
+  color: #923f4c;
+}
+
 .tier-row {
   min-width: 0;
   overflow: visible;

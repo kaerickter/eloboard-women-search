@@ -43,6 +43,7 @@ let tierAdminSaving = false;
 let tierAdminSelectedName = "";
 let tierAdminSuggestionIndex = -1;
 let tierAdminDrag = null;
+let tierAdminStorage = { mode: "unknown", durable: false, message: "" };
 
 const state = {
   players: [],
@@ -423,11 +424,28 @@ async function readAdminResponse(response) {
   return data;
 }
 
+function updateTierAdminStorage(storage) {
+  if (!storage || typeof storage !== "object") return;
+  tierAdminStorage = {
+    mode: String(storage.mode || "unknown"),
+    durable: storage.durable === true,
+    message: String(storage.message || "")
+  };
+  tierAdminDialog.classList.toggle("has-storage-warning", !tierAdminStorage.durable);
+}
+
+function savedAdminMessage(message) {
+  return tierAdminStorage.durable
+    ? message + " PostgreSQL에 영구 저장했습니다."
+    : message;
+}
+
 async function checkTierAdminSession() {
   tierAdminStatus.textContent = "관리자 상태를 확인하고 있습니다.";
   try {
     const response = await fetch("/api/admin/status", { headers: { "Accept": "application/json" } });
     const data = await readAdminResponse(response);
+    updateTierAdminStorage(data.storage);
     if (!data.configured) {
       tierAdminStatus.textContent = "Render 환경변수 TIER_ADMIN_PASSWORD를 먼저 설정해 주세요.";
       tierAdminPassword.disabled = true;
@@ -437,9 +455,11 @@ async function checkTierAdminSession() {
     tierAdminPassword.disabled = false;
     tierAdminCsrf = data.csrf || "";
     setTierAdminView(Boolean(data.authenticated));
-    tierAdminStatus.textContent = data.authenticated
-      ? "로그인되었습니다. 변경 내용은 즉시 전체 티어표에 반영됩니다."
-      : "관리자 비밀번호로 로그인해 주세요.";
+    tierAdminStatus.textContent = !tierAdminStorage.durable
+      ? tierAdminStorage.message
+      : (data.authenticated
+        ? "로그인되었습니다. 변경 내용은 PostgreSQL에 영구 저장됩니다."
+        : "관리자 비밀번호로 로그인해 주세요. 변경 내용은 PostgreSQL에 영구 저장됩니다.");
   } catch (error) {
     setTierAdminView(false);
     tierAdminStatus.textContent = error.message;
@@ -468,10 +488,11 @@ async function saveTierAdminPlayer(changes, successMessage) {
       },
       body: JSON.stringify({ playerName, universities, tier, promotionLight })
     });
-    await readAdminResponse(response);
+    const data = await readAdminResponse(response);
+    updateTierAdminStorage(data.storage);
     await loadRoster(false);
     renderTierAdminEditor(playerName);
-    tierAdminStatus.textContent = successMessage;
+    tierAdminStatus.textContent = savedAdminMessage(successMessage);
   } catch (error) {
     tierAdminStatus.textContent = error.message;
     if (/인증|로그인/.test(error.message)) {
@@ -517,11 +538,12 @@ async function createTierAdminPlayer() {
         broadcastId: tierAdminNewBroadcastId.value
       })
     });
-    await readAdminResponse(response);
+    const data = await readAdminResponse(response);
+    updateTierAdminStorage(data.storage);
     await loadRoster(false);
     tierAdminSelectedName = playerName;
     renderTierAdminEditor(playerName);
-    tierAdminStatus.textContent = playerName + " 선수를 새 명단에 등록했습니다.";
+    tierAdminStatus.textContent = savedAdminMessage(playerName + " 선수를 새 명단에 등록했습니다.");
   } catch (error) {
     tierAdminStatus.textContent = error.message;
   } finally {
@@ -550,13 +572,14 @@ async function revertTierAdminMembership() {
       },
       body: JSON.stringify({ playerName })
     });
-    await readAdminResponse(response);
+    const data = await readAdminResponse(response);
+    updateTierAdminStorage(data.storage);
     await loadRoster(false);
     tierAdminSelectedName = "";
     renderTierAdminEditor();
-    tierAdminStatus.textContent = customPlayer
+    tierAdminStatus.textContent = savedAdminMessage(customPlayer
       ? playerName + " 등록 선수를 명단에서 삭제했습니다."
-      : playerName + " 선수의 티어·승급불·소속을 가져온 원본으로 되돌렸습니다.";
+      : playerName + " 선수의 티어·승급불·소속을 가져온 원본으로 되돌렸습니다.");
   } catch (error) {
     tierAdminStatus.textContent = error.message;
   } finally {
@@ -927,10 +950,13 @@ tierAdminLogin.addEventListener("submit", async (event) => {
       body: JSON.stringify({ password: tierAdminPassword.value })
     });
     const data = await readAdminResponse(response);
+    updateTierAdminStorage(data.storage);
     tierAdminCsrf = data.csrf || "";
     tierAdminPassword.value = "";
     setTierAdminView(true);
-    tierAdminStatus.textContent = "로그인되었습니다. 변경할 선수를 선택해 주세요.";
+    tierAdminStatus.textContent = tierAdminStorage.durable
+      ? "로그인되었습니다. 변경 내용은 PostgreSQL에 영구 저장됩니다."
+      : tierAdminStorage.message;
   } catch (error) {
     tierAdminStatus.textContent = error.message;
   }
