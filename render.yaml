@@ -13,6 +13,8 @@ services:
         fromDatabase:
           name: elo-kitten-rooms
           property: connectionString
+      - key: TIER_ADMIN_PASSWORD
+        sync: false
 
 databases:
   - name: elo-kitten-rooms

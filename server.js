@@ -5,6 +5,7 @@ const os = require("node:os");
 const { Server: SocketIOServer } = require("socket.io");
 const { setupCollaboration } = require("./collaboration-server");
 const { normalizeBjListPlayerText } = require("./eloboard-utils");
+const { TierAdmin } = require("./tier-admin");
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
@@ -21,6 +22,16 @@ const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const PINNED_SOOP_ALIASES = {
+  "핑핑": {
+    broadcastId: "nreupne",
+    searchName: "핑핑♥",
+    stationNames: ["핑핑♥"]
+  },
+  "핑핑♥": {
+    broadcastId: "nreupne",
+    searchName: "핑핑♥",
+    stationNames: ["핑핑♥"]
+  },
   "려원님": {
     broadcastId: "fudnjs0235",
     searchName: "려원♡",
@@ -47,6 +58,9 @@ const PINNED_SOOP_ALIASES = {
     stationNames: ["임조이1111", "Imzoe"]
   }
 };
+const PINNED_TIER_DISPLAY_NAMES = {
+  "핑핑": "핑핑♥"
+};
 const PORT = Number(process.env.PORT || 5177);
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
@@ -71,6 +85,7 @@ const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 15;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 8;
+const tierAdmin = new TierAdmin();
 
 try {
   channelRegistry = JSON.parse(fs.readFileSync(SOOP_CHANNEL_FILE, "utf8"));
@@ -97,9 +112,22 @@ try {
   tierRosterCache = null;
 }
 
-function send(res, status, body, type = "text/plain; charset=utf-8") {
-  res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" });
+function send(res, status, body, type = "text/plain; charset=utf-8", headers = {}) {
+  res.writeHead(status, {
+    "Content-Type": type,
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, X-CSRF-Token",
+    ...headers
+  });
   res.end(body);
+}
+
+function requestIsSameOrigin(req) {
+  const origin = String(req.headers.origin || "");
+  if (!origin) return process.env.NODE_ENV !== "production";
+  const protocol = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim();
+  return origin === protocol + "://" + req.headers.host;
 }
 async function fetchWithRetry(url, options = {}, attempts = 2) {
   let lastError;
@@ -757,12 +785,14 @@ async function refreshTierRoster() {
   const players = new Map();
   for (const player of rosters.flat()) {
     if ((!/^\d+$/.test(player.tier) && player.tier !== "FA") || player.division !== "women") continue;
-    const key = normalizeName(player.name);
+    const pinnedName = PINNED_TIER_DISPLAY_NAMES[normalizeName(player.name)] || player.name;
+    const rosterPlayer = pinnedName === player.name ? player : { ...player, name: pinnedName };
+    const key = normalizeName(rosterPlayer.name);
     const current = players.get(key);
     if (!current) {
-      players.set(key, { ...player, universities: [player.university] });
-    } else if (!current.universities.includes(player.university)) {
-      current.universities.push(player.university);
+      players.set(key, { ...rosterPlayer, universities: [rosterPlayer.university] });
+    } else if (!current.universities.includes(rosterPlayer.university)) {
+      current.universities.push(rosterPlayer.university);
     }
   }
   const tierRank = (tier) => tier === "FA" ? Number.MAX_SAFE_INTEGER : Number(tier);
@@ -888,7 +918,10 @@ async function searchSoopLiveStatus(name) {
       ...(Array.isArray(data?.EXTRA_BROAD) ? data.EXTRA_BROAD : [])
     ];
     const acceptedNames = allowedSoopNames(name);
+    const pinnedBroadcastId = String(alias?.broadcastId || "");
     const broad = broadcasts.find((item) => {
+      const candidateId = String(item?.user_id || "");
+      if (pinnedBroadcastId) return candidateId === pinnedBroadcastId;
       const candidateNames = [
         item?.station_name,
         item?.user_nick
@@ -1133,6 +1166,79 @@ function lanUrls(port) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname === "/api/admin/status" && req.method === "GET") {
+    const session = tierAdmin.session(req);
+    return send(res, 200, JSON.stringify({
+      configured: tierAdmin.configured,
+      authenticated: Boolean(session),
+      csrf: session?.csrf || ""
+    }), "application/json; charset=utf-8");
+  }
+  if (url.pathname === "/api/admin/login" && req.method === "POST") {
+    if (!requestIsSameOrigin(req)) {
+      return send(res, 403, JSON.stringify({ error: "허용되지 않은 요청입니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const body = await readJsonBody(req);
+      const result = tierAdmin.login(req, body.password);
+      if (result.error) {
+        return send(res, result.status, JSON.stringify({ error: result.error }), "application/json; charset=utf-8");
+      }
+      return send(res, 200, JSON.stringify({
+        authenticated: true,
+        csrf: result.session.csrf
+      }), "application/json; charset=utf-8", { "Set-Cookie": result.cookie });
+    } catch (error) {
+      return send(res, 400, JSON.stringify({ error: error.message || "로그인 요청을 처리하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/admin/logout" && req.method === "POST") {
+    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+      return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    return send(res, 200, JSON.stringify({ authenticated: false }), "application/json; charset=utf-8", {
+      "Set-Cookie": tierAdmin.logout(req)
+    });
+  }
+  if (url.pathname === "/api/admin/tier-memberships" && req.method === "GET") {
+    const session = tierAdmin.session(req);
+    if (!session) {
+      return send(res, 401, JSON.stringify({ error: "관리자 로그인이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    return send(res, 200, JSON.stringify({
+      overrides: tierAdmin.listOverrides(),
+      csrf: session.csrf
+    }), "application/json; charset=utf-8");
+  }
+  if (url.pathname === "/api/admin/tier-memberships" && (req.method === "PUT" || req.method === "DELETE")) {
+    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+      return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const body = await readJsonBody(req);
+      const playerName = String(body.playerName || "").trim();
+      const sourcePlayer = tierRosterCache?.players?.find((player) =>
+        normalizeName(player.name) === normalizeName(playerName));
+      if (!sourcePlayer) {
+        return send(res, 404, JSON.stringify({ error: "현재 티어 명단에서 선수를 찾지 못했습니다." }), "application/json; charset=utf-8");
+      }
+      if (req.method === "DELETE") {
+        await tierAdmin.deleteOverride(playerName);
+        return send(res, 200, JSON.stringify({ ok: true, reverted: true }), "application/json; charset=utf-8");
+      }
+      const currentPlayer = tierAdmin.applyOverrides([sourcePlayer])[0];
+      const override = await tierAdmin.setOverride(playerName, {
+        universities: Array.isArray(body.universities) ? body.universities : currentPlayer.universities,
+        tier: body.tier == null ? currentPlayer.tier : body.tier,
+        promotionLight: body.promotionLight == null
+          ? Boolean(currentPlayer.promotionLight)
+          : body.promotionLight === true
+      });
+      return send(res, 200, JSON.stringify({ ok: true, override }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 400, JSON.stringify({ error: error.message || "선수 정보를 변경하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/tiers" && req.method === "GET") {
     try {
       const force = url.searchParams.get("refresh") === "1";
@@ -1141,7 +1247,7 @@ const server = http.createServer(async (req, res) => {
         players = await tierRosterPromise;
       }
       return send(res, 200, JSON.stringify({
-        players: addTierProfileAssets(players),
+        players: addTierProfileAssets(tierAdmin.applyOverrides(players)),
         source: UNIVERSITY_LIST_URL,
         updatedAt: new Date(tierRosterCache?.cacheTime || Date.now()).toISOString(),
         refreshing: Boolean(tierRosterPromise)
@@ -1362,13 +1468,15 @@ const io = new SocketIOServer(server, {
   transports: ["polling", "websocket"]
 });
 
-setupCollaboration(io)
+Promise.all([setupCollaboration(io), tierAdmin.init()])
   .then(() => server.listen(PORT, "0.0.0.0", () => {
     console.log("ELOBoard board search app: http://localhost:" + PORT);
     for (const url of lanUrls(PORT)) console.log("LAN: " + url);
   }))
   .catch((error) => {
-    console.error("Collaborative storage initialization failed:", error);
+    console.error("Server storage initialization failed:", error);
     process.exitCode = 1;
   });
+
+module.exports = { server, io, tierAdmin };
 
