@@ -34,12 +34,27 @@
         </div>
       </header>
 
-      <section id="tierBoard" class="tier-board" aria-label="티어별 선수 목록">
-        <div class="loading-card">
-          <span class="loading-dot" aria-hidden="true"></span>
-          최신 티어 명단을 불러오고 있습니다.
-        </div>
-      </section>
+      <div class="tier-content-layout">
+        <section id="tierBoard" class="tier-board" aria-label="티어별 선수 목록">
+          <div class="loading-card">
+            <span class="loading-dot" aria-hidden="true"></span>
+            최신 티어 명단을 불러오고 있습니다.
+          </div>
+        </section>
+
+        <aside class="university-filter-panel" aria-label="대학별 선수 필터">
+          <div class="university-filter-heading">
+            <strong>대학별 보기</strong>
+            <span id="universityFilterSummary">전체 선수</span>
+          </div>
+          <div id="universityFilters" class="university-filter-buttons">
+            <button class="university-filter-button is-active" type="button" data-university-filter="__all__" aria-pressed="true">
+              <span>전체</span>
+            </button>
+          </div>
+          <p class="university-filter-note">명단 변경 시 대학과 인원수가 자동 반영됩니다.</p>
+        </aside>
+      </div>
 
       <p id="boardStatus" class="board-status" role="status"></p>
       <p class="source-note">대학 소속 및 FA 선수를 모두 포함하며, LIVE 정보는 페이지 진입 즉시 확인한 뒤 15초마다 자동 갱신됩니다.</p>

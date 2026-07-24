@@ -2,8 +2,12 @@ const board = document.getElementById("tierBoard");
 const statusLine = document.getElementById("boardStatus");
 const refreshButton = document.getElementById("refreshButton");
 const countdown = document.getElementById("refreshCountdown");
+const universityFilters = document.getElementById("universityFilters");
+const universityFilterSummary = document.getElementById("universityFilterSummary");
 const LIVE_POLL_MS = 15000;
 const MAX_ANIMATED_PROFILES = 4;
+const ALL_UNIVERSITIES = "__all__";
+const FREE_AGENTS = "__fa__";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let livePollTimer = null;
 let profileObserver = null;
@@ -13,7 +17,8 @@ const state = {
   liveByName: new Map(),
   loadingLive: false,
   refreshingTiers: new Set(),
-  openCard: null
+  openCard: null,
+  selectedUniversity: ALL_UNIVERSITIES
 };
 
 function keyOf(value) {
@@ -108,14 +113,87 @@ function raceSection(players, race) {
   ].join("");
 }
 
+function playerUniversities(player) {
+  const values = Array.isArray(player?.universities) && player.universities.length
+    ? player.universities
+    : [player?.university];
+  return [...new Set(values
+    .map((value) => String(value || "").trim())
+    .filter((value) => value && value !== "FA" && value !== "연합팀"))];
+}
+
+function isFreeAgent(player) {
+  return playerUniversities(player).length === 0;
+}
+
+function universityOptions() {
+  const names = [...new Set(state.players.flatMap(playerUniversities))]
+    .sort((nameA, nameB) => nameA.localeCompare(nameB, "ko"));
+  return names.map((name) => ({
+    value: name,
+    label: name,
+    count: state.players.filter((player) => playerUniversities(player).includes(name)).length
+  }));
+}
+
+function matchesUniversity(player) {
+  if (state.selectedUniversity === ALL_UNIVERSITIES) return true;
+  if (state.selectedUniversity === FREE_AGENTS) return isFreeAgent(player);
+  return playerUniversities(player).includes(state.selectedUniversity);
+}
+
+function renderUniversityFilters() {
+  const universities = universityOptions();
+  const freeAgentCount = state.players.filter(isFreeAgent).length;
+  const validFilters = new Set([
+    ALL_UNIVERSITIES,
+    FREE_AGENTS,
+    ...universities.map((item) => item.value)
+  ]);
+  if (!validFilters.has(state.selectedUniversity)) state.selectedUniversity = ALL_UNIVERSITIES;
+
+  const options = [
+    { value: ALL_UNIVERSITIES, label: "전체", count: state.players.length },
+    ...universities,
+    { value: FREE_AGENTS, label: "FA", count: freeAgentCount }
+  ];
+  universityFilters.innerHTML = options.map((option) => {
+    const active = option.value === state.selectedUniversity;
+    return [
+      '<button class="university-filter-button' + (active ? " is-active" : "") + '" type="button"',
+      ' data-university-filter="' + escapeHtml(option.value) + '"',
+      ' aria-pressed="' + String(active) + '">',
+      '<span>' + escapeHtml(option.label) + "</span>",
+      '<span class="university-filter-count">' + option.count + "</span>",
+      "</button>"
+    ].join("");
+  }).join("");
+
+  if (state.selectedUniversity === ALL_UNIVERSITIES) {
+    universityFilterSummary.textContent = "전체 " + state.players.length + "명";
+  } else if (state.selectedUniversity === FREE_AGENTS) {
+    universityFilterSummary.textContent = "FA " + freeAgentCount + "명";
+  } else {
+    const selected = universities.find((item) => item.value === state.selectedUniversity);
+    universityFilterSummary.textContent = state.selectedUniversity + " " + Number(selected?.count || 0) + "명";
+  }
+}
+
 function render() {
+  renderUniversityFilters();
   if (!state.players.length) {
     board.innerHTML = '<div class="empty-card">표시할 티어 선수가 없습니다.</div>';
     return;
   }
 
+  const visiblePlayers = state.players.filter(matchesUniversity);
+  if (!visiblePlayers.length) {
+    board.innerHTML = '<div class="empty-card">선택한 대학에 표시할 선수가 없습니다.</div>';
+    return;
+  }
+
   const groups = new Map();
-  for (const player of state.players) {
+  for (const player of visiblePlayers) {
     if (!groups.has(player.tier)) groups.set(player.tier, []);
     groups.get(player.tier).push(player);
   }
@@ -369,7 +447,8 @@ async function fetchLiveStatuses(names, force = false) {
 async function refreshTierLive(tier) {
   const tierKey = String(tier || "");
   if (!tierKey || state.loadingLive || state.refreshingTiers.has(tierKey)) return;
-  const players = state.players.filter((player) => String(player.tier) === tierKey);
+  const players = state.players.filter((player) =>
+    String(player.tier) === tierKey && matchesUniversity(player));
   if (!players.length) return;
 
   state.refreshingTiers.add(tierKey);
@@ -390,6 +469,13 @@ async function refreshTierLive(tier) {
 }
 
 refreshButton.addEventListener("click", () => loadRoster(true));
+universityFilters.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-university-filter]");
+  if (!button) return;
+  state.selectedUniversity = button.dataset.universityFilter || ALL_UNIVERSITIES;
+  closeOpenCard();
+  render();
+});
 document.addEventListener("visibilitychange", () => {
   syncProfileAnimations();
   if (document.visibilityState === "visible") loadLive(false);
