@@ -4,6 +4,7 @@ const path = require("node:path");
 const os = require("node:os");
 const { Server: SocketIOServer } = require("socket.io");
 const { setupCollaboration } = require("./collaboration-server");
+const { normalizeBjListPlayerText } = require("./eloboard-utils");
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
@@ -275,7 +276,7 @@ function parseBjListPlayers(html) {
   const links = html.match(/<a\b[^>]*href=["'][^"']*bo_table=bj_list[^"']*wr_id=\d+[^"']*["'][^>]*>[\s\S]*?<\/a>/gi) || [];
   for (const linkHtml of links) {
     const hrefMatch = linkHtml.match(/href=["']([^"']+)["']/i);
-    const text = cleanText(linkHtml);
+    const text = normalizeBjListPlayerText(cleanText(linkHtml));
     const href = hrefMatch ? hrefMatch[1].replace(/&amp;/g, "&") : "";
     const wrId = wrIdFromUrl(href);
     if (!wrId || !text || text.length > 30 || /\s/.test(text)) continue;
@@ -807,6 +808,23 @@ function scheduleChannelRegistrySave() {
   }, 300);
 }
 
+function tierProfileAssets(player) {
+  const key = normalizePlayerName(player?.name);
+  const pinnedId = String(manualSoopAlias(player?.name)?.broadcastId || "").trim();
+  const registeredId = String(channelRegistry[key] || "").trim();
+  const broadcastId = pinnedId || registeredId;
+  if (!/^[a-z0-9_-]+$/i.test(broadcastId)) return {};
+  const encodedId = encodeURIComponent(broadcastId);
+  return {
+    tierStaticImage: "/tier-profiles/" + encodedId + "-static.webp",
+    tierAnimatedImage: "/tier-profiles/" + encodedId + "-animated.webp"
+  };
+}
+
+function addTierProfileAssets(players) {
+  return (players || []).map((player) => ({ ...player, ...tierProfileAssets(player) }));
+}
+
 async function discoverSoopChannel(name) {
   const key = normalizePlayerName(name);
   const aliasId = String(manualSoopAlias(name)?.broadcastId || "");
@@ -1084,8 +1102,23 @@ function serveStatic(req, res) {
   if (!file.startsWith(PUBLIC)) return send(res, 403, "Forbidden");
   fs.readFile(file, (err, data) => {
     if (err) return send(res, 404, "Not found");
-    const type = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8" }[path.extname(file)] || "application/octet-stream";
-    send(res, 200, data, type);
+    const type = {
+      ".html": "text/html; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".js": "application/javascript; charset=utf-8",
+      ".webp": "image/webp",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif"
+    }[path.extname(file)] || "application/octet-stream";
+    const isTierProfile = file.startsWith(path.join(PUBLIC, "tier-profiles") + path.sep);
+    res.writeHead(200, {
+      "Content-Type": type,
+      "Cache-Control": isTierProfile ? "public, max-age=86400" : "no-store",
+      "Access-Control-Allow-Origin": "*"
+    });
+    res.end(data);
   });
 }
 function lanUrls(port) {
@@ -1108,7 +1141,7 @@ const server = http.createServer(async (req, res) => {
         players = await tierRosterPromise;
       }
       return send(res, 200, JSON.stringify({
-        players,
+        players: addTierProfileAssets(players),
         source: UNIVERSITY_LIST_URL,
         updatedAt: new Date(tierRosterCache?.cacheTime || Date.now()).toISOString(),
         refreshing: Boolean(tierRosterPromise)
