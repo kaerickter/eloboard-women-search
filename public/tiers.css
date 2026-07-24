@@ -101,7 +101,7 @@ h1 {
 
 .tier-content-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 190px;
+  grid-template-columns: minmax(0, 1fr) 220px;
   align-items: start;
   gap: 30px;
 }
@@ -123,7 +123,7 @@ h1 {
 }
 
 .university-filter-heading strong {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 950;
 }
 
@@ -136,23 +136,23 @@ h1 {
 
 .university-filter-buttons {
   display: grid;
-  gap: 7px;
+  gap: 9px;
 }
 
 .university-filter-button {
-  min-height: 38px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 11px;
+  padding: 0 14px;
   border: 1px solid var(--theme-line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--theme-surface);
   color: var(--theme-ink);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
 }
@@ -171,7 +171,7 @@ h1 {
 }
 
 .university-filter-count {
-  min-width: 22px;
+  min-width: 26px;
   text-align: right;
   opacity: .72;
 }
@@ -183,15 +183,15 @@ h1 {
 
 .tier-admin-open {
   width: 100%;
-  min-height: 38px;
+  min-height: 46px;
   margin-top: 13px;
   border: 1px solid var(--theme-ink);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--theme-surface);
   color: var(--theme-ink);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -203,8 +203,13 @@ h1 {
 }
 
 .tier-admin-dialog {
-  width: min(520px, calc(100% - 28px));
-  max-height: min(760px, calc(100vh - 28px));
+  position: fixed;
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: min(680px, calc(100% - 28px));
+  max-height: min(820px, calc(100vh - 28px));
+  margin: 0;
   padding: 0;
   overflow: auto;
   border: 1px solid var(--theme-line);
@@ -212,6 +217,7 @@ h1 {
   background: var(--theme-surface);
   color: var(--theme-ink);
   box-shadow: 0 24px 70px rgba(23, 33, 58, .24);
+  transform: translate(-50%, -50%);
 }
 
 .tier-admin-dialog::backdrop {
@@ -229,6 +235,13 @@ h1 {
   padding: 17px 18px;
   border-bottom: 1px solid var(--theme-line);
   background: var(--theme-surface);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.tier-admin-dialog.is-dragging .tier-admin-header {
+  cursor: grabbing;
 }
 
 .tier-admin-header div {
@@ -262,7 +275,7 @@ h1 {
 
 .tier-admin-login,
 .tier-admin-manager {
-  padding: 18px;
+  padding: 22px;
 }
 
 .tier-admin-login {
@@ -279,6 +292,7 @@ h1 {
 }
 
 .tier-admin-login input,
+.tier-admin-player-search input,
 .tier-admin-manager select,
 .tier-admin-add-row input {
   width: 100%;
@@ -289,6 +303,75 @@ h1 {
   background: #fff;
   color: var(--theme-ink);
   font: inherit;
+}
+
+.tier-admin-player-search {
+  position: relative;
+}
+
+.tier-admin-player-search input {
+  padding-right: 40px;
+}
+
+.tier-admin-player-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 12;
+  max-height: 310px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--theme-line);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: 0 16px 34px rgba(23, 33, 58, .2);
+}
+
+.tier-admin-player-suggestions[hidden] {
+  display: none;
+}
+
+.tier-admin-player-suggestion {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.tier-admin-player-suggestion:hover,
+.tier-admin-player-suggestion.is-active {
+  background: var(--theme-surface-soft);
+}
+
+.tier-admin-player-suggestion strong {
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.tier-admin-player-suggestion span {
+  color: var(--theme-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tier-admin-no-results {
+  margin: 0;
+  padding: 13px 10px;
+  color: var(--theme-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .tier-admin-player-settings {

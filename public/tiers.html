@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>여성 선수 티어표 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./tiers.css?v=20260724-tier-promotion">
+    <link rel="stylesheet" href="./tiers.css?v=20260724-admin-search">
   </head>
   <body>
     <nav class="site-nav" aria-label="페이지 이동">
@@ -64,7 +64,7 @@
         <div class="tier-admin-header">
           <div>
             <strong id="tierAdminTitle">티어표 선수 관리</strong>
-            <span>관리자만 변경할 수 있습니다.</span>
+            <span>상단을 끌어 창 이동 · 관리자만 변경할 수 있습니다.</span>
           </div>
           <button id="tierAdminClose" class="tier-admin-close" type="button" aria-label="닫기">×</button>
         </div>
@@ -76,8 +76,19 @@
         </form>
 
         <section id="tierAdminManager" class="tier-admin-manager" hidden>
-          <label for="tierAdminPlayer">선수 선택</label>
-          <select id="tierAdminPlayer"></select>
+          <label for="tierAdminPlayerSearch">선수 검색 및 선택</label>
+          <div class="tier-admin-player-search">
+            <input
+              id="tierAdminPlayerSearch"
+              type="search"
+              placeholder="선수 이름 일부를 입력하세요"
+              autocomplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="tierAdminPlayerSuggestions"
+              aria-expanded="false">
+            <div id="tierAdminPlayerSuggestions" class="tier-admin-player-suggestions" role="listbox" hidden></div>
+          </div>
 
           <div class="tier-admin-player-settings">
             <label for="tierAdminTier">
@@ -126,6 +137,6 @@
         <p id="tierAdminStatus" class="tier-admin-status" role="status"></p>
       </dialog>
     </main>
-    <script src="./tiers.js?v=20260724-tier-promotion"></script>
+    <script src="./tiers.js?v=20260724-admin-search"></script>
   </body>
 </html>
