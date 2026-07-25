@@ -732,10 +732,11 @@ function syncProfileAnimations() {
   const canAnimate = document.visibilityState === "visible" && !reducedMotion.matches;
   const candidates = canAnimate
     ? photos.filter((image) => {
-        if (image.dataset.inView !== "1" || !image.dataset.animatedSrc) return false;
+        if (!image.dataset.animatedSrc) return false;
         const card = image.closest(".player-card");
-        return card?.classList.contains("is-live") ||
-          card?.classList.contains("is-open") ||
+        if (card?.classList.contains("is-live")) return true;
+        if (image.dataset.inView !== "1") return false;
+        return card?.classList.contains("is-open") ||
           card?.classList.contains("is-hovered") ||
           card?.matches(":focus-within");
       }).sort((imageA, imageB) => {
