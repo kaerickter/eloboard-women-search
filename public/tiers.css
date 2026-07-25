@@ -94,52 +94,29 @@ h1 {
 
 .refresh-button:disabled { cursor: wait; opacity: .6; }
 
-.live-only-dock {
-  position: fixed;
-  z-index: 35;
-  top: 50%;
-  right: 18px;
-  transform: translateY(-50%);
-}
-
 .live-only-toggle {
-  min-width: 142px;
-  min-height: 52px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 8px 0 15px;
-  border: 2px solid var(--tier-red);
-  border-radius: 14px;
+  gap: 8px;
+  padding: 0 7px 0 12px;
+  border: 1px solid var(--tier-red);
+  border-radius: 999px;
   background: var(--theme-surface);
   color: var(--theme-ink);
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   white-space: nowrap;
-  box-shadow: 0 12px 30px rgba(23, 33, 58, .18);
+  box-shadow: 0 4px 12px rgba(23, 33, 58, .1);
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 
-.live-only-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.live-only-label i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--tier-red);
-  box-shadow: 0 0 0 4px rgba(240, 75, 87, .14);
-}
-
 .live-only-toggle strong {
-  min-width: 42px;
-  min-height: 30px;
+  min-width: 38px;
+  min-height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -154,8 +131,8 @@ h1 {
 .live-only-toggle:focus-visible {
   border-color: var(--tier-red-deep);
   outline: 0;
-  transform: translateY(-2px);
-  box-shadow: 0 16px 34px rgba(23, 33, 58, .24);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(23, 33, 58, .15);
 }
 
 .live-only-toggle.is-active {
@@ -1247,19 +1224,7 @@ h1 {
 
 @media (max-width: 430px) {
   .live-key { display: none; }
-  .live-only-dock {
-    top: auto;
-    right: 12px;
-    bottom: max(14px, env(safe-area-inset-bottom));
-    transform: none;
-  }
-  .live-only-toggle {
-    min-width: 132px;
-    min-height: 48px;
-    padding-left: 13px;
-    border-radius: 13px;
-    box-shadow: 0 10px 26px rgba(23, 33, 58, .24);
-  }
+  .live-only-toggle { order: -1; }
   .countdown { width: 100%; margin-left: 0; text-align: right; }
   .tier-admin-player-settings { grid-template-columns: 1fr; }
   .tier-admin-create-grid { grid-template-columns: 1fr; }
