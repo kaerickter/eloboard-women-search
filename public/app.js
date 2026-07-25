@@ -201,15 +201,38 @@ function periodStats(rows) {
   return { games, wins, losses, rate };
 }
 
-function currentMatchDay(now = new Date()) {
-  const korea = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-  const beforeReset = korea.getUTCHours() < 6
-    || (korea.getUTCHours() === 6 && korea.getUTCMinutes() === 0);
-  if (beforeReset) korea.setUTCDate(korea.getUTCDate() - 1);
-  const year = korea.getUTCFullYear();
-  const month = String(korea.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(korea.getUTCDate()).padStart(2, "0");
+function formatKoreaDate(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return year + "-" + month + "-" + day;
+}
+
+function currentMatchWindow(now = new Date()) {
+  const korea = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  const calendarDay = formatKoreaDate(korea);
+  const koreaMinutes = (korea.getUTCHours() * 60) + korea.getUTCMinutes();
+  const beforeReset = koreaMinutes <= 360;
+  const start = new Date(korea);
+  if (beforeReset) start.setUTCDate(start.getUTCDate() - 1);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return {
+    startDate: formatKoreaDate(start),
+    endDate: formatKoreaDate(end),
+    calendarDay,
+    beforeReset
+  };
+}
+
+function currentMatchDay(now = new Date()) {
+  return currentMatchWindow(now).startDate;
+}
+
+function isCurrentMatchDayRow(row, window = currentMatchWindow()) {
+  const date = String(row?.date || "");
+  return date === window.startDate
+    || (window.beforeReset && date === window.calendarDay);
 }
 
 function setPeriodValues(prefix, stats) {
@@ -327,14 +350,17 @@ function renderPeriod(data) {
 
   const yearRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-"));
   const monthRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-" + state.selectedMonth));
-  const matchDay = currentMatchDay();
-  const dayRows = rows.filter((row) => String(row.date || "") === matchDay);
+  const matchWindow = currentMatchWindow();
+  const dayRows = rows.filter((row) => isCurrentMatchDayRow(row, matchWindow));
   const year = periodStats(yearRows);
   const month = periodStats(monthRows);
   const day = periodStats(dayRows);
 
   $("periodLabel").textContent = (data.profile.name || state.query) + " \u00b7 " + TXT.periodBasis;
-  $("dayRowLabel").title = matchDay + " 06:01부터 다음 날 06:00까지";
+  $("dayRowLabel").innerHTML = "<span>당일</span><small>"
+    + matchWindow.startDate + " 06:01 ~ " + matchWindow.endDate + " 06:00</small>";
+  $("dayRowLabel").title = matchWindow.startDate + " 오전 06:01부터 "
+    + matchWindow.endDate + " 오전 06:00까지";
   setPeriodValues("year", year);
   setPeriodValues("month", month);
   setPeriodValues("day", day);
@@ -381,7 +407,8 @@ function renderProfile(data) {
     }).join("") + '</div></div>'
     : "";
 
-  const periodRows = selectedMonthRows(profile.matches || []);
+  const profileRows = profile.matches || [];
+  const periodRows = selectedMonthRows(profileRows);
   const periodTitle = state.selectedYear && state.selectedMonth
     ? state.selectedYear + TXT.yearSuffix + " " + state.selectedMonth + TXT.monthSuffix + " " + TXT.profileMatches
     : TXT.profileMatches;
@@ -391,13 +418,15 @@ function renderProfile(data) {
     const memo = escapeHtml(match.memo || "-");
     return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="ELO" class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
   };
-  const matchDay = currentMatchDay();
-  const dayRows = periodRows.filter((match) => String(match.date || "") === matchDay);
-  const otherRows = periodRows.filter((match) => String(match.date || "") !== matchDay);
+  const matchWindow = currentMatchWindow();
+  const dayRows = profileRows.filter((match) => isCurrentMatchDayRow(match, matchWindow));
+  const otherRows = periodRows.filter((match) => !isCurrentMatchDayRow(match, matchWindow));
   const dayGroup = dayRows.length
-    ? '<section class="profile-day-group" aria-label="당일 전적"><div class="profile-day-group-title"><strong>당일 전적</strong><small>' + matchDay + ' · 06:01 ~ 익일 06:00</small></div>' + dayRows.map(renderMatchRow).join("") + '</section>'
+    ? '<section class="profile-day-group" aria-label="당일 전적"><div class="profile-day-group-title"><strong>당일 전적</strong><small>'
+      + matchWindow.startDate + ' 06:01 ~ ' + matchWindow.endDate + ' 06:00</small></div>'
+      + dayRows.map(renderMatchRow).join("") + '</section>'
     : "";
-  const rows = periodRows.length
+  const rows = dayRows.length || periodRows.length
     ? dayGroup + otherRows.map(renderMatchRow).join("")
     : '<div class="empty">' + TXT.noData + '</div>';
 
