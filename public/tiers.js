@@ -32,7 +32,6 @@ const tierAdminRevert = document.getElementById("tierAdminRevert");
 const tierAdminLogout = document.getElementById("tierAdminLogout");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
-const MAX_ANIMATED_NON_LIVE_PROFILES = 4;
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -747,13 +746,7 @@ function syncProfileAnimations() {
         return selectedB - selectedA;
       })
     : [];
-  const liveCandidates = candidates.filter((image) =>
-    image.closest(".player-card")?.classList.contains("is-live")
-  );
-  const selectedCandidates = candidates.filter((image) =>
-    !image.closest(".player-card")?.classList.contains("is-live")
-  ).slice(0, MAX_ANIMATED_NON_LIVE_PROFILES);
-  const animated = new Set([...liveCandidates, ...selectedCandidates]);
+  const animated = new Set(candidates);
 
   for (const image of photos) {
     const shouldAnimate = animated.has(image);
