@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>여성 선수 티어표 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./tiers.css?v=20260725-live-inline">
+    <link rel="stylesheet" href="./tiers.css?v=20260726-live-left">
   </head>
   <body>
     <nav class="site-nav" aria-label="페이지 이동">
@@ -27,8 +27,7 @@
           <h1>여성 선수 티어표</h1>
           <p class="tier-intro">티어별로 선수를 모아보고, 방송 중인 카드는 바로 확인할 수 있습니다.</p>
         </div>
-        <div class="live-toolbar" aria-live="polite">
-          <span class="live-key"><i aria-hidden="true"></i> 현재 방송 중</span>
+        <div class="tier-live-controls">
           <button
             id="liveOnlyToggle"
             class="live-only-toggle"
@@ -39,8 +38,11 @@
             <span>방송중 보기</span>
             <strong>OFF</strong>
           </button>
-          <button id="refreshButton" class="refresh-button" type="button">LIVE 새로고침</button>
-          <span id="refreshCountdown" class="countdown">15초마다 자동 갱신</span>
+          <div class="live-toolbar" aria-live="polite">
+            <span class="live-key"><i aria-hidden="true"></i> 현재 방송 중</span>
+            <button id="refreshButton" class="refresh-button" type="button">LIVE 새로고침</button>
+            <span id="refreshCountdown" class="countdown">15초마다 자동 갱신</span>
+          </div>
         </div>
       </header>
 
@@ -196,6 +198,6 @@
         <p id="tierAdminStatus" class="tier-admin-status" role="status"></p>
       </dialog>
     </main>
-    <script src="./tiers.js?v=20260725-live-inline"></script>
+    <script src="./tiers.js?v=20260726-live-left"></script>
   </body>
 </html>
