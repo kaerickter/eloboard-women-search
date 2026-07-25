@@ -2,6 +2,7 @@ const board = document.getElementById("tierBoard");
 const statusLine = document.getElementById("boardStatus");
 const refreshButton = document.getElementById("refreshButton");
 const countdown = document.getElementById("refreshCountdown");
+const liveOnlyToggle = document.getElementById("liveOnlyToggle");
 const universityFilters = document.getElementById("universityFilters");
 const universityFilterSummary = document.getElementById("universityFilterSummary");
 const tierAdminOpen = document.getElementById("tierAdminOpen");
@@ -50,7 +51,8 @@ const state = {
   loadingLive: false,
   refreshingTiers: new Set(),
   openCard: null,
-  selectedUniversity: ALL_UNIVERSITIES
+  selectedUniversity: ALL_UNIVERSITIES,
+  liveOnly: false
 };
 
 function keyOf(value) {
@@ -175,6 +177,20 @@ function matchesUniversity(player) {
   if (state.selectedUniversity === ALL_UNIVERSITIES) return true;
   if (state.selectedUniversity === FREE_AGENTS) return isFreeAgent(player);
   return playerUniversities(player).includes(state.selectedUniversity);
+}
+
+function isPlayerLive(player) {
+  return Boolean(state.liveByName.get(keyOf(player.name))?.isLive);
+}
+
+function matchesActiveFilters(player) {
+  return matchesUniversity(player) && (!state.liveOnly || isPlayerLive(player));
+}
+
+function renderLiveOnlyToggle() {
+  liveOnlyToggle.classList.toggle("is-active", state.liveOnly);
+  liveOnlyToggle.setAttribute("aria-pressed", String(state.liveOnly));
+  liveOnlyToggle.querySelector("strong").textContent = state.liveOnly ? "ON" : "OFF";
 }
 
 function renderUniversityFilters() {
@@ -588,15 +604,18 @@ async function revertTierAdminMembership() {
 }
 
 function render() {
+  renderLiveOnlyToggle();
   renderUniversityFilters();
   if (!state.players.length) {
     board.innerHTML = '<div class="empty-card">표시할 티어 선수가 없습니다.</div>';
     return;
   }
 
-  const visiblePlayers = state.players.filter(matchesUniversity);
+  const visiblePlayers = state.players.filter(matchesActiveFilters);
   if (!visiblePlayers.length) {
-    board.innerHTML = '<div class="empty-card">선택한 대학에 표시할 선수가 없습니다.</div>';
+    board.innerHTML = '<div class="empty-card">' +
+      (state.liveOnly ? "현재 방송중인 선수가 없습니다." : "선택한 대학에 표시할 선수가 없습니다.") +
+      "</div>";
     return;
   }
 
@@ -893,6 +912,11 @@ function centerTierAdminDialog() {
 }
 
 refreshButton.addEventListener("click", () => loadRoster(true));
+liveOnlyToggle.addEventListener("click", () => {
+  state.liveOnly = !state.liveOnly;
+  closeOpenCard();
+  render();
+});
 universityFilters.addEventListener("click", (event) => {
   const button = event.target.closest("[data-university-filter]");
   if (!button) return;

@@ -47,6 +47,7 @@ h1 {
 .live-toolbar {
   min-width: 350px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
@@ -92,6 +93,55 @@ h1 {
 }
 
 .refresh-button:disabled { cursor: wait; opacity: .6; }
+
+.live-only-toggle {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 7px 0 12px;
+  border: 1px solid var(--theme-line);
+  border-radius: 999px;
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.live-only-toggle strong {
+  min-width: 38px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--theme-line);
+  color: var(--theme-muted);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.live-only-toggle:hover,
+.live-only-toggle:focus-visible {
+  border-color: var(--tier-red);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.live-only-toggle.is-active {
+  border-color: var(--tier-red-deep);
+  background: rgba(240, 75, 87, .08);
+  color: var(--tier-red-deep);
+}
+
+.live-only-toggle.is-active strong {
+  background: var(--tier-red);
+  color: #fff;
+}
 
 .tier-board {
   overflow: visible;
@@ -1080,7 +1130,8 @@ h1 {
 @media (max-width: 780px) {
   .tier-shell { width: min(100% - 20px, 620px); padding-top: 24px; }
   .tier-hero { align-items: stretch; flex-direction: column; gap: 16px; }
-  .live-toolbar { min-width: 0; justify-content: space-between; }
+  .live-toolbar { min-width: 0; justify-content: flex-start; }
+  .countdown { margin-left: auto; }
   .tier-board { gap: 18px; }
   .tier-header { min-height: 56px; padding: 10px 12px; }
   .tier-label strong { font-size: 21px; }
@@ -1170,6 +1221,8 @@ h1 {
 
 @media (max-width: 430px) {
   .live-key { display: none; }
+  .live-only-toggle { order: -1; }
+  .countdown { width: 100%; margin-left: 0; text-align: right; }
   .tier-admin-player-settings { grid-template-columns: 1fr; }
   .tier-admin-create-grid { grid-template-columns: 1fr; }
   .tier-admin-create-channel { grid-column: auto; }
