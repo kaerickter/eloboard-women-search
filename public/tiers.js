@@ -39,6 +39,8 @@ const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let livePollTimer = null;
+let pendingLiveReload = false;
+let pendingLiveForce = false;
 let profileObserver = null;
 let tierAdminCsrf = "";
 let tierAdminSaving = false;
@@ -810,7 +812,7 @@ async function loadRoster(force = false) {
     if (!response.ok) throw new Error(data.error || "티어 명단을 불러오지 못했습니다.");
     state.players = Array.isArray(data.players) ? data.players : [];
     render();
-    await loadLive();
+    await loadLive(force);
     if (data.refreshing) await syncDailyRoster();
   } catch (error) {
     board.innerHTML = '<div class="empty-card">' + escapeHtml(error.message) + "</div>";
@@ -861,14 +863,27 @@ function scheduleLivePoll() {
 }
 
 async function loadLive(force = false) {
-  if (state.loadingLive || !state.players.length) return;
+  if (!state.players.length) return;
+  if (state.loadingLive) {
+    pendingLiveReload = true;
+    pendingLiveForce = pendingLiveForce || force;
+    return;
+  }
   state.loadingLive = true;
   countdown.textContent = "LIVE 확인 중";
   try {
-    const names = state.players.map((player) => player.name);
+    const names = state.players
+      .filter((player) => matchesDivision(player) && matchesUniversity(player))
+      .map((player) => player.name);
+    if (!names.length) {
+      statusLine.textContent = "현재 조건에 맞는 선수가 없습니다.";
+      return;
+    }
     const statuses = await fetchLiveStatuses(names, force);
     const changed = mergeLiveStatuses(statuses);
-    const liveCount = [...state.liveByName.values()].filter((item) => item.isLive).length;
+    const liveCount = names.reduce((count, name) => {
+      return count + Number(Boolean(state.liveByName.get(keyOf(name))?.isLive));
+    }, 0);
     statusLine.textContent = liveCount
       ? "현재 " + liveCount + "명이 방송 중입니다."
       : "현재 확인된 LIVE 방송이 없습니다.";
@@ -878,15 +893,25 @@ async function loadLive(force = false) {
   } finally {
     countdown.textContent = "15초마다 자동 갱신";
     state.loadingLive = false;
-    scheduleLivePoll();
+    if (pendingLiveReload) {
+      const shouldForce = pendingLiveForce;
+      pendingLiveReload = false;
+      pendingLiveForce = false;
+      void loadLive(shouldForce);
+    } else {
+      scheduleLivePoll();
+    }
   }
 }
 
 async function fetchLiveStatuses(names, force = false) {
-  const params = new URLSearchParams({ names: names.join(",") });
-  if (force) params.set("refresh", "1");
-  const response = await fetch("/api/live-status?" + params.toString(), {
-    headers: { "Accept": "application/json" }
+  const response = await fetch("/api/live-status", {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ names, refresh: force })
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
@@ -948,6 +973,7 @@ divisionFilters.addEventListener("click", (event) => {
   state.selectedUniversity = ALL_UNIVERSITIES;
   closeOpenCard();
   render();
+  void loadLive(false);
 });
 universityFilters.addEventListener("click", (event) => {
   const button = event.target.closest("[data-university-filter]");
@@ -955,6 +981,7 @@ universityFilters.addEventListener("click", (event) => {
   state.selectedUniversity = button.dataset.universityFilter || ALL_UNIVERSITIES;
   closeOpenCard();
   render();
+  void loadLive(false);
 });
 tierAdminOpen.addEventListener("click", () => {
   if (!tierAdminDialog.open) tierAdminDialog.showModal();
