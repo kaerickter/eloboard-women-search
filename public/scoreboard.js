@@ -17,6 +17,7 @@ const scoreHead = document.querySelector("#scoreHead");
 const scoreBody = document.querySelector("#scoreBody");
 const defaultButton = document.querySelector("#defaultButton");
 const randomButton = document.querySelector("#randomButton");
+const teamSelectButton = document.querySelector("#teamSelectButton");
 const sortButton = document.querySelector("#sortButton");
 const resetButton = document.querySelector("#resetButton");
 const teamResult = document.querySelector("#teamResult");
@@ -26,6 +27,8 @@ const winnerText = document.querySelector("#winnerText");
 
 let state = loadState();
 let realtimeRoom = null;
+let teamSelectionActive = false;
+const selectedTeamRows = new Set();
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
@@ -86,17 +89,41 @@ function render() {
   gameCount.value = String(state.games);
   sizeSummary.textContent = `${state.players} × ${state.games}`;
   randomButton.textContent = state.assignedNumbers ? "번호 다시 뽑기" : "랜덤 번호 지정";
+  const requiredTeamSize = Math.ceil(state.players / 2);
+  teamSelectButton.textContent = teamSelectionActive
+    ? `팀 선택 완료 ${selectedTeamRows.size}/${requiredTeamSize}`
+    : "팀 선택";
+  teamSelectButton.classList.toggle("is-selecting", teamSelectionActive);
+  teamSelectButton.setAttribute("aria-pressed", String(teamSelectionActive));
 
   scoreHead.innerHTML = `<tr><th class="number-col">번호</th><th class="name-col">참여자</th>${Array.from({ length: state.games }, (_, game) => `<th>${game + 1}게임</th>`).join("")}<th class="total-col">합계</th></tr>`;
   scoreBody.innerHTML = "";
 
   for (let row = 0; row < state.players; row += 1) {
     const tr = document.createElement("tr");
-    if (state.assignedNumbers) tr.className = state.assignedNumbers[row] % 2 ? "team-odd" : "team-even";
+    if (teamSelectionActive) {
+      tr.className = selectedTeamRows.has(row) ? "team-picking is-picked" : "team-picking";
+    } else if (state.assignedNumbers) {
+      tr.className = state.assignedNumbers[row] % 2 ? "team-odd" : "team-even";
+    }
 
     const numberCell = document.createElement("td");
     numberCell.className = "number-col";
-    numberCell.innerHTML = state.assignedNumbers ? `<span class="number-badge">${state.assignedNumbers[row]}</span>` : `<span class="waiting-number">대기</span>`;
+    if (teamSelectionActive) {
+      const picker = document.createElement("input");
+      picker.type = "checkbox";
+      picker.className = "team-picker";
+      picker.checked = selectedTeamRows.has(row);
+      picker.setAttribute("aria-label", `${state.names[row] || `${row + 1}번째 참가자`} 같은 팀으로 선택`);
+      picker.addEventListener("change", event => {
+        if (event.target.checked) selectedTeamRows.add(row);
+        else selectedTeamRows.delete(row);
+        render();
+      });
+      numberCell.append(picker);
+    } else {
+      numberCell.innerHTML = state.assignedNumbers ? `<span class="number-badge">${state.assignedNumbers[row]}</span>` : `<span class="waiting-number">대기</span>`;
+    }
     tr.append(numberCell);
 
     const nameCell = document.createElement("td");
@@ -177,10 +204,14 @@ function resize(key, rawValue) {
   realtimeRoom?.sendSet("scores", state.scores, 0);
   realtimeRoom?.sendSet("comments", state.comments, 0);
   realtimeRoom?.sendSet("assignedNumbers", state.assignedNumbers, 0);
+  teamSelectionActive = false;
+  selectedTeamRows.clear();
   render();
 }
 
 function assignRandomNumbers() {
+  teamSelectionActive = false;
+  selectedTeamRows.clear();
   const numbers = Array.from({ length: state.players }, (_, index) => index + 1);
   for (let index = numbers.length - 1; index > 0; index -= 1) {
     const target = Math.floor(Math.random() * (index + 1));
@@ -192,14 +223,47 @@ function assignRandomNumbers() {
 }
 
 function assignDefaultNumbers() {
+  teamSelectionActive = false;
+  selectedTeamRows.clear();
   const numbers = Array.from({ length: state.players }, (_, index) => index + 1);
   state.assignedNumbers = numbers;
   realtimeRoom?.sendSet("assignedNumbers", numbers, 0);
   render();
 }
 
+function selectTeamMembers() {
+  if (!teamSelectionActive) {
+    teamSelectionActive = true;
+    selectedTeamRows.clear();
+    render();
+    return;
+  }
+
+  const requiredTeamSize = Math.ceil(state.players / 2);
+  if (selectedTeamRows.size !== requiredTeamSize) {
+    window.alert(`같은 팀으로 묶을 참가자 ${requiredTeamSize}명을 선택해주세요.`);
+    return;
+  }
+
+  const oddNumbers = Array.from({ length: requiredTeamSize }, (_, index) => index * 2 + 1);
+  const evenNumbers = Array.from({ length: Math.floor(state.players / 2) }, (_, index) => (index + 1) * 2);
+  let oddIndex = 0;
+  let evenIndex = 0;
+  const numbers = Array.from({ length: state.players }, (_, row) => (
+    selectedTeamRows.has(row) ? oddNumbers[oddIndex++] : evenNumbers[evenIndex++]
+  ));
+
+  state.assignedNumbers = numbers;
+  realtimeRoom?.sendSet("assignedNumbers", numbers, 0);
+  teamSelectionActive = false;
+  selectedTeamRows.clear();
+  render();
+}
+
 function sortByNumber() {
   if (!state.assignedNumbers) return;
+  teamSelectionActive = false;
+  selectedTeamRows.clear();
   const order = state.assignedNumbers.map((number, index) => ({ number, index })).sort((a, b) => a.number - b.number);
   state = {
     ...state,
@@ -221,6 +285,7 @@ playerCount.addEventListener("change", event => resize("players", event.target.v
 gameCount.addEventListener("change", event => resize("games", event.target.value));
 defaultButton.addEventListener("click", assignDefaultNumbers);
 randomButton.addEventListener("click", assignRandomNumbers);
+teamSelectButton.addEventListener("click", selectTeamMembers);
 sortButton.addEventListener("click", sortByNumber);
 resetButton.addEventListener("click", () => {
   if (!window.confirm("입력한 이름, 점수, 코멘트를 모두 지울까요?")) return;
@@ -231,6 +296,8 @@ resetButton.addEventListener("click", () => {
     comments: Array.from({ length: state.players }, () => Array(state.games).fill("")),
     assignedNumbers: null,
   };
+  teamSelectionActive = false;
+  selectedTeamRows.clear();
   realtimeRoom?.sendSet("names", state.names, 0);
   realtimeRoom?.sendSet("scores", state.scores, 0);
   realtimeRoom?.sendSet("comments", state.comments, 0);
@@ -244,6 +311,8 @@ realtimeRoom = new RealtimeRoom({
   getState: () => state,
   applyState: nextState => {
     state = normalize(nextState);
+    teamSelectionActive = false;
+    selectedTeamRows.clear();
     RealtimeRoom.preserveFocus(render);
   }
 });
