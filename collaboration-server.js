@@ -8,7 +8,10 @@ const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ROOM_FILE = process.env.ROOM_DATA_FILE || path.join(__dirname, "data", "collaboration-rooms.json");
 
 function defaultState(feature) {
-  if (feature === "bingo") return { size: 4, title: "빙고", cells: Array(25).fill(""), checked: Array(25).fill(false) };
+  if (feature === "bingo") return {
+    size: 4, title: "빙고", cells: Array(25).fill(""), checked: Array(25).fill(false),
+    mode: "classic", owners: Array(25).fill(0), teamColors: ["#ef5b78", "#3b82f6"]
+  };
   if (feature === "kill-bet") return { chickenKillValue: 1, panels: {} };
   return {
     title: "매치 카멜레온", players: 7, games: 9, names: Array(7).fill(""),
@@ -26,10 +29,16 @@ function number(value, min, max, fallback = min) {
 function normalizeState(feature, raw = {}) {
   if (feature === "bingo") {
     const size = Number(raw.size) === 5 ? 5 : 4;
+    const fallbackColors = ["#ef5b78", "#3b82f6"];
     return {
       size, title: text(raw.title || "빙고", 28),
       cells: Array.from({ length: 25 }, (_, index) => text(raw.cells?.[index], 34)),
-      checked: Array.from({ length: 25 }, (_, index) => Boolean(raw.checked?.[index]))
+      checked: Array.from({ length: 25 }, (_, index) => Boolean(raw.checked?.[index])),
+      mode: raw.mode === "territory" ? "territory" : "classic",
+      owners: Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(raw.owners?.[index])) ? Number(raw.owners[index]) : 0),
+      teamColors: Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(raw.teamColors?.[index] || "")
+        ? raw.teamColors[index]
+        : fallbackColors[index])
     };
   }
   if (feature === "kill-bet") {
