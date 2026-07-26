@@ -11,17 +11,7 @@ const tierAdminClose = document.getElementById("tierAdminClose");
 const tierAdminLogin = document.getElementById("tierAdminLogin");
 const tierAdminPassword = document.getElementById("tierAdminPassword");
 const tierAdminManager = document.getElementById("tierAdminManager");
-const tierAdminHeader = tierAdminDialog.querySelector(".tier-admin-header");
-const tierAdminPlayerSearch = document.getElementById("tierAdminPlayerSearch");
-const tierAdminPlayerSuggestions = document.getElementById("tierAdminPlayerSuggestions");
-const tierAdminCreatePlayer = document.getElementById("tierAdminCreatePlayer");
-const tierAdminNewName = document.getElementById("tierAdminNewName");
-const tierAdminNewTier = document.getElementById("tierAdminNewTier");
-const tierAdminNewRace = document.getElementById("tierAdminNewRace");
-const tierAdminNewUniversity = document.getElementById("tierAdminNewUniversity");
-const tierAdminNewBroadcastId = document.getElementById("tierAdminNewBroadcastId");
-const tierAdminCreateConfirm = document.getElementById("tierAdminCreateConfirm");
-const tierAdminCreateCancel = document.getElementById("tierAdminCreateCancel");
+const tierAdminPlayer = document.getElementById("tierAdminPlayer");
 const tierAdminTier = document.getElementById("tierAdminTier");
 const tierAdminPromotion = document.getElementById("tierAdminPromotion");
 const tierAdminMemberships = document.getElementById("tierAdminMemberships");
@@ -33,6 +23,7 @@ const tierAdminRevert = document.getElementById("tierAdminRevert");
 const tierAdminLogout = document.getElementById("tierAdminLogout");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
+const MAX_ANIMATED_PROFILES = 4;
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -40,10 +31,6 @@ let livePollTimer = null;
 let profileObserver = null;
 let tierAdminCsrf = "";
 let tierAdminSaving = false;
-let tierAdminSelectedName = "";
-let tierAdminSuggestionIndex = -1;
-let tierAdminDrag = null;
-let tierAdminStorage = { mode: "unknown", durable: false, message: "" };
 
 const state = {
   players: [],
@@ -231,133 +218,8 @@ function renderUniversityFilters() {
 }
 
 function adminSelectedPlayer() {
-  const selectedKey = keyOf(tierAdminSelectedName || tierAdminPlayerSearch.value);
+  const selectedKey = keyOf(tierAdminPlayer.value);
   return state.players.find((player) => keyOf(player.name) === selectedKey) || null;
-}
-
-function playerSearchKey(value) {
-  return keyOf(value).replace(/[^0-9a-z가-힣]/gi, "");
-}
-
-function playerNameDistance(valueA, valueB) {
-  const charsA = Array.from(valueA);
-  const charsB = Array.from(valueB);
-  const row = Array.from({ length: charsB.length + 1 }, (_, index) => index);
-  for (let indexA = 1; indexA <= charsA.length; indexA += 1) {
-    let diagonal = row[0];
-    row[0] = indexA;
-    for (let indexB = 1; indexB <= charsB.length; indexB += 1) {
-      const previous = row[indexB];
-      row[indexB] = Math.min(
-        row[indexB] + 1,
-        row[indexB - 1] + 1,
-        diagonal + Number(charsA[indexA - 1] !== charsB[indexB - 1])
-      );
-      diagonal = previous;
-    }
-  }
-  return row[charsB.length];
-}
-
-function playerSearchScore(name, query) {
-  const nameKey = playerSearchKey(name);
-  const queryKey = playerSearchKey(query);
-  if (!queryKey) return 10;
-  if (nameKey === queryKey) return 0;
-  if (nameKey.startsWith(queryKey)) return 1;
-  if (nameKey.includes(queryKey)) return 2;
-  let cursor = 0;
-  for (const character of nameKey) {
-    if (character === Array.from(queryKey)[cursor]) cursor += 1;
-    if (cursor === Array.from(queryKey).length) return 3;
-  }
-  const distance = playerNameDistance(nameKey, queryKey);
-  return distance <= Math.max(1, Math.floor(queryKey.length * .34)) ? 4 + distance : Number.POSITIVE_INFINITY;
-}
-
-function matchingAdminPlayers(query) {
-  return state.players
-    .map((player) => ({ player, score: playerSearchScore(player.name, query) }))
-    .filter((item) => Number.isFinite(item.score))
-    .sort((itemA, itemB) =>
-      itemA.score - itemB.score || itemA.player.name.localeCompare(itemB.player.name, "ko"))
-    .slice(0, 10)
-    .map((item) => item.player);
-}
-
-function hideTierAdminSuggestions() {
-  tierAdminPlayerSuggestions.hidden = true;
-  tierAdminPlayerSuggestions.innerHTML = "";
-  tierAdminPlayerSearch.setAttribute("aria-expanded", "false");
-  tierAdminPlayerSearch.removeAttribute("aria-activedescendant");
-  tierAdminSuggestionIndex = -1;
-}
-
-function renderTierAdminSuggestions() {
-  const query = String(tierAdminPlayerSearch.value || "").replace(/\s+/g, " ").trim();
-  const players = matchingAdminPlayers(tierAdminPlayerSearch.value);
-  const hasExact = state.players.some((player) => keyOf(player.name) === keyOf(query));
-  tierAdminSuggestionIndex = players.length ? 0 : -1;
-  const playerButtons = players.map((player, index) => [
-        '<button id="tierAdminSuggestion-' + index + '" class="tier-admin-player-suggestion',
-        index === 0 ? " is-active" : "",
-        '" type="button" role="option" aria-selected="' + String(index === 0) + '"',
-        ' data-player-name="' + escapeHtml(player.name) + '">',
-        '<strong>' + escapeHtml(player.name) + "</strong>",
-        '<span>' + escapeHtml(player.tier === "FA" ? "FA" : player.tier + "티어") + "</span>",
-        "</button>"
-      ].join("")).join("");
-  const createButton = query && !hasExact
-    ? '<button class="tier-admin-create-suggestion" type="button" data-create-player="' +
-      escapeHtml(query) + '"><strong>＋ ' + escapeHtml(query) +
-      '</strong><span>새 선수로 등록</span></button>'
-    : "";
-  tierAdminPlayerSuggestions.innerHTML = playerButtons + createButton ||
-    '<p class="tier-admin-no-results">등록된 선수가 없습니다.</p>';
-  tierAdminPlayerSuggestions.hidden = false;
-  tierAdminPlayerSearch.setAttribute("aria-expanded", "true");
-  if (players.length) tierAdminPlayerSearch.setAttribute("aria-activedescendant", "tierAdminSuggestion-0");
-}
-
-function openTierAdminCreatePlayer(name) {
-  tierAdminSelectedName = "";
-  tierAdminNewName.value = String(name || tierAdminPlayerSearch.value || "").replace(/\s+/g, " ").trim();
-  tierAdminNewTier.value = "6";
-  tierAdminNewRace.value = "T";
-  tierAdminNewUniversity.value = "";
-  tierAdminNewBroadcastId.value = "";
-  tierAdminCreatePlayer.hidden = false;
-  hideTierAdminSuggestions();
-  renderTierAdminMemberships();
-  tierAdminNewName.focus();
-}
-
-function closeTierAdminCreatePlayer() {
-  tierAdminCreatePlayer.hidden = true;
-}
-
-function moveTierAdminSuggestion(direction) {
-  const buttons = [...tierAdminPlayerSuggestions.querySelectorAll("[data-player-name]")];
-  if (!buttons.length) return;
-  tierAdminSuggestionIndex = (tierAdminSuggestionIndex + direction + buttons.length) % buttons.length;
-  buttons.forEach((button, index) => {
-    const active = index === tierAdminSuggestionIndex;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-selected", String(active));
-  });
-  const active = buttons[tierAdminSuggestionIndex];
-  tierAdminPlayerSearch.setAttribute("aria-activedescendant", active.id);
-  active.scrollIntoView({ block: "nearest" });
-}
-
-function selectTierAdminPlayer(name) {
-  const player = state.players.find((item) => keyOf(item.name) === keyOf(name));
-  if (!player) return;
-  tierAdminSelectedName = player.name;
-  tierAdminPlayerSearch.value = player.name;
-  closeTierAdminCreatePlayer();
-  hideTierAdminSuggestions();
-  renderTierAdminMemberships();
 }
 
 function setTierAdminView(authenticated) {
@@ -367,14 +229,13 @@ function setTierAdminView(authenticated) {
 }
 
 function renderTierAdminEditor(preferredName = "") {
+  const currentName = preferredName || tierAdminPlayer.value;
   const players = [...state.players].sort((playerA, playerB) =>
     playerA.name.localeCompare(playerB.name, "ko"));
-  const currentName = preferredName || tierAdminSelectedName;
-  const selected = players.find((player) => keyOf(player.name) === keyOf(currentName)) || players[0];
-  tierAdminSelectedName = selected?.name || "";
-  tierAdminPlayerSearch.value = tierAdminSelectedName;
-  closeTierAdminCreatePlayer();
-  hideTierAdminSuggestions();
+  tierAdminPlayer.innerHTML = players.map((player) =>
+    '<option value="' + escapeHtml(player.name) + '">' + escapeHtml(player.name) + "</option>"
+  ).join("");
+  if (players.some((player) => player.name === currentName)) tierAdminPlayer.value = currentName;
 
   tierAdminUniversityOptions.innerHTML = universityOptions().map((item) =>
     '<option value="' + escapeHtml(item.value) + '"></option>'
@@ -394,7 +255,6 @@ function renderTierAdminMemberships() {
   tierAdminTier.value = String(player.tier || "FA");
   tierAdminPromotion.checked = Boolean(player.promotionLight);
   tierAdminPromotion.disabled = tierAdminTier.value === "FA";
-  tierAdminRevert.textContent = player.customPlayer ? "등록 선수 삭제" : "모든 변경 원본으로 되돌리기";
   const universities = playerUniversities(player);
   tierAdminMemberships.innerHTML = universities.length
     ? universities.map((university) => [
@@ -409,14 +269,7 @@ function renderTierAdminMemberships() {
 
 function setTierAdminControlsDisabled(disabled) {
   [
-    tierAdminPlayerSearch,
-    tierAdminNewName,
-    tierAdminNewTier,
-    tierAdminNewRace,
-    tierAdminNewUniversity,
-    tierAdminNewBroadcastId,
-    tierAdminCreateConfirm,
-    tierAdminCreateCancel,
+    tierAdminPlayer,
     tierAdminTier,
     tierAdminPromotion,
     tierAdminUniversity,
@@ -424,9 +277,6 @@ function setTierAdminControlsDisabled(disabled) {
     tierAdminMakeFa,
     tierAdminRevert
   ].forEach((control) => { control.disabled = disabled; });
-  tierAdminPlayerSuggestions.querySelectorAll("button").forEach((button) => {
-    button.disabled = disabled;
-  });
   tierAdminMemberships.querySelectorAll("button").forEach((button) => {
     button.disabled = disabled;
   });
@@ -439,28 +289,11 @@ async function readAdminResponse(response) {
   return data;
 }
 
-function updateTierAdminStorage(storage) {
-  if (!storage || typeof storage !== "object") return;
-  tierAdminStorage = {
-    mode: String(storage.mode || "unknown"),
-    durable: storage.durable === true,
-    message: String(storage.message || "")
-  };
-  tierAdminDialog.classList.toggle("has-storage-warning", !tierAdminStorage.durable);
-}
-
-function savedAdminMessage(message) {
-  return tierAdminStorage.durable
-    ? message + " PostgreSQL에 영구 저장했습니다."
-    : message;
-}
-
 async function checkTierAdminSession() {
   tierAdminStatus.textContent = "관리자 상태를 확인하고 있습니다.";
   try {
     const response = await fetch("/api/admin/status", { headers: { "Accept": "application/json" } });
     const data = await readAdminResponse(response);
-    updateTierAdminStorage(data.storage);
     if (!data.configured) {
       tierAdminStatus.textContent = "Render 환경변수 TIER_ADMIN_PASSWORD를 먼저 설정해 주세요.";
       tierAdminPassword.disabled = true;
@@ -470,11 +303,9 @@ async function checkTierAdminSession() {
     tierAdminPassword.disabled = false;
     tierAdminCsrf = data.csrf || "";
     setTierAdminView(Boolean(data.authenticated));
-    tierAdminStatus.textContent = !tierAdminStorage.durable
-      ? tierAdminStorage.message
-      : (data.authenticated
-        ? "로그인되었습니다. 변경 내용은 PostgreSQL에 영구 저장됩니다."
-        : "관리자 비밀번호로 로그인해 주세요. 변경 내용은 PostgreSQL에 영구 저장됩니다.");
+    tierAdminStatus.textContent = data.authenticated
+      ? "로그인되었습니다. 변경 내용은 즉시 전체 티어표에 반영됩니다."
+      : "관리자 비밀번호로 로그인해 주세요.";
   } catch (error) {
     setTierAdminView(false);
     tierAdminStatus.textContent = error.message;
@@ -503,11 +334,10 @@ async function saveTierAdminPlayer(changes, successMessage) {
       },
       body: JSON.stringify({ playerName, universities, tier, promotionLight })
     });
-    const data = await readAdminResponse(response);
-    updateTierAdminStorage(data.storage);
+    await readAdminResponse(response);
     await loadRoster(false);
     renderTierAdminEditor(playerName);
-    tierAdminStatus.textContent = savedAdminMessage(successMessage);
+    tierAdminStatus.textContent = successMessage;
   } catch (error) {
     tierAdminStatus.textContent = error.message;
     if (/인증|로그인/.test(error.message)) {
@@ -524,59 +354,13 @@ function saveTierAdminMemberships(universities, successMessage) {
   return saveTierAdminPlayer({ universities }, successMessage);
 }
 
-async function createTierAdminPlayer() {
-  if (tierAdminSaving) return;
-  const playerName = String(tierAdminNewName.value || "").replace(/\s+/g, " ").trim();
-  const university = String(tierAdminNewUniversity.value || "").replace(/\s+/g, " ").trim();
-  if (!playerName) {
-    tierAdminStatus.textContent = "새 선수 이름을 입력해 주세요.";
-    tierAdminNewName.focus();
-    return;
-  }
-  tierAdminSaving = true;
-  setTierAdminControlsDisabled(true);
-  tierAdminStatus.textContent = playerName + " 선수를 등록하고 있습니다.";
-  try {
-    const response = await fetch("/api/admin/tier-players", {
-      method: "POST",
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "X-CSRF-Token": tierAdminCsrf
-      },
-      body: JSON.stringify({
-        playerName,
-        tier: tierAdminNewTier.value,
-        race: tierAdminNewRace.value,
-        university,
-        universities: university ? [university] : [],
-        broadcastId: tierAdminNewBroadcastId.value
-      })
-    });
-    const data = await readAdminResponse(response);
-    updateTierAdminStorage(data.storage);
-    await loadRoster(false);
-    tierAdminSelectedName = playerName;
-    renderTierAdminEditor(playerName);
-    tierAdminStatus.textContent = savedAdminMessage(playerName + " 선수를 새 명단에 등록했습니다.");
-  } catch (error) {
-    tierAdminStatus.textContent = error.message;
-  } finally {
-    tierAdminSaving = false;
-    if (!tierAdminManager.hidden) setTierAdminControlsDisabled(false);
-  }
-}
-
 async function revertTierAdminMembership() {
   const player = adminSelectedPlayer();
   if (!player || tierAdminSaving) return;
   const playerName = player.name;
-  const customPlayer = Boolean(player.customPlayer);
   tierAdminSaving = true;
   setTierAdminControlsDisabled(true);
-  tierAdminStatus.textContent = customPlayer
-    ? "등록한 선수를 명단에서 삭제하고 있습니다."
-    : "가져온 원본 명단으로 되돌리고 있습니다.";
+  tierAdminStatus.textContent = "가져온 원본 명단으로 되돌리고 있습니다.";
   try {
     const response = await fetch("/api/admin/tier-memberships", {
       method: "DELETE",
@@ -587,14 +371,10 @@ async function revertTierAdminMembership() {
       },
       body: JSON.stringify({ playerName })
     });
-    const data = await readAdminResponse(response);
-    updateTierAdminStorage(data.storage);
+    await readAdminResponse(response);
     await loadRoster(false);
-    tierAdminSelectedName = "";
-    renderTierAdminEditor();
-    tierAdminStatus.textContent = savedAdminMessage(customPlayer
-      ? playerName + " 등록 선수를 명단에서 삭제했습니다."
-      : playerName + " 선수의 티어·승급불·소속을 가져온 원본으로 되돌렸습니다.");
+    renderTierAdminEditor(playerName);
+    tierAdminStatus.textContent = playerName + " 선수의 티어·승급불·소속을 가져온 원본으로 되돌렸습니다.";
   } catch (error) {
     tierAdminStatus.textContent = error.message;
   } finally {
@@ -751,11 +531,10 @@ function syncProfileAnimations() {
   const canAnimate = document.visibilityState === "visible" && !reducedMotion.matches;
   const candidates = canAnimate
     ? photos.filter((image) => {
-        if (!image.dataset.animatedSrc) return false;
+        if (image.dataset.inView !== "1" || !image.dataset.animatedSrc) return false;
         const card = image.closest(".player-card");
-        if (card?.classList.contains("is-live")) return true;
-        if (image.dataset.inView !== "1") return false;
-        return card?.classList.contains("is-open") ||
+        return card?.classList.contains("is-live") ||
+          card?.classList.contains("is-open") ||
           card?.classList.contains("is-hovered") ||
           card?.matches(":focus-within");
       }).sort((imageA, imageB) => {
@@ -764,7 +543,7 @@ function syncProfileAnimations() {
         const selectedA = Number(cardA?.classList.contains("is-open") || cardA?.classList.contains("is-hovered") || cardA?.matches(":focus-within"));
         const selectedB = Number(cardB?.classList.contains("is-open") || cardB?.classList.contains("is-hovered") || cardB?.matches(":focus-within"));
         return selectedB - selectedA;
-      })
+      }).slice(0, MAX_ANIMATED_PROFILES)
     : [];
   const animated = new Set(candidates);
 
@@ -896,21 +675,6 @@ async function refreshTierLive(tier) {
   }
 }
 
-function positionTierAdminDialog(left, top) {
-  const rect = tierAdminDialog.getBoundingClientRect();
-  const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
-  const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
-  tierAdminDialog.style.left = Math.min(Math.max(8, left), maxLeft) + "px";
-  tierAdminDialog.style.top = Math.min(Math.max(8, top), maxTop) + "px";
-  tierAdminDialog.style.transform = "none";
-}
-
-function centerTierAdminDialog() {
-  tierAdminDialog.style.removeProperty("left");
-  tierAdminDialog.style.removeProperty("top");
-  tierAdminDialog.style.removeProperty("transform");
-}
-
 refreshButton.addEventListener("click", () => loadRoster(true));
 liveOnlyToggle.addEventListener("click", () => {
   state.liveOnly = !state.liveOnly;
@@ -932,38 +696,6 @@ tierAdminClose.addEventListener("click", () => tierAdminDialog.close());
 tierAdminDialog.addEventListener("click", (event) => {
   if (event.target === tierAdminDialog) tierAdminDialog.close();
 });
-tierAdminHeader.addEventListener("pointerdown", (event) => {
-  if (window.innerWidth < 640 || event.button !== 0 || event.target.closest("button")) return;
-  const rect = tierAdminDialog.getBoundingClientRect();
-  tierAdminDrag = {
-    pointerId: event.pointerId,
-    offsetX: event.clientX - rect.left,
-    offsetY: event.clientY - rect.top
-  };
-  tierAdminHeader.setPointerCapture(event.pointerId);
-  tierAdminDialog.classList.add("is-dragging");
-  event.preventDefault();
-});
-tierAdminHeader.addEventListener("pointermove", (event) => {
-  if (!tierAdminDrag || event.pointerId !== tierAdminDrag.pointerId) return;
-  positionTierAdminDialog(
-    event.clientX - tierAdminDrag.offsetX,
-    event.clientY - tierAdminDrag.offsetY
-  );
-});
-tierAdminHeader.addEventListener("pointerup", (event) => {
-  if (!tierAdminDrag || event.pointerId !== tierAdminDrag.pointerId) return;
-  tierAdminHeader.releasePointerCapture(event.pointerId);
-  tierAdminDrag = null;
-  tierAdminDialog.classList.remove("is-dragging");
-});
-tierAdminHeader.addEventListener("pointercancel", () => {
-  tierAdminDrag = null;
-  tierAdminDialog.classList.remove("is-dragging");
-});
-tierAdminHeader.addEventListener("dblclick", (event) => {
-  if (!event.target.closest("button")) centerTierAdminDialog();
-});
 tierAdminLogin.addEventListener("submit", async (event) => {
   event.preventDefault();
   tierAdminStatus.textContent = "로그인하고 있습니다.";
@@ -974,64 +706,15 @@ tierAdminLogin.addEventListener("submit", async (event) => {
       body: JSON.stringify({ password: tierAdminPassword.value })
     });
     const data = await readAdminResponse(response);
-    updateTierAdminStorage(data.storage);
     tierAdminCsrf = data.csrf || "";
     tierAdminPassword.value = "";
     setTierAdminView(true);
-    tierAdminStatus.textContent = tierAdminStorage.durable
-      ? "로그인되었습니다. 변경 내용은 PostgreSQL에 영구 저장됩니다."
-      : tierAdminStorage.message;
+    tierAdminStatus.textContent = "로그인되었습니다. 변경할 선수를 선택해 주세요.";
   } catch (error) {
     tierAdminStatus.textContent = error.message;
   }
 });
-tierAdminPlayerSearch.addEventListener("focus", renderTierAdminSuggestions);
-tierAdminPlayerSearch.addEventListener("input", () => {
-  closeTierAdminCreatePlayer();
-  const exact = state.players.find((player) => keyOf(player.name) === keyOf(tierAdminPlayerSearch.value));
-  tierAdminSelectedName = exact?.name || "";
-  renderTierAdminMemberships();
-  renderTierAdminSuggestions();
-});
-tierAdminPlayerSearch.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    event.preventDefault();
-    if (tierAdminPlayerSuggestions.hidden) renderTierAdminSuggestions();
-    else moveTierAdminSuggestion(event.key === "ArrowDown" ? 1 : -1);
-    return;
-  }
-  if (event.key === "Enter" && !tierAdminPlayerSuggestions.hidden) {
-    const buttons = [...tierAdminPlayerSuggestions.querySelectorAll("[data-player-name]")];
-    const selected = buttons[Math.max(0, tierAdminSuggestionIndex)];
-    if (selected) {
-      event.preventDefault();
-      selectTierAdminPlayer(selected.dataset.playerName);
-    } else {
-      const createButton = tierAdminPlayerSuggestions.querySelector("[data-create-player]");
-      if (createButton) {
-        event.preventDefault();
-        openTierAdminCreatePlayer(createButton.dataset.createPlayer);
-      }
-    }
-    return;
-  }
-  if (event.key === "Escape") hideTierAdminSuggestions();
-});
-tierAdminPlayerSuggestions.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-player-name]");
-  if (button) {
-    selectTierAdminPlayer(button.dataset.playerName);
-    return;
-  }
-  const createButton = event.target.closest("[data-create-player]");
-  if (createButton) openTierAdminCreatePlayer(createButton.dataset.createPlayer);
-});
-tierAdminCreateConfirm.addEventListener("click", createTierAdminPlayer);
-tierAdminCreateCancel.addEventListener("click", () => {
-  closeTierAdminCreatePlayer();
-  tierAdminPlayerSearch.focus();
-  renderTierAdminSuggestions();
-});
+tierAdminPlayer.addEventListener("change", renderTierAdminMemberships);
 tierAdminTier.addEventListener("change", () => {
   const player = adminSelectedPlayer();
   if (!player) return;
@@ -1094,18 +777,7 @@ document.addEventListener("visibilitychange", () => {
 });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
 document.addEventListener("click", (event) => {
-  if (!event.target.closest(".tier-admin-player-search")) hideTierAdminSuggestions();
   if (state.openCard && !state.openCard.contains(event.target)) closeOpenCard();
-});
-window.addEventListener("resize", () => {
-  if (window.innerWidth < 640) {
-    centerTierAdminDialog();
-    return;
-  }
-  if (tierAdminDialog.style.transform === "none") {
-    const rect = tierAdminDialog.getBoundingClientRect();
-    positionTierAdminDialog(rect.left, rect.top);
-  }
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeOpenCard();
