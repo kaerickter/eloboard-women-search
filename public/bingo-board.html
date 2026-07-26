@@ -18,6 +18,8 @@
       --peach: #ffe3d4;
       --cell: #ffffff;
       --cell-checked: #fff0f3;
+      --team-1: #ef5b78;
+      --team-2: #3b82f6;
       --shadow: 0 18px 40px rgba(24, 32, 46, .12);
     }
 
@@ -284,6 +286,33 @@
         inset 0 1px 0 rgba(255, 255, 255, .94);
     }
 
+    .preview-cell.territory-cell,
+    .edit-cell.territory-cell {
+      color: var(--claim-ink, #fff);
+      background: var(--claim-color);
+      border-color: var(--claim-color);
+    }
+
+    .preview-cell.territory-cell {
+      box-shadow:
+        0 12px 24px color-mix(in srgb, var(--claim-color) 36%, transparent),
+        inset 0 -7px 0 rgba(0, 0, 0, .1),
+        inset 0 1px 0 rgba(255, 255, 255, .32);
+    }
+
+    .preview-cell.territory-cell.team-bingo {
+      border-color: #fff;
+      box-shadow:
+        0 0 0 4px rgba(255, 255, 255, .95),
+        0 0 0 9px var(--claim-color),
+        0 16px 32px color-mix(in srgb, var(--claim-color) 48%, transparent),
+        inset 0 -7px 0 rgba(0, 0, 0, .12);
+    }
+
+    .edit-cell.territory-cell.team-bingo {
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .86);
+    }
+
     .editor {
       display: flex;
       flex-direction: column;
@@ -337,8 +366,8 @@
 
     .segmented {
       display: inline-grid;
-      grid-template-columns: 1fr 1fr;
-      width: 166px;
+      grid-template-columns: 1fr 1fr 1.35fr;
+      width: min(100%, 290px);
       padding: 3px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -359,6 +388,82 @@
       color: var(--ink);
       background: #fff;
       box-shadow: 0 2px 8px rgba(20, 28, 40, .12);
+    }
+
+    .segmented button.mode-active {
+      color: #fff;
+      background: linear-gradient(135deg, var(--team-1), var(--team-2));
+      box-shadow: 0 3px 10px rgba(49, 78, 135, .24);
+    }
+
+    .territory-controls {
+      display: grid;
+      gap: 12px;
+    }
+
+    .territory-controls[hidden] {
+      display: none;
+    }
+
+    .team-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .team-button {
+      min-height: 46px;
+      border: 3px solid transparent;
+      border-radius: 10px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 900;
+      box-shadow: 0 8px 18px rgba(24, 32, 46, .12);
+    }
+
+    .team-button[data-team="1"] {
+      background: var(--team-1);
+    }
+
+    .team-button[data-team="2"] {
+      background: var(--team-2);
+    }
+
+    .team-button.active {
+      border-color: #fff;
+      outline: 3px solid currentColor;
+      transform: translateY(-1px);
+    }
+
+    .team-color-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .team-color-row input {
+      width: 46px;
+      height: 30px;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .territory-guide {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
     }
 
     .field {
@@ -461,6 +566,15 @@
       text-shadow: 0 2px 0 rgba(255, 255, 255, .85);
     }
 
+    .bingo-message .team-score {
+      display: inline-block;
+      margin: 2px 6px;
+      padding: 6px 12px;
+      border: 3px solid currentColor;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .86);
+    }
+
     @media (max-width: 920px) {
       .app {
         grid-template-columns: 1fr;
@@ -539,11 +653,29 @@
       </section>
 
       <section class="section">
-        <div class="label">판 크기</div>
+        <div class="label">판 크기 / 모드</div>
         <div class="segmented" role="group" aria-label="빙고판 크기 선택">
           <button type="button" class="active" data-size="4">4x4</button>
           <button type="button" data-size="5">5x5</button>
+          <button type="button" data-mode="territory">땅따먹기</button>
         </div>
+      </section>
+
+      <section class="section territory-controls" id="territoryControls" hidden>
+        <div class="label">현재 차례</div>
+        <div class="team-picker" role="group" aria-label="점령할 팀 선택">
+          <button class="team-button active" type="button" data-team="1">1팀</button>
+          <button class="team-button" type="button" data-team="2">2팀</button>
+        </div>
+        <div class="team-color-row">
+          <label for="team1Color">1팀 색깔</label>
+          <input id="team1Color" type="color" value="#ef5b78">
+        </div>
+        <div class="team-color-row">
+          <label for="team2Color">2팀 색깔</label>
+          <input id="team2Color" type="color" value="#3b82f6">
+        </div>
+        <p class="territory-guide">팀을 고른 뒤 숫자를 누르면 점령합니다. 상대 팀이 같은 칸을 누르면 그 팀 색으로 바뀌며, 자기 칸을 다시 누르면 점령이 해제됩니다.</p>
       </section>
 
       <section class="section">
@@ -575,7 +707,10 @@
       size: 4,
       title: "빙고",
       cells: Array.from({ length: 25 }, () => ""),
-      checked: Array.from({ length: 25 }, () => false)
+      checked: Array.from({ length: 25 }, () => false),
+      mode: "classic",
+      owners: Array.from({ length: 25 }, () => 0),
+      teamColors: ["#ef5b78", "#3b82f6"]
     };
 
     const previewTitle = document.getElementById("previewTitle");
@@ -588,9 +723,17 @@
     const status = document.getElementById("status");
     const bingoMessage = document.getElementById("bingoMessage");
     const sizeButtons = document.querySelectorAll("[data-size]");
+    const territoryButton = document.querySelector("[data-mode='territory']");
+    const territoryControls = document.getElementById("territoryControls");
+    const teamButtons = document.querySelectorAll("[data-team]");
+    const teamColorInputs = [
+      document.getElementById("team1Color"),
+      document.getElementById("team2Color")
+    ];
     const channel = "BroadcastChannel" in window ? new BroadcastChannel("broadcast-bingo") : null;
     let syncing = false;
     let realtimeRoom = null;
+    let activeTeam = 1;
 
     const saved = localStorage.getItem("broadcast-bingo-state");
     if (saved) {
@@ -600,6 +743,12 @@
         localStorage.removeItem("broadcast-bingo-state");
       }
     }
+
+    state.mode = state.mode === "territory" ? "territory" : "classic";
+    state.owners = Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(state.owners?.[index])) ? Number(state.owners[index]) : 0);
+    state.teamColors = Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(state.teamColors?.[index] || "")
+      ? state.teamColors[index]
+      : ["#ef5b78", "#3b82f6"][index]);
 
     function activeCount() {
       return state.size * state.size;
@@ -621,7 +770,7 @@
       return copy;
     }
 
-    function getBingoLineIndexes() {
+    function getBingoLineIndexes(team = 0) {
       const lines = [];
       const size = state.size;
 
@@ -636,7 +785,19 @@
       lines.push(Array.from({ length: size }, (_, i) => i * size + i));
       lines.push(Array.from({ length: size }, (_, i) => i * size + (size - 1 - i)));
 
-      return lines.filter(line => line.every(index => state.checked[index]));
+      return lines.filter(line => line.every(index => (
+        state.mode === "territory"
+          ? state.owners[index] === team
+          : state.checked[index]
+      )));
+    }
+
+    function readableInk(hex) {
+      const value = hex.replace("#", "");
+      const red = Number.parseInt(value.slice(0, 2), 16);
+      const green = Number.parseInt(value.slice(2, 4), 16);
+      const blue = Number.parseInt(value.slice(4, 6), 16);
+      return (red * 299 + green * 587 + blue * 114) / 1000 > 150 ? "#18202b" : "#ffffff";
     }
 
     function fitText(element) {
@@ -677,16 +838,23 @@
 
     function render() {
       const count = activeCount();
-      const bingoLines = getBingoLineIndexes();
+      const isTerritory = state.mode === "territory";
+      const bingoLines = isTerritory ? [] : getBingoLineIndexes();
+      const team1Lines = isTerritory ? getBingoLineIndexes(1) : [];
+      const team2Lines = isTerritory ? getBingoLineIndexes(2) : [];
       const highlighted = new Set(bingoLines.flat());
+      const team1Highlighted = new Set(team1Lines.flat());
+      const team2Highlighted = new Set(team2Lines.flat());
       const grid = `repeat(${state.size}, minmax(0, 1fr))`;
 
+      document.documentElement.style.setProperty("--team-1", state.teamColors[0]);
+      document.documentElement.style.setProperty("--team-2", state.teamColors[1]);
       previewTitle.textContent = state.title || "빙고";
       titleInput.value = state.title;
       previewBoard.style.gridTemplateColumns = grid;
       editBoard.style.gridTemplateColumns = grid;
-      previewBoard.classList.toggle("has-bingo", bingoLines.length > 0);
-      stage.classList.toggle("has-bingo", bingoLines.length > 0);
+      previewBoard.classList.toggle("has-bingo", bingoLines.length > 0 || team1Lines.length > 0 || team2Lines.length > 0);
+      stage.classList.toggle("has-bingo", bingoLines.length > 0 || team1Lines.length > 0 || team2Lines.length > 0);
       previewBoard.innerHTML = "";
       editBoard.innerHTML = "";
 
@@ -695,17 +863,33 @@
         previewCell.type = "button";
         previewCell.className = "preview-cell";
         previewCell.textContent = state.cells[i] || "";
-        previewCell.setAttribute("aria-label", `${i + 1}번 칸`);
-        previewCell.addEventListener("click", () => toggleCheck(i));
-        if (state.checked[i]) previewCell.classList.add("checked");
-        if (highlighted.has(i)) previewCell.classList.add("bingo-line");
+        const owner = state.owners[i];
+        const ownerLabel = owner ? `, ${owner}팀 점령` : "";
+        previewCell.setAttribute("aria-label", `${i + 1}번 칸${ownerLabel}`);
+        previewCell.addEventListener("click", () => handleCellClick(i));
+        if (isTerritory && owner) {
+          previewCell.classList.add("territory-cell");
+          previewCell.style.setProperty("--claim-color", state.teamColors[owner - 1]);
+          previewCell.style.setProperty("--claim-ink", readableInk(state.teamColors[owner - 1]));
+          if ((owner === 1 ? team1Highlighted : team2Highlighted).has(i)) previewCell.classList.add("team-bingo");
+        } else {
+          if (state.checked[i]) previewCell.classList.add("checked");
+          if (highlighted.has(i)) previewCell.classList.add("bingo-line");
+        }
         previewBoard.appendChild(previewCell);
         fitText(previewCell);
 
         const editCell = document.createElement("div");
         editCell.className = "edit-cell";
-        if (state.checked[i]) editCell.classList.add("checked");
-        if (highlighted.has(i)) editCell.classList.add("bingo-line");
+        if (isTerritory && owner) {
+          editCell.classList.add("territory-cell");
+          editCell.style.setProperty("--claim-color", state.teamColors[owner - 1]);
+          editCell.style.setProperty("--claim-ink", readableInk(state.teamColors[owner - 1]));
+          if ((owner === 1 ? team1Highlighted : team2Highlighted).has(i)) editCell.classList.add("team-bingo");
+        } else {
+          if (state.checked[i]) editCell.classList.add("checked");
+          if (highlighted.has(i)) editCell.classList.add("bingo-line");
+        }
 
         const input = document.createElement("input");
         input.value = state.cells[i] || "";
@@ -718,7 +902,7 @@
           save();
           renderPreviewOnly();
         });
-        input.addEventListener("dblclick", () => toggleCheck(i));
+        input.addEventListener("dblclick", () => handleCellClick(i));
         editCell.appendChild(input);
         editBoard.appendChild(editCell);
         fitInput(input);
@@ -728,7 +912,23 @@
         button.classList.toggle("active", Number(button.dataset.size) === state.size);
       });
 
-      bingoMessage.textContent = bingoLines.length ? `${bingoLines.length} BINGO!` : "";
+      territoryButton.classList.toggle("mode-active", isTerritory);
+      territoryControls.hidden = !isTerritory;
+      teamButtons.forEach(button => button.classList.toggle("active", Number(button.dataset.team) === activeTeam));
+      teamColorInputs.forEach((input, index) => { input.value = state.teamColors[index]; });
+
+      bingoMessage.innerHTML = "";
+      if (isTerritory) {
+        [[1, team1Lines.length], [2, team2Lines.length]].forEach(([team, lines]) => {
+          const score = document.createElement("span");
+          score.className = "team-score";
+          score.style.color = state.teamColors[team - 1];
+          score.textContent = `${team}팀 ${lines} BINGO`;
+          bingoMessage.appendChild(score);
+        });
+      } else {
+        bingoMessage.textContent = bingoLines.length ? `${bingoLines.length} BINGO!` : "";
+      }
       save();
     }
 
@@ -757,11 +957,36 @@
       render();
     }
 
+    function claimTerritory(index) {
+      state.owners[index] = state.owners[index] === activeTeam ? 0 : activeTeam;
+      realtimeRoom?.sendSet(`owners.${index}`, state.owners[index], 0);
+      render();
+    }
+
+    function handleCellClick(index) {
+      if (state.mode === "territory") {
+        claimTerritory(index);
+      } else {
+        toggleCheck(index);
+      }
+    }
+
     function setSize(size) {
       state.size = size;
       state.checked = state.checked.map((checked, index) => index < activeCount() && checked);
+      state.owners = state.owners.map((owner, index) => index < activeCount() ? owner : 0);
       realtimeRoom?.sendSet("size", state.size, 0);
       state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
+      state.owners.forEach((value, index) => realtimeRoom?.sendSet(`owners.${index}`, value, 0));
+      render();
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      realtimeRoom?.sendSet("mode", state.mode);
+      status.textContent = mode === "territory"
+        ? "현재 팀을 선택한 뒤 숫자를 눌러 땅을 점령하세요."
+        : "일반 빙고 모드로 돌아왔습니다.";
       render();
     }
 
@@ -787,8 +1012,10 @@
       shuffle(pool).slice(0, count).forEach((value, index) => {
         state.cells[index] = value;
         state.checked[index] = false;
+        state.owners[index] = 0;
         realtimeRoom?.sendSet(`cells.${index}`, value, 0);
         realtimeRoom?.sendSet(`checked.${index}`, false, 0);
+        realtimeRoom?.sendSet(`owners.${index}`, 0, 0);
       });
 
       status.textContent = `${low} ~ ${high} 중 ${count}개를 랜덤으로 넣었습니다.`;
@@ -830,18 +1057,39 @@
     sizeButtons.forEach(button => {
       button.addEventListener("click", () => setSize(Number(button.dataset.size)));
     });
+    territoryButton.addEventListener("click", () => setMode(state.mode === "territory" ? "classic" : "territory"));
+    teamButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        activeTeam = Number(button.dataset.team);
+        render();
+      });
+    });
+    teamColorInputs.forEach((input, index) => {
+      input.addEventListener("input", event => {
+        state.teamColors[index] = event.target.value;
+        realtimeRoom?.sendSet(`teamColors.${index}`, state.teamColors[index]);
+        render();
+      });
+    });
 
     document.getElementById("randomFill").addEventListener("click", randomFill);
     document.getElementById("clearMarks").addEventListener("click", () => {
-      state.checked = state.checked.map(() => false);
-      state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
+      if (state.mode === "territory") {
+        state.owners = state.owners.map(() => 0);
+        state.owners.forEach((value, index) => realtimeRoom?.sendSet(`owners.${index}`, value, 0));
+      } else {
+        state.checked = state.checked.map(() => false);
+        state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
+      }
       render();
     });
     document.getElementById("clearAll").addEventListener("click", () => {
       state.cells = state.cells.map(() => "");
       state.checked = state.checked.map(() => false);
+      state.owners = state.owners.map(() => 0);
       state.cells.forEach((value, index) => realtimeRoom?.sendSet(`cells.${index}`, value, 0));
       state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
+      state.owners.forEach((value, index) => realtimeRoom?.sendSet(`owners.${index}`, value, 0));
       status.textContent = "빙고판을 비웠습니다.";
       render();
     });
