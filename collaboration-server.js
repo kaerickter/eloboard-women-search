@@ -10,7 +10,8 @@ const ROOM_FILE = process.env.ROOM_DATA_FILE || path.join(__dirname, "data", "co
 function defaultState(feature) {
   if (feature === "bingo") return {
     size: 4, title: "빙고", cells: Array(25).fill(""), checked: Array(25).fill(false),
-    mode: "classic", owners: Array(25).fill(0), teamColors: ["#ef5b78", "#3b82f6"]
+    mode: "classic", owners: Array(25).fill(0), teamColors: ["#ef5b78", "#3b82f6"],
+    teamNames: ["1팀", "2팀"]
   };
   if (feature === "kill-bet") return { chickenKillValue: 1, panels: {} };
   return {
@@ -38,7 +39,8 @@ function normalizeState(feature, raw = {}) {
       owners: Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(raw.owners?.[index])) ? Number(raw.owners[index]) : 0),
       teamColors: Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(raw.teamColors?.[index] || "")
         ? raw.teamColors[index]
-        : fallbackColors[index])
+        : fallbackColors[index]),
+      teamNames: Array.from({ length: 2 }, (_, index) => text(raw.teamNames?.[index] || `${index + 1}팀`, 16))
     };
   }
   if (feature === "kill-bet") {
