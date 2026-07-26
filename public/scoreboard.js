@@ -15,6 +15,7 @@ const gameCount = document.querySelector("#gameCount");
 const sizeSummary = document.querySelector("#sizeSummary");
 const scoreHead = document.querySelector("#scoreHead");
 const scoreBody = document.querySelector("#scoreBody");
+const defaultButton = document.querySelector("#defaultButton");
 const randomButton = document.querySelector("#randomButton");
 const sortButton = document.querySelector("#sortButton");
 const resetButton = document.querySelector("#resetButton");
@@ -190,6 +191,13 @@ function assignRandomNumbers() {
   render();
 }
 
+function assignDefaultNumbers() {
+  const numbers = Array.from({ length: state.players }, (_, index) => index + 1);
+  state.assignedNumbers = numbers;
+  realtimeRoom?.sendSet("assignedNumbers", numbers, 0);
+  render();
+}
+
 function sortByNumber() {
   if (!state.assignedNumbers) return;
   const order = state.assignedNumbers.map((number, index) => ({ number, index })).sort((a, b) => a.number - b.number);
@@ -211,6 +219,7 @@ titleInput.dataset.collabPath = "title";
 titleInput.addEventListener("input", event => { state.title = event.target.value; realtimeRoom?.sendSet("title", state.title); saveState(); });
 playerCount.addEventListener("change", event => resize("players", event.target.value));
 gameCount.addEventListener("change", event => resize("games", event.target.value));
+defaultButton.addEventListener("click", assignDefaultNumbers);
 randomButton.addEventListener("click", assignRandomNumbers);
 sortButton.addEventListener("click", sortByNumber);
 resetButton.addEventListener("click", () => {
