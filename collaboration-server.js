@@ -6,13 +6,10 @@ const { Pool } = require("pg");
 const FEATURES = new Set(["bingo", "kill-bet", "scoreboard"]);
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ROOM_FILE = process.env.ROOM_DATA_FILE || path.join(__dirname, "data", "collaboration-rooms.json");
+const DATABASE_RETRY_MS = 15000;
 
 function defaultState(feature) {
-  if (feature === "bingo") return {
-    size: 4, title: "빙고", cells: Array(25).fill(""), checked: Array(25).fill(false),
-    mode: "classic", owners: Array(25).fill(0), teamColors: ["#ef5b78", "#3b82f6"],
-    teamNames: ["1팀", "2팀"]
-  };
+  if (feature === "bingo") return { size: 4, title: "빙고", cells: Array(25).fill(""), checked: Array(25).fill(false) };
   if (feature === "kill-bet") return { chickenKillValue: 1, panels: {} };
   return {
     title: "매치 카멜레온", players: 7, games: 9, names: Array(7).fill(""),
@@ -30,17 +27,10 @@ function number(value, min, max, fallback = min) {
 function normalizeState(feature, raw = {}) {
   if (feature === "bingo") {
     const size = Number(raw.size) === 5 ? 5 : 4;
-    const fallbackColors = ["#ef5b78", "#3b82f6"];
     return {
       size, title: text(raw.title || "빙고", 28),
       cells: Array.from({ length: 25 }, (_, index) => text(raw.cells?.[index], 34)),
-      checked: Array.from({ length: 25 }, (_, index) => Boolean(raw.checked?.[index])),
-      mode: raw.mode === "territory" ? "territory" : "classic",
-      owners: Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(raw.owners?.[index])) ? Number(raw.owners[index]) : 0),
-      teamColors: Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(raw.teamColors?.[index] || "")
-        ? raw.teamColors[index]
-        : fallbackColors[index]),
-      teamNames: Array.from({ length: 2 }, (_, index) => text(raw.teamNames?.[index] || `${index + 1}팀`, 16))
+      checked: Array.from({ length: 25 }, (_, index) => Boolean(raw.checked?.[index]))
     };
   }
   if (feature === "kill-bet") {
@@ -78,17 +68,41 @@ function roomKey(feature, code) { return `${feature}:${code}`; }
 
 class RoomStore {
   constructor() {
-    this.pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
+    this.pool = process.env.DATABASE_URL ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+      max: 3,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      allowExitOnIdle: true
+    }) : null;
+    this.databaseReady = false;
+    this.retryTimer = null;
     this.fileData = {};
     this.fileWrite = Promise.resolve();
   }
   async init() {
     if (this.pool) {
-      await this.pool.query(`CREATE TABLE IF NOT EXISTS collaboration_rooms (
-        feature TEXT NOT NULL, code TEXT NOT NULL, state JSONB NOT NULL, version BIGINT NOT NULL DEFAULT 0,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (feature, code)
-      )`);
-      console.log("Collaborative rooms: PostgreSQL persistence enabled");
+      try {
+        await this.pool.query(`CREATE TABLE IF NOT EXISTS collaboration_rooms (
+          feature TEXT NOT NULL, code TEXT NOT NULL, state JSONB NOT NULL, version BIGINT NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (feature, code)
+        )`);
+        this.databaseReady = true;
+        clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+        console.log("Collaborative rooms: PostgreSQL persistence enabled");
+      } catch (error) {
+        this.databaseReady = false;
+        console.error("Collaborative rooms database unavailable; retrying:", error.message);
+        clearTimeout(this.retryTimer);
+        this.retryTimer = setTimeout(() => {
+          this.init().catch((retryError) => {
+            console.error("Collaborative rooms retry failed:", retryError.message);
+          });
+        }, DATABASE_RETRY_MS);
+        this.retryTimer.unref?.();
+      }
       return;
     }
     try { this.fileData = JSON.parse(await fs.promises.readFile(ROOM_FILE, "utf8")); }
@@ -97,6 +111,7 @@ class RoomStore {
   }
   async load(feature, code) {
     if (this.pool) {
+      if (!this.databaseReady) throw new Error("저장 서버 연결을 복구하고 있습니다. 잠시 후 다시 시도해 주세요.");
       const result = await this.pool.query("SELECT state, version, updated_at FROM collaboration_rooms WHERE feature=$1 AND code=$2", [feature, code]);
       if (!result.rows[0]) return null;
       return { state: normalizeState(feature, result.rows[0].state), version: Number(result.rows[0].version), updatedAt: result.rows[0].updated_at };
@@ -108,6 +123,7 @@ class RoomStore {
     const updatedAt = new Date().toISOString();
     room.updatedAt = updatedAt;
     if (this.pool) {
+      if (!this.databaseReady) throw new Error("저장 서버 연결을 복구하고 있습니다. 잠시 후 다시 시도해 주세요.");
       await this.pool.query(`INSERT INTO collaboration_rooms(feature, code, state, version, updated_at) VALUES($1,$2,$3,$4,$5)
         ON CONFLICT(feature, code) DO UPDATE SET state=EXCLUDED.state, version=EXCLUDED.version, updated_at=EXCLUDED.updated_at`,
       [feature, code, room.state, room.version, updatedAt]);

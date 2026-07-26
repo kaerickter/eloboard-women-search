@@ -88,9 +88,9 @@ npm start
 
 기존 Render 서비스에 이 폴더를 반영한 뒤 다시 배포합니다. Build Command는 `npm install`, Start Command는 `npm start`로 설정합니다. 서버는 Render가 제공하는 `PORT` 환경 변수를 자동으로 사용합니다.
 
-저장 데이터가 재배포나 무료 인스턴스 절전 뒤에도 유지되게 하려면 PostgreSQL 연결이 필요합니다. 저장소의 `render.yaml`을 Blueprint로 적용하면 웹 서비스와 `elo-kitten-rooms` 데이터베이스, `DATABASE_URL` 연결이 함께 설정됩니다. 기존 서비스를 직접 관리한다면 Render PostgreSQL을 만든 다음 Internal Database URL을 웹 서비스의 `DATABASE_URL` 환경 변수로 등록해도 됩니다. `DATABASE_URL`이 없는 로컬 개발 환경에서는 `data/collaboration-rooms.json`을 사용합니다.
+저장 데이터는 Neon PostgreSQL에 영구 저장합니다. Neon 콘솔의 **Connect > Pooled connection**에서 복사한 연결 문자열을 Render 웹 서비스의 `DATABASE_URL` 환경 변수에 등록하세요. 연결 문자열에는 `-pooler` 호스트와 `sslmode=require`가 포함되어야 합니다. `render.yaml`에는 비밀값을 저장하지 않으며 `DATABASE_URL` 입력 자리만 선언합니다. `DATABASE_URL`이 없는 로컬 개발 환경에서는 `data/collaboration-rooms.json`을 사용합니다.
 
-Render 무료 PostgreSQL은 생성 후 30일에 만료되므로 장기 운영 시 데이터베이스만 유료 플랜으로 올리거나, 호환되는 외부 PostgreSQL의 연결 주소를 `DATABASE_URL`에 설정해야 합니다.
+Render 서비스는 GitHub `main` 브랜치와 연결하고 **Auto-Deploy: On Commit**으로 설정합니다. 환경 변수를 바꾼 뒤에는 **Save, rebuild, and deploy**를 선택하세요. 배포본이 GitHub보다 오래된 경우 **Manual Deploy > Clear build cache & deploy**로 최신 커밋을 다시 배포합니다.
 
 ### 티어표 선수 관리자
 

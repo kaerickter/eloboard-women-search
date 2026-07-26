@@ -24,7 +24,24 @@ function normalizeUniversities(values) {
 
 function normalizeTier(value) {
   const tier = String(value ?? "").trim().toUpperCase();
-  return /^(?:[0-9]|FA)$/.test(tier) ? tier : "";
+  return /^(?:[0-9]|FA|갓|킹|잭|조커|스페이드)$/.test(tier) ? tier : "";
+}
+
+function normalizeRace(value) {
+  const race = String(value ?? "").trim().toUpperCase();
+  return /^(?:T|P|Z)$/.test(race) ? race : "";
+}
+
+function normalizeBroadcastId(value) {
+  const broadcastId = String(value ?? "").trim();
+  return /^[a-z0-9_-]{2,40}$/i.test(broadcastId) ? broadcastId : "";
+}
+
+function soopProfileImage(broadcastId) {
+  if (!broadcastId) return "";
+  return "https://profile.img.sooplive.co.kr/LOGO/" +
+    encodeURIComponent(broadcastId.slice(0, 2).toLowerCase()) + "/" +
+    encodeURIComponent(broadcastId) + "/" + encodeURIComponent(broadcastId) + ".jpg";
 }
 
 function parseCookies(req) {
@@ -48,14 +65,26 @@ class TierAdmin {
     this.password = options.password ?? process.env.TIER_ADMIN_PASSWORD ?? "";
     this.filePath = options.filePath || process.env.TIER_OVERRIDE_FILE ||
       path.join(__dirname, "data", "tier-university-overrides.json");
-    const databaseUrl = options.databaseUrl ?? process.env.DATABASE_URL ?? "";
-    this.pool = databaseUrl
+    const databaseUrl = options.databaseUrl ??
+      process.env.TIER_ADMIN_DATABASE_URL ??
+      process.env.DATABASE_URL ??
+      "";
+    this.production = options.production ?? process.env.NODE_ENV === "production";
+    const durableSetting = String(process.env.TIER_ADMIN_REQUIRE_DATABASE || "").trim().toLowerCase();
+    this.requireDurable = options.requireDurable ??
+      (durableSetting ? !["0", "false", "no"].includes(durableSetting) : this.production);
+    this.pool = options.pool || (databaseUrl
       ? new Pool({
           connectionString: databaseUrl,
-          ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-          max: 2
+          ssl: this.production ? { rejectUnauthorized: false } : undefined,
+          max: 2,
+          connectionTimeoutMillis: 10000,
+          idleTimeoutMillis: 30000,
+          allowExitOnIdle: true
         })
-      : null;
+      : null);
+    this.databaseReady = false;
+    this.databaseError = "";
     this.overrides = new Map();
     this.sessions = new Map();
     this.loginAttempts = new Map();
@@ -66,36 +95,86 @@ class TierAdmin {
     return Boolean(this.password);
   }
 
+  get storageStatus() {
+    const databaseReady = Boolean(this.pool && this.databaseReady);
+    return {
+      mode: this.pool ? "postgresql" : "local-file",
+      durable: databaseReady || (!this.pool && !this.production),
+      message: databaseReady
+        ? "PostgreSQL에 영구 저장됩니다."
+        : (this.pool
+          ? "PostgreSQL 연결을 복구하고 있습니다. 잠시 후 다시 시도해 주세요."
+        : (this.production
+          ? "영구 저장소가 연결되지 않았습니다. Render에 DATABASE_URL을 연결해 주세요."
+          : "로컬 JSON 파일에 저장됩니다."))
+    };
+  }
+
+  assertWritableStorage() {
+    if (!this.requireDurable || (this.pool && this.databaseReady)) return;
+    const error = new Error(
+      this.pool
+        ? "PostgreSQL 연결이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요."
+        : "영구 저장소가 연결되지 않아 변경하지 않았습니다. Render Environment의 DATABASE_URL에 PostgreSQL을 연결해 주세요."
+    );
+    error.statusCode = 503;
+    error.code = this.pool ? "DATABASE_UNAVAILABLE" : "DURABLE_STORAGE_REQUIRED";
+    throw error;
+  }
+
   async init() {
     if (this.pool) {
-      await this.pool.query(`CREATE TABLE IF NOT EXISTS tier_university_overrides (
-        player_key TEXT PRIMARY KEY,
-        player_name TEXT NOT NULL,
-        universities JSONB NOT NULL,
-        tier TEXT,
-        promotion_light BOOLEAN NOT NULL DEFAULT FALSE,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )`);
-      await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS tier TEXT");
-      await this.pool.query(
-        "ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS promotion_light BOOLEAN NOT NULL DEFAULT FALSE"
-      );
-      const result = await this.pool.query(
-        "SELECT player_key, player_name, universities, tier, promotion_light, updated_at FROM tier_university_overrides"
-      );
-      for (const row of result.rows) {
-        this.overrides.set(row.player_key, {
-          playerName: row.player_name,
-          universities: normalizeUniversities(row.universities),
-          tier: normalizeTier(row.tier) || null,
-          promotionLight: Boolean(row.promotion_light),
-          updatedAt: row.updated_at
-        });
+      try {
+        await this.pool.query(`CREATE TABLE IF NOT EXISTS tier_university_overrides (
+          player_key TEXT PRIMARY KEY,
+          player_name TEXT NOT NULL,
+          universities JSONB NOT NULL,
+          tier TEXT,
+          promotion_light BOOLEAN NOT NULL DEFAULT FALSE,
+          is_custom BOOLEAN NOT NULL DEFAULT FALSE,
+          race TEXT,
+          broadcast_id TEXT,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS tier TEXT");
+        await this.pool.query(
+          "ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS promotion_light BOOLEAN NOT NULL DEFAULT FALSE"
+        );
+        await this.pool.query(
+          "ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS is_custom BOOLEAN NOT NULL DEFAULT FALSE"
+        );
+        await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS race TEXT");
+        await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS broadcast_id TEXT");
+        const result = await this.pool.query(
+          `SELECT player_key, player_name, universities, tier, promotion_light,
+            is_custom, race, broadcast_id, updated_at
+           FROM tier_university_overrides`
+        );
+        this.overrides.clear();
+        for (const row of result.rows) {
+          this.overrides.set(row.player_key, {
+            playerName: row.player_name,
+            universities: normalizeUniversities(row.universities),
+            tier: normalizeTier(row.tier) || null,
+            promotionLight: Boolean(row.promotion_light),
+            isCustom: Boolean(row.is_custom),
+            race: normalizeRace(row.race) || null,
+            broadcastId: normalizeBroadcastId(row.broadcast_id) || null,
+            updatedAt: row.updated_at
+          });
+        }
+        this.databaseReady = true;
+        this.databaseError = "";
+        console.log("Tier university overrides: PostgreSQL persistence enabled");
+        return;
+      } catch (error) {
+        this.databaseReady = false;
+        this.databaseError = String(error?.message || "PostgreSQL connection failed");
+        throw error;
       }
-      console.log("Tier university overrides: PostgreSQL persistence enabled");
-      return;
     }
 
+    this.databaseReady = false;
     try {
       const saved = JSON.parse(await fs.promises.readFile(this.filePath, "utf8"));
       for (const [key, value] of Object.entries(saved || {})) {
@@ -104,6 +183,9 @@ class TierAdmin {
           universities: normalizeUniversities(value.universities),
           tier: normalizeTier(value.tier) || null,
           promotionLight: Boolean(value.promotionLight),
+          isCustom: Boolean(value.isCustom),
+          race: normalizeRace(value.race) || null,
+          broadcastId: normalizeBroadcastId(value.broadcastId) || null,
           updatedAt: value.updatedAt || null
         });
       }
@@ -114,7 +196,9 @@ class TierAdmin {
   }
 
   applyOverrides(players) {
-    return (Array.isArray(players) ? players : []).map((player) => {
+    const seen = new Set();
+    const result = (Array.isArray(players) ? players : []).map((player) => {
+      seen.add(playerKey(player.name));
       const override = this.overrides.get(playerKey(player.name));
       if (!override) return player;
       const universities = [...override.universities];
@@ -124,10 +208,46 @@ class TierAdmin {
         universities,
         tier: override.tier || player.tier,
         promotionLight: Boolean(override.promotionLight),
+        race: override.race || player.race,
+        broadcastId: override.broadcastId || player.broadcastId,
+        customPlayer: Boolean(override.isCustom),
         universityOverride: true,
         tierOverride: Boolean(override.tier)
       };
     });
+    for (const [key, override] of this.overrides) {
+      if (!override.isCustom || seen.has(key)) continue;
+      const universities = [...override.universities];
+      result.push({
+        name: override.playerName,
+        tier: override.tier || "FA",
+        division: /^(?:갓|킹|잭|조커|스페이드)$/.test(override.tier || "") ? "men" : "women",
+        race: override.race || "T",
+        university: universities[0] || "연합팀",
+        universities,
+        broadcastId: override.broadcastId || "",
+        image: soopProfileImage(override.broadcastId),
+        profileUrl: override.broadcastId
+          ? "https://play.sooplive.co.kr/" + encodeURIComponent(override.broadcastId)
+          : "",
+        promotionLight: Boolean(override.promotionLight),
+        universityOverride: true,
+        tierOverride: true,
+        customPlayer: true
+      });
+    }
+    const tierOrder = new Map([
+      ...Array.from({ length: 10 }, (_, index) => [String(index), index]),
+      ["갓", 10],
+      ["킹", 11],
+      ["잭", 12],
+      ["조커", 13],
+      ["스페이드", 14],
+      ["FA", 15]
+    ]);
+    const tierRank = (tier) => tierOrder.get(tier) ?? Number.MAX_SAFE_INTEGER;
+    return result.sort((playerA, playerB) =>
+      tierRank(playerA.tier) - tierRank(playerB.tier) || playerA.name.localeCompare(playerB.name, "ko"));
   }
 
   listOverrides() {
@@ -136,51 +256,103 @@ class TierAdmin {
       .sort((itemA, itemB) => itemA.playerName.localeCompare(itemB.playerName, "ko"));
   }
 
+  getOverride(playerName) {
+    const item = this.overrides.get(playerKey(playerName));
+    return item ? { ...item, universities: [...item.universities] } : null;
+  }
+
   async setOverride(playerName, values) {
+    this.assertWritableStorage();
     const normalizedName = String(playerName || "").trim().slice(0, 40);
     const key = playerKey(normalizedName);
     if (!key) throw new Error("선수 이름이 필요합니다.");
     const payload = Array.isArray(values) ? { universities: values } : (values || {});
     const tier = payload.tier == null || payload.tier === "" ? null : normalizeTier(payload.tier);
     if (payload.tier != null && payload.tier !== "" && !tier) {
-      throw new Error("티어는 0~9 또는 FA 중에서 선택해 주세요.");
+      throw new Error("티어는 0~9, 갓, 킹, 잭, 조커, 스페이드 또는 FA 중에서 선택해 주세요.");
+    }
+    const current = this.overrides.get(key);
+    const isCustom = payload.isCustom == null ? Boolean(current?.isCustom) : Boolean(payload.isCustom);
+    const race = normalizeRace(payload.race ?? current?.race);
+    const broadcastId = normalizeBroadcastId(payload.broadcastId ?? current?.broadcastId);
+    if (isCustom && !tier) throw new Error("새 선수의 티어를 선택해 주세요.");
+    if (isCustom && !race) throw new Error("새 선수의 종족을 선택해 주세요.");
+    if (payload.broadcastId && !broadcastId) {
+      throw new Error("SOOP 아이디는 영문, 숫자, 밑줄 또는 하이픈만 입력해 주세요.");
     }
     const item = {
       playerName: normalizedName,
       universities: normalizeUniversities(payload.universities),
       tier,
       promotionLight: tier === "FA" ? false : Boolean(payload.promotionLight),
+      isCustom,
+      race: race || null,
+      broadcastId: broadcastId || null,
       updatedAt: new Date().toISOString()
     };
-    this.overrides.set(key, item);
     if (this.pool) {
-      await this.pool.query(
+      const result = await this.pool.query(
         `INSERT INTO tier_university_overrides(
-           player_key, player_name, universities, tier, promotion_light, updated_at
+           player_key, player_name, universities, tier, promotion_light,
+           is_custom, race, broadcast_id, updated_at
          )
-         VALUES($1,$2,$3,$4,$5,$6)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT(player_key) DO UPDATE SET
            player_name=EXCLUDED.player_name,
            universities=EXCLUDED.universities,
            tier=EXCLUDED.tier,
            promotion_light=EXCLUDED.promotion_light,
-           updated_at=EXCLUDED.updated_at`,
-        [key, item.playerName, JSON.stringify(item.universities), item.tier, item.promotionLight, item.updatedAt]
+           is_custom=EXCLUDED.is_custom,
+           race=EXCLUDED.race,
+           broadcast_id=EXCLUDED.broadcast_id,
+           updated_at=EXCLUDED.updated_at
+         RETURNING player_key`,
+        [
+          key,
+          item.playerName,
+          JSON.stringify(item.universities),
+          item.tier,
+          item.promotionLight,
+          item.isCustom,
+          item.race,
+          item.broadcastId,
+          item.updatedAt
+        ]
       );
+      if (result.rowCount !== 1 || result.rows[0]?.player_key !== key) {
+        throw new Error("PostgreSQL에서 저장 완료를 확인하지 못했습니다.");
+      }
+      this.overrides.set(key, item);
     } else {
-      await this.persistFile();
+      const previous = this.overrides.get(key);
+      this.overrides.set(key, item);
+      try {
+        await this.persistFile();
+      } catch (error) {
+        if (previous) this.overrides.set(key, previous);
+        else this.overrides.delete(key);
+        throw error;
+      }
     }
     return { ...item, universities: [...item.universities] };
   }
 
   async deleteOverride(playerName) {
+    this.assertWritableStorage();
     const key = playerKey(playerName);
     if (!key) throw new Error("선수 이름이 필요합니다.");
-    this.overrides.delete(key);
     if (this.pool) {
       await this.pool.query("DELETE FROM tier_university_overrides WHERE player_key=$1", [key]);
+      this.overrides.delete(key);
     } else {
-      await this.persistFile();
+      const previous = this.overrides.get(key);
+      this.overrides.delete(key);
+      try {
+        await this.persistFile();
+      } catch (error) {
+        if (previous) this.overrides.set(key, previous);
+        throw error;
+      }
     }
   }
 
@@ -276,6 +448,8 @@ class TierAdmin {
 
 module.exports = {
   TierAdmin,
+  normalizeBroadcastId,
+  normalizeRace,
   normalizeTier,
   normalizeUniversities,
   playerKey

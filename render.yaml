@@ -3,23 +3,17 @@ services:
     name: elo-kitten
     runtime: node
     plan: free
+    branch: main
+    autoDeployTrigger: commit
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: elo-kitten-rooms
-          property: connectionString
+        sync: false
       - key: TIER_ADMIN_PASSWORD
         sync: false
       - key: TIER_ADMIN_REQUIRE_DATABASE
         value: "true"
-
-databases:
-  - name: elo-kitten-rooms
-    plan: free
-    databaseName: elo_kitten_rooms
-    user: elo_kitten
