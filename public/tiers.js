@@ -53,7 +53,7 @@ const state = {
   loadingLive: false,
   refreshingTiers: new Set(),
   openCard: null,
-  selectedDivision: ALL_DIVISIONS,
+  selectedDivision: "women",
   selectedUniversity: ALL_UNIVERSITIES,
   liveOnly: false
 };
