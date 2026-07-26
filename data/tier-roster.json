@@ -1,6 +1,966 @@
 {
-  "updatedAt": "2026-07-24T01:11:37.858Z",
+  "updatedAt": "2026-07-26T14:23:14.137Z",
   "players": [
+    {
+      "name": "김민철",
+      "tier": "갓",
+      "division": "men",
+      "race": "Z",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_85LtkpMa_7c65d20220dcb8bd0b22f96d4bf6558e7a00be36.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=416",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "김성대",
+      "tier": "갓",
+      "division": "men",
+      "race": "Z",
+      "university": "JSA",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_Sktq3Lym_a37944173a9d07d29d29ce8ddf25ebea93ae72ed.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=133",
+      "universities": [
+        "JSA"
+      ]
+    },
+    {
+      "name": "김택용",
+      "tier": "갓",
+      "division": "men",
+      "race": "P",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_cnFrGzTq_e47059a4705b88ff3e9b03b5e8fcb4676bbd3233.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=394",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "도재욱",
+      "tier": "갓",
+      "division": "men",
+      "race": "P",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_BZG6sL5a_56c3533bcaf0a1fda1bca4a451d8cac5e5c8e5b7.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=142",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "박상현",
+      "tier": "갓",
+      "division": "men",
+      "race": "Z",
+      "university": "수술대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_GsvoaS28_b571f771fd02a2c0a1e4e2aabb5f5fb66c71f86b.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=378",
+      "universities": [
+        "수술대"
+      ]
+    },
+    {
+      "name": "박성균",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_m3Wpj6Gh_4fece5765cf6464a5dd76086b2550a4cebc2b935.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=107",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "변현제",
+      "tier": "갓",
+      "division": "men",
+      "race": "P",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_qByjlDfz_06eb1966c237759de19df44e6d1ce5ed991f1e07.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=431",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "윤찬희",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "신세계",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_LyXcxE0H_54e79db013af6a02a0289609897a299dc59a5a36.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=289",
+      "universities": [
+        "신세계"
+      ]
+    },
+    {
+      "name": "이영호",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_YBKQxaAL_9b33bcc70e2b398360f8a943915aef2d9268e7b9.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=756",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "임홍규",
+      "tier": "갓",
+      "division": "men",
+      "race": "Z",
+      "university": "JSA",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_6a7fbHRM_2c67bfdfe8515f8db7294d83fa398bfa35711372.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=365",
+      "universities": [
+        "JSA"
+      ]
+    },
+    {
+      "name": "장윤철",
+      "tier": "갓",
+      "division": "men",
+      "race": "P",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_DU8FGRVM_615aa19383df29f97a54c603ff8e9e3386d765ab.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=110",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "정영재",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_TILQH1v9_7bab251633a445761a5bba45aac7b543776681f8.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=168",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "조기석",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "JSA",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_1WXmzqAS_30518b3cae2cee4ef652ef804242f3a6e18bda25.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=379",
+      "universities": [
+        "JSA"
+      ]
+    },
+    {
+      "name": "최호선",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "HM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_ZSBqa1Xn_74173ca0230e2957e96e6e463fcd237032182dde.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=358",
+      "universities": [
+        "HM"
+      ]
+    },
+    {
+      "name": "구성훈",
+      "tier": "킹",
+      "division": "men",
+      "race": "T",
+      "university": "JSA",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_PmEHXaow_ffd8e8f6b34b7681b0dc5df6ebac87694ee4c139.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=397",
+      "universities": [
+        "JSA"
+      ]
+    },
+    {
+      "name": "김경모",
+      "tier": "킹",
+      "division": "men",
+      "race": "Z",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_JFVc5y6u_5111b2031f2fdc7beae7ed7a3e36b34adf647ada.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=178",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "김윤중",
+      "tier": "킹",
+      "division": "men",
+      "race": "P",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_dS7VEQsi_82737ca07a5b6384b4dd9e9b2ecada09a619234f.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=229",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "김태영",
+      "tier": "킹",
+      "division": "men",
+      "race": "T",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_yfuHGzDK_261525d8e1d64a61aaf2b3dfdbbcb167d5c8fe21.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=242",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "박준오",
+      "tier": "킹",
+      "division": "men",
+      "race": "Z",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_g4DRpuOS_f96103441be10d9ddd0b4613eb7b7738349c6c07.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=473",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "방태수",
+      "tier": "킹",
+      "division": "men",
+      "race": "Z",
+      "university": "HM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950628216_Vw4LzOrY_24a2aee98c29c53ff7227de620c9129285389652.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=572",
+      "universities": [
+        "HM"
+      ]
+    },
+    {
+      "name": "신상문",
+      "tier": "킹",
+      "division": "men",
+      "race": "T",
+      "university": "수술대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_LD8brBl4_acb0ddb85af31125fcb5b2f646e084cf40d6b830.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=157",
+      "universities": [
+        "수술대"
+      ]
+    },
+    {
+      "name": "어윤수",
+      "tier": "킹",
+      "division": "men",
+      "race": "Z",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950636096_qSBO6YZb_682b545d8a6039360fc6efe2c11fcfbb4708656a.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=774",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "원선재",
+      "tier": "킹",
+      "division": "men",
+      "race": "P",
+      "university": "DM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_460cCMqx_b9cc7f579dfd4e889e9294827dd69d661ba1b900.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=193",
+      "universities": [
+        "DM"
+      ]
+    },
+    {
+      "name": "윤수철",
+      "tier": "킹",
+      "division": "men",
+      "race": "P",
+      "university": "신세계",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_Xy1OE3GS_090f3f202637cfa1b2f90690a5df90e3eb682da2.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=226",
+      "universities": [
+        "신세계"
+      ]
+    },
+    {
+      "name": "윤용태",
+      "tier": "킹",
+      "division": "men",
+      "race": "P",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_F6uWxcXy_01cf212efa510acdf73aeaa242dcdd98bff4193f.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=488",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "이영한",
+      "tier": "킹",
+      "division": "men",
+      "race": "Z",
+      "university": "엠비대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_mbJOHguG_1e54f381ed1e95256eaebdb6e327116a0613b5a3.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=192",
+      "universities": [
+        "엠비대"
+      ]
+    },
+    {
+      "name": "이예훈",
+      "tier": "킹",
+      "division": "men",
+      "race": "Z",
+      "university": "DM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_Gkn0ZPIr_1586ab6c8eaed2b36f6defb262046adc5d74c98f.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=169",
+      "universities": [
+        "DM"
+      ]
+    },
+    {
+      "name": "임진묵",
+      "tier": "킹",
+      "division": "men",
+      "race": "T",
+      "university": "DM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_GCa5K84P_f76fb64cbab2417255048d58ed7a574f8d0e4d64.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=144",
+      "universities": [
+        "DM"
+      ]
+    },
+    {
+      "name": "홍덕",
+      "tier": "킹",
+      "division": "men",
+      "race": "P",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_pfeKgtB9_05a238d009d2b396f7593f943950f2f814e62acd.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=333",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "강민기",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "와플대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950631690_pnVASPz4_c3c4affeb6e85a87f277ec380db2ba2dba78bf77.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=635",
+      "universities": [
+        "와플대"
+      ]
+    },
+    {
+      "name": "고석현",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_Mblh3Oxy_75c6c0821cb829d014620f3810f966a9cd803306.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=504",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "권혁진",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "신세계",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_f0jOP9Qr_cacfff6bfd940a152f02229f39e38b40d1f4f100.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=183",
+      "universities": [
+        "신세계"
+      ]
+    },
+    {
+      "name": "김범수",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "BGM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_2mKSq1jf_f80bed567d20835bdc1e03f6ea0641727b8ebb6b.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=403",
+      "universities": [
+        "BGM"
+      ]
+    },
+    {
+      "name": "김병수",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "JSA",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950633468_batBhVU3_72214b8579000f712a892189475c3285c7af8d1a.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=429",
+      "universities": [
+        "JSA"
+      ]
+    },
+    {
+      "name": "김성민",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950632934_AxVydMj5_b2dfd30fc479775612cedb3a967bae0092ebe4f2.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=521",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "김수식",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "와플대",
+      "image": "https://eloboard.com/men/data/file/bj_list/1850093433_uBxdVeqS_0665c1c80a164db74fcdccc84604b5f04e58c44f.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=534",
+      "universities": [
+        "와플대"
+      ]
+    },
+    {
+      "name": "김영진",
+      "tier": "잭",
+      "division": "men",
+      "race": "T",
+      "university": "JSA",
+      "image": "https://eloboard.com/men/data/file/bj_list/1850093236_YnOFBa0p_9373f054a0d7b71d3ea5d57c28621b20b09c01f9.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=618",
+      "universities": [
+        "JSA"
+      ]
+    },
+    {
+      "name": "김윤환",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_SmZJXxoM_85bf934bc96445c2fcc175ae1b45ee85279aea5a.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=132",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "김준혁",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "엠비대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_DSzAKLNv_809faf5d589df9f5c80d8cfdbadf6f4e35592c52.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=410",
+      "universities": [
+        "엠비대"
+      ]
+    },
+    {
+      "name": "김호성",
+      "tier": "잭",
+      "division": "men",
+      "race": "T",
+      "university": "엠비대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_JyHY0hAs_d25ff357b8685bb93334912b2486309557750342.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=462",
+      "universities": [
+        "엠비대"
+      ]
+    },
+    {
+      "name": "민찬기",
+      "tier": "잭",
+      "division": "men",
+      "race": "T",
+      "university": "흑카데미",
+      "image": "https://eloboard.com/men/data/file/bj_list/654783993_JDVPA3S4_082549a767065d75cbd4f952c3a287f122747b55.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=267",
+      "universities": [
+        "흑카데미"
+      ]
+    },
+    {
+      "name": "박수범",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_Z7vD463K_e5062ef14546ead0a384abad79f43162864617da.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=297",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "박재혁",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_3vkMZl8o_cc914a7436b637ba1de3d5e19ff3d3c46c9dfe4f.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=167",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "배병우",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "수술대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_Bnv7ed9Z_90d38b4208310a0878972fd04c6f90eae3d73fee.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=143",
+      "universities": [
+        "수술대"
+      ]
+    },
+    {
+      "name": "배성흠",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_oU9rpVaA_508cac2e16abb8b71d9e31d74e48436ff74692a9.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=206",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "배호연",
+      "tier": "잭",
+      "division": "men",
+      "race": "T",
+      "university": "흑카데미",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950636012_YAL39QpM_743c0a610ee6cc4559aec7e7bf43bc5c0cb6b7bd.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=517",
+      "universities": [
+        "흑카데미"
+      ]
+    },
+    {
+      "name": "선우도현",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "수술대",
+      "image": "https://eloboard.com/men/data/file/bj_list/1850095545_fhjnezgo_256fd87e1d3ae5d4937cc67aa61f04759c1c29f6.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=770",
+      "universities": [
+        "수술대"
+      ]
+    },
+    {
+      "name": "이광용",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "BGM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_RmynEG04_590c53e79b88c3521dadaa685d94fe26bdc430da.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=207",
+      "universities": [
+        "BGM"
+      ]
+    },
+    {
+      "name": "이성은",
+      "tier": "잭",
+      "division": "men",
+      "race": "T",
+      "university": "흑카데미",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_rG5fi9DU_eca9b316870fdcc49ae20d059e34ee9aadf31dfb.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=339",
+      "universities": [
+        "흑카데미"
+      ]
+    },
+    {
+      "name": "이창우",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "엠비대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950635858_1TLuG2gr_e19cdf88f2a963b733b5094088db297baae3bb0c.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=581",
+      "universities": [
+        "엠비대"
+      ]
+    },
+    {
+      "name": "장민철",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950636147_itOZPz7m_4b84227e5d6c9b11d803d1788afc803498d89cc4.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=583",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "정경두",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "엠비대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950633468_bPB9RXxZ_c5f1c57d89f810f154b407f7f4edc278e0b4e35b.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=422",
+      "universities": [
+        "엠비대"
+      ]
+    },
+    {
+      "name": "정민기",
+      "tier": "잭",
+      "division": "men",
+      "race": "T",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_yY6NBkVi_a716703d2a56f35f0fb87ac7f89152f76c4517ed.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=209",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "지동원",
+      "tier": "잭",
+      "division": "men",
+      "race": "T",
+      "university": "캄몬스타즈",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_4JtF3Mo0_fd696aea29d25af47e4c48568245ed37431d5186.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=181",
+      "universities": [
+        "캄몬스타즈"
+      ]
+    },
+    {
+      "name": "진영화",
+      "tier": "잭",
+      "division": "men",
+      "race": "P",
+      "university": "수술대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_kTHrvn3S_cf56b95b5006d17888fe2e3e9587389f1412b57d.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=145",
+      "universities": [
+        "수술대"
+      ]
+    },
+    {
+      "name": "김건욱",
+      "tier": "조커",
+      "division": "men",
+      "race": "Z",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_aFiz2pSh_feb7d5e219334ea230b72468c5032e14cd9eec17.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=309",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "김대한",
+      "tier": "조커",
+      "division": "men",
+      "race": "Z",
+      "university": "BGM",
+      "image": "https://eloboard.com/men/data/file/bj_list/1850093499_hfKT05PJ_7d74b9a61098dbffefaa509b939319ea8ab34b9f.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=760",
+      "universities": [
+        "BGM"
+      ]
+    },
+    {
+      "name": "김동민",
+      "tier": "조커",
+      "division": "men",
+      "race": "Z",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/654783993_0msvyxKR_92fdfc396a6740a7a53dd8307a246d489cf75b5b.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=471",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "김민우",
+      "tier": "조커",
+      "division": "men",
+      "race": "P",
+      "university": "JSA",
+      "image": "https://eloboard.com/men/data/file/bj_list/654783414_nv8sykow_59b1d58c9f61ca95efd9848af3f026cb5cfc7162.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=544",
+      "universities": [
+        "JSA"
+      ]
+    },
+    {
+      "name": "김상곤",
+      "tier": "조커",
+      "division": "men",
+      "race": "Z",
+      "university": "신세계",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950630132_HjYUTXpA_4206eca0369f1f6032d08348a8f9aac8d3f275e3.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=547",
+      "universities": [
+        "신세계"
+      ]
+    },
+    {
+      "name": "김영주",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "흑카데미",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950630226_yv0tSzbK_3aa63c15e092495ba678e7ce3276f1e228011b2c.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=823",
+      "universities": [
+        "흑카데미"
+      ]
+    },
+    {
+      "name": "김학수",
+      "tier": "조커",
+      "division": "men",
+      "race": "P",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_nPKLoGms_02a51776f56e64c37065854ee5173ab9025280b9.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=108",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "박정일",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_apK2v8Jt_4e3484b800f7acb95fbbd948f5d1983afca6ebf0.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=180",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "박준영",
+      "tier": "조커",
+      "division": "men",
+      "race": "P",
+      "university": "수술대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950628109_5Qfmvd7B_896b7e0156832e6b1d25a5e0ece29e77e0971687.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=303",
+      "universities": [
+        "수술대"
+      ]
+    },
+    {
+      "name": "박준혁",
+      "tier": "조커",
+      "division": "men",
+      "race": "P",
+      "university": "HM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950634431_twL1m6DG_2f09f126d709c86ff00428012a58837b5e261f1d.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=556",
+      "universities": [
+        "HM"
+      ]
+    },
+    {
+      "name": "박현재",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_Xcv86wO4_3e0d10e161d53390a3dcc111c352b95a2a640edf.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=228",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "이예준",
+      "tier": "조커",
+      "division": "men",
+      "race": "Z",
+      "university": "씨나인",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950633468_Qzf0M3we_0082e61ca000bd9e15bb667280389270a045487e.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=227",
+      "universities": [
+        "씨나인"
+      ]
+    },
+    {
+      "name": "전상욱",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "와플대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_iF0RefOj_d749f3743ab41b9db8962805009333dcd00a92c1.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=98",
+      "universities": [
+        "와플대"
+      ]
+    },
+    {
+      "name": "전흥식",
+      "tier": "조커",
+      "division": "men",
+      "race": "P",
+      "university": "신세계",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_RofTKEry_897e0ab21560805332ffa7453fb763d640179d9e.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=527",
+      "universities": [
+        "신세계"
+      ]
+    },
+    {
+      "name": "최재성",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "엠비대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950637246_51U24ENC_366680cc39a73db6e1550d0b456ab2971b12baad.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=520",
+      "universities": [
+        "엠비대"
+      ]
+    },
+    {
+      "name": "허유진",
+      "tier": "조커",
+      "division": "men",
+      "race": "Z",
+      "university": "와플대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_GqZC8cdb_3215cf4a4724a9a10067593193b8f70a8f16e7cc.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=184",
+      "universities": [
+        "와플대"
+      ]
+    },
+    {
+      "name": "강민",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "P",
+      "university": "HM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_FpuzbyCl_b40ed6efd81906734be1ac389e9284fca2be13e5.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=353",
+      "universities": [
+        "HM"
+      ]
+    },
+    {
+      "name": "박성준",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "Z",
+      "university": "와플대",
+      "image": "https://eloboard.com/men/data/file/bj_list/1850094590_jeVo6UtM_c2df5768355ae666293295bdfbb3217dfb2c7bda.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=758",
+      "universities": [
+        "와플대"
+      ]
+    },
+    {
+      "name": "박종승",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "P",
+      "university": "엠비대",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950630026_FGJVHbT9_48d4ccb07a8ad283717958d9e6e8708ee42f8a27.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=405",
+      "universities": [
+        "엠비대"
+      ]
+    },
+    {
+      "name": "유규민",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "T",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950628216_donYwh3p_0fcd32db9e16e1e959a4af69f6de40b5035f3040.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=182",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "유민",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "P",
+      "university": "케이대",
+      "image": "https://eloboard.com/men/data/file/bj_list/1850084913_QxYer89F_5626d81dc42d939e88e84fc9d8fb8947943e625e.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=423",
+      "universities": [
+        "케이대"
+      ]
+    },
+    {
+      "name": "이윤열",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "T",
+      "university": "BGM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_3BUH4PFA_ce9eb59513a674afbf6caa8df6fb746b05ba6e65.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=363",
+      "universities": [
+        "BGM"
+      ]
+    },
+    {
+      "name": "장영근",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "P",
+      "university": "BGM",
+      "image": "https://eloboard.com/men/data/file/bj_list/654783993_F4TlVcRC_91c05870b1147fadbd21add1f37913fe93f1260b.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=225",
+      "universities": [
+        "BGM"
+      ]
+    },
+    {
+      "name": "저그맨박성준",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "Z",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950635199_gS5AD1FT_c0f5e0356fc5faefbf0f538a7c7113b59f93157f.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=897",
+      "universities": [
+        "뉴캣슬"
+      ]
+    },
+    {
+      "name": "전태규",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "P",
+      "university": "DM",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950633468_LMTaeHBZ_e69ce9120b0e97af7117ff5b67e96ea37d098b7e.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=337",
+      "universities": [
+        "DM"
+      ]
+    },
     {
       "name": "보혜",
       "tier": "0",
@@ -626,18 +1586,6 @@
       ]
     },
     {
-      "name": "란란",
-      "tier": "5",
-      "division": "women",
-      "race": "Z",
-      "university": "씨나인",
-      "image": "https://eloboard.com/women/data/file/bj_list/2523616559_vpHtb1cI_274ff9e9f4883c91f544c7550e3659d4aaa085e0.jpg",
-      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=176",
-      "universities": [
-        "씨나인"
-      ]
-    },
-    {
       "name": "링가",
       "tier": "5",
       "division": "women",
@@ -1007,6 +1955,18 @@
       "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=753",
       "universities": [
         "씨나인"
+      ]
+    },
+    {
+      "name": "이아깽",
+      "tier": "6",
+      "division": "women",
+      "race": "T",
+      "university": "뉴캣슬",
+      "image": "https://eloboard.com/women/data/file/bj_list/2950634435_0TAEc3e2_959eb2453ecb32d8fbb58e79442ed8fc006f2ff4.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=652",
+      "universities": [
+        "뉴캣슬"
       ]
     },
     {
@@ -1478,6 +2438,18 @@
       ]
     },
     {
+      "name": "밤하밍",
+      "tier": "8",
+      "division": "women",
+      "race": "T",
+      "university": "신세계",
+      "image": "https://eloboard.com/women/data/file/bj_list/2950636156_1DE8JSik_0aefb894f5871f6698b8f0cf1508ca183893294f.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=872",
+      "universities": [
+        "신세계"
+      ]
+    },
+    {
       "name": "연또",
       "tier": "8",
       "division": "women",
@@ -1646,6 +2618,18 @@
       ]
     },
     {
+      "name": "가영",
+      "tier": "9",
+      "division": "women",
+      "race": "T",
+      "university": "흑카데미",
+      "image": "https://eloboard.com/women/data/file/bj_list/1995115118_oKJvuHnC_39096fe3bf0d378239c2457466aa05f19792a10b.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=904",
+      "universities": [
+        "흑카데미"
+      ]
+    },
+    {
       "name": "김바다",
       "tier": "9",
       "division": "women",
@@ -1778,6 +2762,258 @@
       ]
     },
     {
+      "name": "김기덕",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950628109_1myrV5FY_7122089c6397a3aa519523b7603ab308bd385c9e.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=568",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "김명운",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_l8HxL2h3_ed4c94a1f953db4d9cc0eedb3ca657f12fdde524.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=401",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "김수환",
+      "tier": "FA",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=729",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "김정우",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_PERtvZGw_1e38a112c30cd37cb44f420e1b84ca00b7dbe49a.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=367",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "김지성",
+      "tier": "FA",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_ZprE5Dlu_4b5e5b54987d89d4873ea6d73a830d1cca6ca826.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=385",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "박재현",
+      "tier": "FA",
+      "division": "men",
+      "race": "P",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_6xKWJbmM_b7fa28174d1000ddecf1d9cec2d1065c6a345827.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=712",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "박태민",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_XAu2TESI_aa8ee3e50d9ee44fd25430af79d1197f456aee97.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=205",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "박한별",
+      "tier": "FA",
+      "division": "men",
+      "race": "P",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2950631351_j2DnS5MI_fa3de7173551e23368602ba9e9f5d6cd9d1cee11.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=780",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "서문지훈",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_xw8Hh4Zf_507b565393ba8aac26ad81ab378dd5a21df0a24e.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=274",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "송병구",
+      "tier": "FA",
+      "division": "men",
+      "race": "P",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_wk0VS863_36bb968403031d8a013f6ae9972cfe6cd49e055f.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=338",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "유승곤",
+      "tier": "FA",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_zxVbB81r_2efb860e1891e1c778568913f5a60dc099f9be78.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=298",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "유영진",
+      "tier": "FA",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_W9peulAm_6fbfb594f7159999497367a37de2aff85f5db27a.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=270",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "윤준석",
+      "tier": "FA",
+      "division": "men",
+      "race": "P",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_YkKc2osW_02d3626ec112dedde120dc4725a88a994527da67.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=671",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "윤진규",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_hzXabFM7_6b3fa189f4be2a73ec8cbd3b701c1b153463a474.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=404",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "이경민",
+      "tier": "FA",
+      "division": "men",
+      "race": "P",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_FVfy5TPu_47443505e92a81a1befbdcaa007a803397cb43bf.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=109",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "이영웅",
+      "tier": "FA",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_2N6yWFre_7a87683f307579760570fe543e8cf2e913236fd5.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=670",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "이재호",
+      "tier": "FA",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_1Kpa78iq_7173a3bb804e80798661c95d8c0f394fc9c1b036.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=400",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "이제동",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_DoiXUxZP_9bbbe3958925274443b7f14a780e658a59abfcbc.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=366",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "전제민",
+      "tier": "FA",
+      "division": "men",
+      "race": "P",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_zUKwYiID_b549582e750d97d0a7f7610e2f15f4884f508e75.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=239",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "조일장",
+      "tier": "FA",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_LaMbrHC5_7c90b138206ec47b81aa962a20e2f7e87830c0d5.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=243",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
+      "name": "황병영",
+      "tier": "FA",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "image": "https://eloboard.com/men/data/file/bj_list/2523616559_bduXoOKJ_b5c0ba3e386a7196bb52bc403d62f283d9b64ebc.png",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=377",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
       "name": "강덕구",
       "tier": "FA",
       "division": "women",
@@ -1886,6 +3122,18 @@
       ]
     },
     {
+      "name": "란란",
+      "tier": "FA",
+      "division": "women",
+      "race": "Z",
+      "university": "연합팀",
+      "image": "https://eloboard.com/women/data/file/bj_list/2523616559_vpHtb1cI_274ff9e9f4883c91f544c7550e3659d4aaa085e0.jpg",
+      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=176",
+      "universities": [
+        "연합팀"
+      ]
+    },
+    {
       "name": "묘묘묫",
       "tier": "FA",
       "division": "women",
@@ -1893,18 +3141,6 @@
       "university": "연합팀",
       "image": "https://eloboard.com/women/data/file/bj_list/654784273_F7g5TXnD_01afee3a2a4b331a02d3b5503e151d408fe5ae12.jpg",
       "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=890",
-      "universities": [
-        "연합팀"
-      ]
-    },
-    {
-      "name": "밤하밍",
-      "tier": "FA",
-      "division": "women",
-      "race": "T",
-      "university": "연합팀",
-      "image": "https://eloboard.com/women/data/file/bj_list/2950636156_1DE8JSik_0aefb894f5871f6698b8f0cf1508ca183893294f.jpg",
-      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=872",
       "universities": [
         "연합팀"
       ]
@@ -2001,18 +3237,6 @@
       "university": "연합팀",
       "image": "https://eloboard.com/women/data/file/bj_list/2950632379_tx23BKTf_e0b5de9d6a854ee14afcacbac0aed9fea4f5a481.jpg",
       "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=681",
-      "universities": [
-        "연합팀"
-      ]
-    },
-    {
-      "name": "이아깽",
-      "tier": "FA",
-      "division": "women",
-      "race": "T",
-      "university": "연합팀",
-      "image": "https://eloboard.com/women/data/file/bj_list/2950634435_0TAEc3e2_959eb2453ecb32d8fbb58e79442ed8fc006f2ff4.jpg",
-      "profileUrl": "https://eloboard.com/univ/bbs/board.php?bo_table=univ_bj_list&wr_id=652",
       "universities": [
         "연합팀"
       ]
