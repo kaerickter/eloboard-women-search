@@ -192,6 +192,13 @@
       overflow-wrap: anywhere;
     }
 
+    .timer-display {
+      min-width: min(86%, 420px);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+
     .preview-board,
     .edit-board {
       display: grid;
@@ -538,6 +545,156 @@
       width: 96px;
     }
 
+    .timer-settings {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid #dce4ee;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f7f8ff, #fff8fc);
+      box-shadow: 0 8px 20px rgba(91, 88, 145, .08);
+    }
+
+    .timer-inputs,
+    .timer-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .timer-inputs label,
+    .target-row label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .timer-inputs input,
+    .target-row input {
+      width: 100%;
+      min-width: 0;
+      min-height: 38px;
+      padding: 0 9px;
+      border: 1px solid #c8d2e2;
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fff;
+      text-align: center;
+      font-weight: 900;
+      outline: none;
+    }
+
+    .timer-inputs input:focus,
+    .target-row input:focus {
+      border-color: #9aa8e8;
+      box-shadow: 0 0 0 3px rgba(154, 168, 232, .2);
+    }
+
+    .timer-actions {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .timer-button {
+      min-height: 40px;
+      border: 1px solid #d9dff2;
+      border-radius: 8px;
+      color: #303858;
+      background: #f0f2ff;
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .timer-button.primary {
+      border-color: #8d9cdf;
+      color: #fff;
+      background: linear-gradient(135deg, #8295df, #b48de1);
+    }
+
+    .target-time {
+      display: grid;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid #dce4ee;
+    }
+
+    .target-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .target-title strong {
+      font-size: 13px;
+    }
+
+    .target-title span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .target-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.25fr;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .time-up-effect {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(31, 27, 48, .46);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .2s ease, visibility .2s ease;
+      pointer-events: none;
+    }
+
+    .time-up-effect.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .time-up-card {
+      display: grid;
+      gap: 8px;
+      min-width: min(90vw, 360px);
+      padding: 30px;
+      border: 5px solid #fff;
+      border-radius: 24px;
+      color: #fff;
+      background: linear-gradient(135deg, #e85a73, #8b7bd9);
+      text-align: center;
+      box-shadow: 0 24px 70px rgba(37, 29, 62, .4);
+      transform: scale(.88);
+    }
+
+    .time-up-effect.show .time-up-card {
+      animation: timeUpPop .6s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+
+    .time-up-card span {
+      font-size: 24px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 900;
+    }
+
+    .time-up-card strong {
+      font-size: 38px;
+    }
+
+    @keyframes timeUpPop {
+      from { transform: scale(.86) translateY(14px); }
+      to { transform: scale(1) translateY(0); }
+    }
+
     .button {
       min-height: 40px;
       padding: 0 13px;
@@ -665,6 +822,14 @@
       .button {
         flex: 1 1 auto;
       }
+
+      .target-row {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .target-row .timer-button {
+        grid-column: 1 / -1;
+      }
     }
   </style>
   <link rel="stylesheet" href="./common-theme.css">
@@ -684,7 +849,7 @@
   <main class="app">
     <section class="broadcast" aria-label="방송 송출용 빙고판">
       <div class="stage" id="stage">
-        <h2 class="stage-title" id="previewTitle">빙고</h2>
+        <div class="stage-title timer-display" id="timerDisplay" role="timer" aria-live="polite">00:00:00</div>
         <div class="preview-board" id="previewBoard"></div>
         <div class="bingo-message" id="bingoMessage"></div>
       </div>
@@ -700,8 +865,30 @@
       </div>
 
       <section class="section">
-        <label class="label" for="titleInput">제목</label>
-        <input class="field" id="titleInput" type="text" value="빙고" maxlength="28">
+        <div class="label">스톱워치 설정</div>
+        <div class="timer-settings">
+          <div class="timer-inputs">
+            <label><span>시</span><input id="timerHours" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+            <label><span>분</span><input id="timerMinutes" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+            <label><span>초</span><input id="timerSeconds" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          </div>
+          <div class="timer-actions">
+            <button id="timerStartButton" class="timer-button primary" type="button">시작</button>
+            <button id="timerResetButton" class="timer-button" type="button">초기화</button>
+          </div>
+          <div class="target-time">
+            <div class="target-title">
+              <strong>종료 시각</strong>
+              <span>한국 시간 기준</span>
+            </div>
+            <div class="target-row">
+              <label><span>시</span><input id="targetHour" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+              <label><span>분</span><input id="targetMinute" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+              <button id="targetStartButton" class="timer-button primary" type="button">시각 시작</button>
+            </div>
+          </div>
+          <div class="status" id="timerStatus">시간을 설정한 뒤 시작을 눌러주세요.</div>
+        </div>
       </section>
 
       <section class="section">
@@ -755,6 +942,13 @@
     </aside>
   </main>
 
+  <div class="time-up-effect" id="timeUpEffect" role="status" aria-live="assertive">
+    <div class="time-up-card">
+      <span>00:00:00</span>
+      <strong>시간 종료</strong>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="./collaboration.js"></script>
   <script>
@@ -769,11 +963,9 @@
       teamNames: ["1팀", "2팀"]
     };
 
-    const previewTitle = document.getElementById("previewTitle");
     const previewBoard = document.getElementById("previewBoard");
     const editBoard = document.getElementById("editBoard");
     const stage = document.getElementById("stage");
-    const titleInput = document.getElementById("titleInput");
     const rangeStart = document.getElementById("rangeStart");
     const rangeEnd = document.getElementById("rangeEnd");
     const status = document.getElementById("status");
@@ -791,10 +983,25 @@
       document.getElementById("team1Color"),
       document.getElementById("team2Color")
     ];
+    const timerHours = document.getElementById("timerHours");
+    const timerMinutes = document.getElementById("timerMinutes");
+    const timerSeconds = document.getElementById("timerSeconds");
+    const timerDisplay = document.getElementById("timerDisplay");
+    const timerStartButton = document.getElementById("timerStartButton");
+    const timerResetButton = document.getElementById("timerResetButton");
+    const targetHour = document.getElementById("targetHour");
+    const targetMinute = document.getElementById("targetMinute");
+    const targetStartButton = document.getElementById("targetStartButton");
+    const timerStatus = document.getElementById("timerStatus");
+    const timeUpEffect = document.getElementById("timeUpEffect");
     const channel = "BroadcastChannel" in window ? new BroadcastChannel("broadcast-bingo") : null;
     let syncing = false;
     let realtimeRoom = null;
     let activeTeam = 1;
+    let timerRemaining = 0;
+    let timerInterval = null;
+    let timerLastTick = 0;
+    let timerSyncing = false;
 
     const saved = localStorage.getItem("broadcast-bingo-state");
     if (saved) {
@@ -911,8 +1118,6 @@
 
       document.documentElement.style.setProperty("--team-1", state.teamColors[0]);
       document.documentElement.style.setProperty("--team-2", state.teamColors[1]);
-      previewTitle.textContent = state.title || "빙고";
-      titleInput.value = state.title;
       previewBoard.style.gridTemplateColumns = grid;
       editBoard.style.gridTemplateColumns = grid;
       previewBoard.classList.toggle("has-bingo", bingoLines.length > 0 || team1Lines.length > 0 || team2Lines.length > 0);
@@ -1007,11 +1212,16 @@
 
     if (channel) {
       channel.addEventListener("message", event => {
-        if (event.data?.type !== "state") return;
-        syncing = true;
-        Object.assign(state, event.data.state);
-        render();
-        syncing = false;
+        if (event.data?.type === "state") {
+          syncing = true;
+          Object.assign(state, event.data.state);
+          render();
+          syncing = false;
+          return;
+        }
+        if (event.data?.type === "timer") {
+          applyRemoteTimer(event.data.timer);
+        }
       });
     }
 
@@ -1118,14 +1328,172 @@
         .stage { width: min(92vh, 92vw); }
       `;
       popup.document.head.appendChild(style);
+      window.setTimeout(broadcastTimer, 250);
     }
 
-    titleInput.addEventListener("input", event => {
-      state.title = event.target.value;
-      realtimeRoom?.sendSet("title", state.title);
-      previewTitle.textContent = state.title || "빙고";
-      save();
+    function clampNumber(value, min, max) {
+      const number = Number.parseInt(value, 10);
+      if (Number.isNaN(number)) return min;
+      return Math.min(max, Math.max(min, number));
+    }
+
+    function configuredSeconds() {
+      const hours = clampNumber(timerHours.value, 0, 23);
+      const minutes = clampNumber(timerMinutes.value, 0, 59);
+      const seconds = clampNumber(timerSeconds.value, 0, 59);
+      timerHours.value = hours;
+      timerMinutes.value = minutes;
+      timerSeconds.value = seconds;
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    function formatTime(totalSeconds) {
+      const safeSeconds = Math.max(0, Math.ceil(totalSeconds));
+      const hours = Math.floor(safeSeconds / 3600);
+      const minutes = Math.floor((safeSeconds % 3600) / 60);
+      const seconds = safeSeconds % 60;
+      return [hours, minutes, seconds].map(part => String(part).padStart(2, "0")).join(":");
+    }
+
+    function renderTimer() {
+      timerDisplay.textContent = formatTime(timerRemaining || configuredSeconds());
+    }
+
+    function stopTimer() {
+      window.clearInterval(timerInterval);
+      timerInterval = null;
+      timerStartButton.textContent = "시작";
+    }
+
+    function broadcastTimer() {
+      if (timerSyncing || !channel) return;
+      channel.postMessage({
+        type: "timer",
+        timer: {
+          remaining: timerRemaining,
+          running: Boolean(timerInterval),
+          endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
+        }
+      });
+    }
+
+    function showTimeUpEffect() {
+      timeUpEffect.classList.add("show");
+      window.setTimeout(() => timeUpEffect.classList.remove("show"), 2600);
+    }
+
+    function finishTimer() {
+      stopTimer();
+      timerRemaining = 0;
+      timerDisplay.textContent = "00:00:00";
+      timerStatus.textContent = "시간이 종료됐습니다.";
+      showTimeUpEffect();
+      broadcastTimer();
+    }
+
+    function tickTimer() {
+      const now = Date.now();
+      timerRemaining = Math.max(0, timerRemaining - (now - timerLastTick) / 1000);
+      timerLastTick = now;
+      timerDisplay.textContent = formatTime(timerRemaining);
+      if (timerRemaining <= 0) finishTimer();
+    }
+
+    function startTimerInterval() {
+      timerLastTick = Date.now();
+      timerStartButton.textContent = "일시정지";
+      timerInterval = window.setInterval(tickTimer, 200);
+      timerDisplay.textContent = formatTime(timerRemaining);
+    }
+
+    function toggleTimer() {
+      if (timerInterval) {
+        stopTimer();
+        timerStatus.textContent = "일시정지했습니다.";
+        broadcastTimer();
+        return;
+      }
+      if (timerRemaining <= 0) timerRemaining = configuredSeconds();
+      if (timerRemaining <= 0) {
+        timerStatus.textContent = "시간을 먼저 설정하세요.";
+        return;
+      }
+      startTimerInterval();
+      timerStatus.textContent = "스톱워치가 진행 중입니다.";
+      broadcastTimer();
+    }
+
+    function resetTimer() {
+      stopTimer();
+      timerRemaining = 0;
+      timerHours.value = 0;
+      timerMinutes.value = 0;
+      timerSeconds.value = 0;
+      targetHour.value = 0;
+      targetMinute.value = 0;
+      timerStatus.textContent = "스톱워치를 초기화했습니다.";
+      renderTimer();
+      broadcastTimer();
+    }
+
+    function kstClockParts(date = new Date()) {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      }).formatToParts(date);
+      return Object.fromEntries(parts.map(part => [part.type, Number(part.value)]));
+    }
+
+    function secondsUntilKstTarget(hour, minute) {
+      const now = kstClockParts();
+      const nowSeconds = now.hour * 3600 + now.minute * 60 + now.second;
+      const targetSeconds = hour * 3600 + minute * 60;
+      const daySeconds = 24 * 3600;
+      return (targetSeconds - nowSeconds + daySeconds) % daySeconds || daySeconds;
+    }
+
+    function startTargetTimeTimer() {
+      const hour = clampNumber(targetHour.value, 0, 23);
+      const minute = clampNumber(targetMinute.value, 0, 59);
+      targetHour.value = hour;
+      targetMinute.value = minute;
+      stopTimer();
+      timerRemaining = secondsUntilKstTarget(hour, minute);
+      timerHours.value = 0;
+      timerMinutes.value = 0;
+      timerSeconds.value = 0;
+      startTimerInterval();
+      timerStatus.textContent = `한국 시간 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}에 종료됩니다.`;
+      broadcastTimer();
+    }
+
+    function applyRemoteTimer(timer) {
+      if (!timer) return;
+      timerSyncing = true;
+      stopTimer();
+      timerRemaining = timer.running && timer.endAt
+        ? Math.max(0, (Number(timer.endAt) - Date.now()) / 1000)
+        : Math.max(0, Number(timer.remaining) || 0);
+      if (timer.running && timerRemaining > 0) startTimerInterval();
+      renderTimer();
+      timerSyncing = false;
+    }
+
+    [timerHours, timerMinutes, timerSeconds].forEach(input => {
+      input.addEventListener("input", () => {
+        if (!timerInterval) {
+          timerRemaining = configuredSeconds();
+          renderTimer();
+          broadcastTimer();
+        }
+      });
     });
+    timerStartButton.addEventListener("click", toggleTimer);
+    timerResetButton.addEventListener("click", resetTimer);
+    targetStartButton.addEventListener("click", startTargetTimeTimer);
 
     sizeButtons.forEach(button => {
       button.addEventListener("click", () => setSize(Number(button.dataset.size)));
