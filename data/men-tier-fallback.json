@@ -1,0 +1,102 @@
+{
+  "updatedAt": "2026-01-23",
+  "note": "엘로보드 대학 명단을 불러오지 못할 때만 사용하는 남자 티어 기본 명단입니다.",
+  "players": [
+    {
+      "name": "유영진",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "최호선",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "김지성",
+      "tier": "갓",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "방태수",
+      "tier": "킹",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "이창우",
+      "tier": "잭",
+      "division": "men",
+      "race": "Z",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "아빈",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "이인극",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "전상욱",
+      "tier": "조커",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "이윤열",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "이완",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "팔레트",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    },
+    {
+      "name": "김상수",
+      "tier": "스페이드",
+      "division": "men",
+      "race": "T",
+      "university": "연합팀",
+      "universities": []
+    }
+  ]
+}
