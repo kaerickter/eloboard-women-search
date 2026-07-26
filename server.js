@@ -819,12 +819,12 @@ async function refreshTierRoster() {
     }
   }
   const tierOrder = new Map([
-    ...Array.from({ length: 10 }, (_, index) => [String(index), index]),
-    ["갓", 10],
-    ["킹", 11],
-    ["잭", 12],
-    ["조커", 13],
-    ["스페이드", 14],
+    ["갓", 0],
+    ["킹", 1],
+    ["잭", 2],
+    ["조커", 3],
+    ["스페이드", 4],
+    ...Array.from({ length: 10 }, (_, index) => [String(index), index + 5]),
     ["FA", 15]
   ]);
   const tierRank = (tier) => tierOrder.get(tier) ?? Number.MAX_SAFE_INTEGER;
