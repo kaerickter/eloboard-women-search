@@ -1356,11 +1356,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 502, JSON.stringify({ error: error.message || "티어 명단을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
-  if (url.pathname === "/api/live-status" && req.method === "GET") {
+  if (url.pathname === "/api/live-status" && (req.method === "GET" || req.method === "POST")) {
     try {
-      const force = url.searchParams.get("refresh") === "1";
-      const names = [...new Set(String(url.searchParams.get("names") || "")
-        .split(",")
+      const body = req.method === "POST" ? await readJsonBody(req) : {};
+      const force = url.searchParams.get("refresh") === "1" || body.refresh === true;
+      const requestedNames = Array.isArray(body.names)
+        ? body.names
+        : String(url.searchParams.get("names") || "").split(",");
+      const names = [...new Set(requestedNames
+        .map((name) => String(name || ""))
         .map((name) => name.trim())
         .filter(Boolean))];
       if (!names.length || names.length > 200) {
@@ -1369,7 +1373,7 @@ const server = http.createServer(async (req, res) => {
       const prioritizedNames = [...names].sort((nameA, nameB) => {
         return Number(Boolean(manualSoopAlias(nameB))) - Number(Boolean(manualSoopAlias(nameA)));
       });
-      const prioritizedStatuses = await mapConcurrent(prioritizedNames, 24, (name) => fetchSoopLiveStatus(name, force));
+      const prioritizedStatuses = await mapConcurrent(prioritizedNames, 10, (name) => fetchSoopLiveStatus(name, force));
       const statusByName = new Map(prioritizedStatuses.map((status) => [normalizePlayerName(status.name), status]));
       const statuses = names.map((name) => statusByName.get(normalizePlayerName(name)) || {
         name,
