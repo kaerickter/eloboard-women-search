@@ -18,6 +18,7 @@ const MEN_SEARCH_URL = "https://eloboard.com/men/bbs/search_bj_list.php";
 const UNIVERSITY_LIST_URL = "https://eloboard.com/univ/bbs/board.php?bo_table=all_bj_list";
 const SOOP_STATION_API = "https://chapi.sooplive.co.kr/api";
 const SOOP_LIVE_SEARCH_API = "https://sch.sooplive.co.kr/api.php";
+const SOOP_VOTE_API = "https://chapi.sooplive.co.kr/api/ititit/title/202619457/comment";
 const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
@@ -134,6 +135,61 @@ function send(res, status, body, type = "text/plain; charset=utf-8", headers = {
     ...headers
   });
   res.end(body);
+}
+
+let soopVoteCache = { expiresAt: 0, payload: null };
+
+async function loadSoopVoteRankings(force = false) {
+  if (!force && soopVoteCache.payload && Date.now() < soopVoteCache.expiresAt) {
+    return soopVoteCache.payload;
+  }
+
+  async function loadPage(page) {
+    const response = await fetchWithRetry(
+      SOOP_VOTE_API + "?page=" + page + "&orderby=reg_date&_=" + Date.now(),
+      { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 ELO Kitten live vote" } }
+    );
+    if (!response.ok) throw new Error("SOOP 댓글 응답 오류: " + response.status);
+    return response.json();
+  }
+
+  const first = await loadPage(1);
+  const lastPage = Math.min(Number(first?.meta?.last_page || 1), 20);
+  const rest = lastPage > 1
+    ? await Promise.all(Array.from({ length: lastPage - 1 }, (_, index) => loadPage(index + 2)))
+    : [];
+  const unique = new Map();
+
+  for (const item of [
+    ...(Array.isArray(first?.data) ? first.data : []),
+    ...rest.flatMap((page) => Array.isArray(page?.data) ? page.data : [])
+  ]) {
+    unique.set(Number(item.p_comment_no), item);
+  }
+
+  const rankings = [...unique.values()]
+    .sort((a, b) => Number(b.like_cnt || 0) - Number(a.like_cnt || 0))
+    .map((item) => ({
+      commentId: Number(item.p_comment_no),
+      nickname: String(item.user_nick || ""),
+      userId: String(item.user_id || ""),
+      profileImage: item.profile_image
+        ? (String(item.profile_image).startsWith("//") ? "https:" + item.profile_image : String(item.profile_image))
+        : "",
+      comment: decodeEntities(item.comment || "").trim(),
+      likes: Number(item.like_cnt || 0),
+      replies: Number(item.c_comment_cnt || 0),
+      registeredAt: String(item.reg_date || "")
+    }));
+
+  const payload = {
+    rankings,
+    totalComments: Number(first?.comment_count || rankings.length),
+    fetchedAt: new Date().toISOString(),
+    source: "https://www.sooplive.com/station/ititit/post/202619457"
+  };
+  soopVoteCache = { expiresAt: Date.now() + 3000, payload };
+  return payload;
 }
 
 function requestIsSameOrigin(req) {
@@ -1209,6 +1265,16 @@ const server = http.createServer(async (req, res) => {
     }), "application/json; charset=utf-8");
   }
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname === "/api/soop-vote-rankings" && req.method === "GET") {
+    try {
+      const payload = await loadSoopVoteRankings(url.searchParams.get("refresh") === "1");
+      return send(res, 200, JSON.stringify(payload), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({
+        error: error.message || "실시간 투표 데이터를 불러오지 못했습니다."
+      }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/status" && req.method === "GET") {
     const session = tierAdmin.session(req);
     return send(res, 200, JSON.stringify({
