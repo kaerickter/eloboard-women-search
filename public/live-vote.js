@@ -65,9 +65,9 @@
     document.getElementById("leaderNickname").textContent = leader.nickname;
     document.getElementById("leaderComment").textContent = leader.comment;
     document.getElementById("leaderLikes").textContent = "👍 " + number(leader.likes);
-    document.getElementById("leaderGap").textContent = runnerUp
-      ? "2위와 " + number(Number(leader.likes) - Number(runnerUp.likes)) + "표 차이"
-      : "현재 단독 집계 중";
+  document.getElementById("leaderGap").textContent = runnerUp
+    ? "🔥 2위와 " + number(Number(leader.likes) - Number(runnerUp.likes)) + "표 차이"
+    : "🏆 현재 단독 집계 중";
   }
 
   function updateSummary(fetchedAt) {

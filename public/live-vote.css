@@ -189,9 +189,22 @@
 }
 
 .vote-leader-gap {
-  margin-top: 3px;
-  color: var(--vote-muted);
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 10px 17px;
+  border: 1px solid #b4c51f;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fbffc8 0%, #d9ef42 100%);
+  color: #17213a;
+  box-shadow:
+    0 0 0 4px rgba(217, 239, 66, 0.22),
+    0 9px 22px rgba(106, 121, 0, 0.22);
+  font-size: 16px;
+  font-weight: 950;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
 }
 
 .vote-summary {
