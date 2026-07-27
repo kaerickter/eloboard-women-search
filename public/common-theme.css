@@ -127,6 +127,45 @@ body::before {
   color: var(--theme-ink) !important;
 }
 
+.site-tab.live-vote-tab,
+.nav-button.live-vote-tab {
+  position: relative;
+  border-color: rgba(24, 214, 151, 0.62) !important;
+  background: rgba(15, 39, 34, 0.96) !important;
+  color: #effff8 !important;
+  box-shadow:
+    0 0 7px rgba(24, 214, 151, 0.28),
+    0 0 17px rgba(24, 214, 151, 0.12),
+    inset 0 0 10px rgba(24, 214, 151, 0.08) !important;
+}
+
+.site-tab.live-vote-tab::before,
+.nav-button.live-vote-tab::before {
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #18d697;
+  box-shadow: 0 0 8px rgba(24, 214, 151, 0.9);
+  content: "";
+}
+
+.site-tab.live-vote-tab:hover,
+.site-tab.live-vote-tab:focus-visible,
+.nav-button.live-vote-tab:hover,
+.nav-button.live-vote-tab:focus-visible,
+.site-tab.live-vote-tab.active,
+.nav-button.live-vote-tab.active {
+  border-color: #18d697 !important;
+  background: #102d27 !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 10px rgba(24, 214, 151, 0.42),
+    0 0 24px rgba(24, 214, 151, 0.2),
+    inset 0 0 13px rgba(24, 214, 151, 0.1) !important;
+}
+
 .site-tab.active,
 .site-tab.search.active,
 .site-tab.matchup.active,
