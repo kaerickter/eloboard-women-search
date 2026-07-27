@@ -34,6 +34,16 @@ const PINNED_SOOP_ALIASES = {
     searchName: "핑핑♥",
     stationNames: ["핑핑♥"]
   },
+  "슈슈": {
+    broadcastId: "ldk8481",
+    searchName: "슈슈♥",
+    stationNames: ["슈슈♥"]
+  },
+  "슈슈♥": {
+    broadcastId: "ldk8481",
+    searchName: "슈슈♥",
+    stationNames: ["슈슈♥"]
+  },
   "려원님": {
     broadcastId: "fudnjs0235",
     searchName: "려원♡",
