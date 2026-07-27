@@ -28,10 +28,19 @@
           <h1>실시간 투표 현황</h1>
           <p class="vote-intro">댓글의 좋아요 수를 약 5초마다 자동으로 집계합니다.</p>
         </div>
-        <div class="vote-live-box" aria-live="polite">
-          <span class="vote-pulse"></span>
-          <span>LIVE</span>
-          <strong id="refreshCountdown">5초 후 갱신</strong>
+        <div class="vote-leader-card" aria-live="polite">
+          <div class="vote-leader-top">
+            <span class="vote-leader-label"><span class="vote-pulse"></span>현재 1위</span>
+            <strong id="refreshCountdown">5초 후 갱신</strong>
+          </div>
+          <div class="vote-leader-avatar" id="leaderAvatar">
+            <span class="vote-crown" aria-hidden="true">♛</span>
+            <span class="vote-avatar-fallback">1</span>
+          </div>
+          <strong class="vote-leader-name" id="leaderNickname">집계 중</strong>
+          <p class="vote-leader-comment" id="leaderComment">최신 댓글을 불러오고 있습니다.</p>
+          <div class="vote-leader-likes" id="leaderLikes">👍 —</div>
+          <small class="vote-leader-gap" id="leaderGap">2위와 표 차이 계산 중</small>
         </div>
       </section>
 
