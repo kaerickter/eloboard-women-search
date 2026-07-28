@@ -34,6 +34,9 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(server, /UPDATE spawn_diary_entries/);
   assert.match(server, /DELETE FROM spawn_diary_entries/);
   assert.match(html, /id="recordOpenButton"/);
+  assert.match(html, /class="spawn-diary-page"/);
+  assert.match(html, /class="site-brand"/);
+  assert.match(html, /MATCH REVIEW JOURNAL/);
   assert.match(html, /<option value="스폰">스폰<\/option>/);
   assert.match(html, /<option value="CK">CK<\/option>/);
   assert.match(html, /<option value="대학대전">대학대전<\/option>/);
