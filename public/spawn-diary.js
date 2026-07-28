@@ -82,6 +82,23 @@ function raceKind(value) {
   return "unknown";
 }
 
+function pillHue(value, seed = 0) {
+  const label = text(value);
+  let hash = seed;
+  for (let index = 0; index < label.length; index += 1) {
+    hash = ((hash * 31) + label.charCodeAt(index)) >>> 0;
+  }
+  return hash % 360;
+}
+
+function coloredPill(kind, value, seed) {
+  const label = text(value);
+  const shown = label || "미정";
+  const emptyClass = label ? "" : " empty";
+  const style = label ? ` style="--pill-hue:${pillHue(label, seed)}"` : "";
+  return `<span class="${kind}-pill${emptyClass}"${style} title="${escapeHtml(shown)}">${escapeHtml(shown)}</span>`;
+}
+
 function searchableText(entry) {
   return Object.values(entry).map(text).join(" ").toLocaleLowerCase("ko");
 }
@@ -130,9 +147,9 @@ function render() {
         </button></td>
         <td>${escapeHtml(entry.game_format)}</td>
         <td>${escapeHtml(entry.opponent)}</td>
-        <td>${escapeHtml(entry.tier)}</td>
+        <td>${coloredPill("tier", entry.tier, 47)}</td>
         <td><span class="race-pill ${raceKind(entry.opponent_race)}">${escapeHtml(entry.opponent_race || "미정")}</span></td>
-        <td>${escapeHtml(entry.map_name)}</td>
+        <td>${coloredPill("map", entry.map_name, 131)}</td>
         <td><span class="result-pill ${kind}">${escapeHtml(resultLabel(entry.result))}</span></td>
         <td>${escapeHtml(entry.opponent_build)}</td>
         <td>${escapeHtml(entry.my_build)}</td>
