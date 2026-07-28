@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 
 .diary-shell {
-  width: calc(66.6667vw + 316px);
+  width: calc(66.6667vw + 116px);
   max-width: calc(100% - 16px);
   margin: 0 auto;
   padding: 34px 0 64px;
@@ -262,7 +262,6 @@ td:nth-child(11) {
 .race-pill.unknown { background: #9299a2; }
 
 .format-pill,
-.tier-pill,
 .map-pill {
   max-width: 100%;
   min-height: 29px;
@@ -283,9 +282,34 @@ td:nth-child(11) {
 }
 
 .format-pill.empty,
-.tier-pill.empty,
 .map-pill.empty {
   background: #a5abb4;
+}
+
+.format-pill.spawn {
+  border: 1px solid #efd36f;
+  background: #fff1b8;
+  color: #8a5a00;
+  text-shadow: none;
+}
+
+.format-pill.ck {
+  background: #7657bf;
+}
+
+.format-pill.university {
+  background: #2f916d;
+}
+
+.tier-text {
+  color: hsl(var(--text-hue) 72% 37%);
+  font-size: 17px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.tier-text.empty {
+  color: #9299a2;
 }
 
 .date-edit-button {

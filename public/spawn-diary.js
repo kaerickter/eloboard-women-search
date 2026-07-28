@@ -82,6 +82,14 @@ function raceKind(value) {
   return "unknown";
 }
 
+function raceAbbreviation(value) {
+  const kind = raceKind(value);
+  if (kind === "terran") return "T";
+  if (kind === "zerg") return "Z";
+  if (kind === "protoss") return "P";
+  return "?";
+}
+
 function pillHue(value, seed = 0) {
   const label = text(value);
   let hash = seed;
@@ -97,6 +105,20 @@ function coloredPill(kind, value, seed) {
   const emptyClass = label ? "" : " empty";
   const style = label ? ` style="--pill-hue:${pillHue(label, seed)}"` : "";
   return `<span class="${kind}-pill${emptyClass}"${style} title="${escapeHtml(shown)}">${escapeHtml(shown)}</span>`;
+}
+
+function coloredText(kind, value, seed) {
+  const label = text(value);
+  const shown = label || "미정";
+  const emptyClass = label ? "" : " empty";
+  const style = label ? ` style="--text-hue:${pillHue(label, seed)}"` : "";
+  return `<span class="${kind}-text${emptyClass}"${style}>${escapeHtml(shown)}</span>`;
+}
+
+function formatPill(value) {
+  const label = text(value);
+  const kind = label === "스폰" ? "spawn" : label === "CK" ? "ck" : label === "대학대전" ? "university" : "empty";
+  return `<span class="format-pill ${kind}">${escapeHtml(label || "미정")}</span>`;
 }
 
 function searchableText(entry) {
@@ -145,10 +167,10 @@ function render() {
           aria-label="${escapeHtml(formatDate(entry.match_date))} 기록 수정 또는 삭제">
           ${escapeHtml(formatDate(entry.match_date))}<small>수정</small>
         </button></td>
-        <td>${coloredPill("format", entry.game_format, 211)}</td>
+        <td>${formatPill(entry.game_format)}</td>
         <td>${escapeHtml(entry.opponent)}</td>
-        <td>${coloredPill("tier", entry.tier, 47)}</td>
-        <td><span class="race-pill ${raceKind(entry.opponent_race)}">${escapeHtml(entry.opponent_race || "미정")}</span></td>
+        <td>${coloredText("tier", entry.tier, 47)}</td>
+        <td><span class="race-pill ${raceKind(entry.opponent_race)}" title="${escapeHtml(entry.opponent_race || "미정")}">${raceAbbreviation(entry.opponent_race)}</span></td>
         <td>${coloredPill("map", entry.map_name, 131)}</td>
         <td><span class="result-pill ${kind}">${escapeHtml(resultLabel(entry.result))}</span></td>
         <td>${escapeHtml(entry.opponent_build)}</td>

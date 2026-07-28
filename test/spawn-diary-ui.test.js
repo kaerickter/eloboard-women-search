@@ -22,9 +22,10 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(script, /method: "DELETE"/);
   assert.match(script, /class="date-edit-button"/);
   assert.match(script, /class="race-pill/);
-  assert.match(script, /coloredPill\("tier"/);
+  assert.match(script, /coloredText\("tier"/);
   assert.match(script, /coloredPill\("map"/);
-  assert.match(script, /coloredPill\("format"/);
+  assert.match(script, /formatPill\(entry\.game_format\)/);
+  assert.match(script, /raceAbbreviation\(entry\.opponent_race\)/);
   assert.match(script, /const PAGE_SIZE = 50/);
   assert.match(server, /FROM spawn_diary_entries/);
   assert.match(server, /ORDER BY match_date DESC NULLS LAST/);
@@ -40,7 +41,7 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(html, /class="date-column"/);
   assert.match(html, /class="feedback-column"/);
   assert.match(html, /class="reflection-column"/);
-  assert.match(styles, /width: calc\(66\.6667vw \+ 316px\)/);
+  assert.match(styles, /width: calc\(66\.6667vw \+ 116px\)/);
 });
 
 test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 보인다", () => {
