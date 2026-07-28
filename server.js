@@ -1152,6 +1152,32 @@ async function fetchSoopLiveStatus(name, force = false) {
   }
 }
 
+function freshSharedLiveStatuses(names) {
+  const now = Date.now();
+  return [...new Set((names || []).map((name) => String(name || "").trim()).filter(Boolean))]
+    .slice(0, 200)
+    .map((name) => {
+      const cached = liveNameCache.get(normalizePlayerName(name));
+      if (!cached || now - cached.cacheTime >= LIVE_CACHE_MS) return null;
+      return { ...cached.status, name };
+    })
+    .filter(Boolean);
+}
+
+function setupLiveStatusSharing(socketServer) {
+  socketServer.on("connection", (socket) => {
+    socket.on("live:subscribe", (payload = {}) => {
+      const statuses = freshSharedLiveStatuses(Array.isArray(payload.names) ? payload.names : []);
+      if (!statuses.length) return;
+      socket.emit("live:statuses", {
+        statuses,
+        cacheSeconds: Math.round(LIVE_CACHE_MS / 1000),
+        updatedAt: new Date().toISOString()
+      });
+    });
+  });
+}
+
 function compactDate(value) {
   const digits = String(value || "").replace(/\D/g, "");
   return digits.length >= 8 ? digits.slice(0, 8) : "";
@@ -1456,6 +1482,11 @@ const server = http.createServer(async (req, res) => {
         available: false,
         isLive: false
       });
+      io.emit("live:statuses", {
+        statuses,
+        cacheSeconds: Math.round(LIVE_CACHE_MS / 1000),
+        updatedAt: new Date().toISOString()
+      });
       return send(res, 200, JSON.stringify({
         statuses,
         cacheSeconds: Math.round(LIVE_CACHE_MS / 1000),
@@ -1647,6 +1678,7 @@ const io = new SocketIOServer(server, {
   maxHttpBufferSize: 200000,
   transports: ["polling", "websocket"]
 });
+setupLiveStatusSharing(io);
 
 let tierAdminRetryTimer = null;
 
