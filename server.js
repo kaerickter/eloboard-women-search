@@ -1311,6 +1311,111 @@ const server = http.createServer(async (req, res) => {
       }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/spawn-diary" && req.method === "GET") {
+    if (!tierAdmin.pool) {
+      return send(res, 503, JSON.stringify({
+        error: "스폰일지 저장소가 연결되지 않았습니다."
+      }), "application/json; charset=utf-8");
+    }
+    try {
+      const result = await tierAdmin.pool.query(`
+        SELECT id, match_date, game_format, opponent, tier, opponent_race,
+          map_name, result, opponent_build, my_build, feedback, reflection,
+          keywords, replay_number
+        FROM spawn_diary_entries
+        ORDER BY match_date DESC NULLS LAST, source_row DESC, id DESC
+      `);
+      return send(res, 200, JSON.stringify({
+        entries: result.rows,
+        total: result.rowCount,
+        updatedAt: new Date().toISOString()
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 503, JSON.stringify({
+        error: "스폰일지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+      }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/admin/spawn-diary" && req.method === "POST") {
+    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+      return send(res, 403, JSON.stringify({
+        error: "관리자 인증이 필요합니다."
+      }), "application/json; charset=utf-8");
+    }
+    if (!tierAdmin.pool) {
+      return send(res, 503, JSON.stringify({
+        error: "스폰일지 저장소가 연결되지 않았습니다."
+      }), "application/json; charset=utf-8");
+    }
+    let client;
+    try {
+      const body = await readJsonBody(req);
+      const clean = (value, limit) => String(value ?? "").replace(/\r\n/g, "\n").trim().slice(0, limit);
+      const matchDate = clean(body.matchDate, 10);
+      const opponent = clean(body.opponent, 80);
+      const resultValue = clean(body.result, 10);
+      if (matchDate && !/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) {
+        return send(res, 400, JSON.stringify({ error: "날짜 형식이 올바르지 않습니다." }), "application/json; charset=utf-8");
+      }
+      if (!opponent) {
+        return send(res, 400, JSON.stringify({ error: "상대 이름을 입력해 주세요." }), "application/json; charset=utf-8");
+      }
+      if (!["", "승", "패", "미정"].includes(resultValue)) {
+        return send(res, 400, JSON.stringify({ error: "전적은 승, 패, 미정 중에서 선택해 주세요." }), "application/json; charset=utf-8");
+      }
+
+      client = await tierAdmin.pool.connect();
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock($1)", [7310927]);
+      const sourceRowResult = await client.query(
+        "SELECT COALESCE(MAX(source_row), 0) + 1 AS next_row FROM spawn_diary_entries WHERE source_sheet_id = $1",
+        ["site-manual"]
+      );
+      const insertResult = await client.query(`
+        INSERT INTO spawn_diary_entries (
+          match_date, game_format, opponent, tier, opponent_race, map_name,
+          result, opponent_build, my_build, feedback, reflection, keywords,
+          replay_number, source_sheet_id, source_row, source_url
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6,
+          $7, $8, $9, $10, $11, $12,
+          $13, $14, $15, NULL
+        )
+        RETURNING id, match_date, game_format, opponent, tier, opponent_race,
+          map_name, result, opponent_build, my_build, feedback, reflection,
+          keywords, replay_number
+      `, [
+        matchDate || null,
+        clean(body.gameFormat, 40) || "스폰",
+        opponent,
+        clean(body.tier, 40) || null,
+        clean(body.opponentRace, 30) || null,
+        clean(body.mapName, 80) || null,
+        resultValue || "미정",
+        clean(body.opponentBuild, 300) || null,
+        clean(body.myBuild, 300) || null,
+        clean(body.feedback, 4000) || null,
+        clean(body.reflection, 4000) || null,
+        clean(body.keywords, 500) || null,
+        clean(body.replayNumber, 100) || null,
+        "site-manual",
+        Number(sourceRowResult.rows[0].next_row)
+      ]);
+      await client.query("COMMIT");
+      return send(res, 201, JSON.stringify({
+        ok: true,
+        entry: insertResult.rows[0]
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      if (client) await client.query("ROLLBACK").catch(() => {});
+      return send(res, error.statusCode || 500, JSON.stringify({
+        error: error.message || "경기 기록을 저장하지 못했습니다."
+      }), "application/json; charset=utf-8");
+    } finally {
+      client?.release();
+    }
+  }
   if (url.pathname === "/api/admin/status" && req.method === "GET") {
     const session = tierAdmin.session(req);
     return send(res, 200, JSON.stringify({
