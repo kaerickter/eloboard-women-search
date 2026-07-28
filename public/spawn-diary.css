@@ -435,46 +435,48 @@ td:nth-child(11) {
 }
 
 .race-pill {
-  min-width: 62px;
-  min-height: 26px;
-  padding: 3px 9px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  color: #fff;
-  font-size: 17px;
+  border-radius: 7px;
+  font-size: 13px;
   font-weight: 900;
 }
 
-.race-pill.terran { background: #3276ba; }
-.race-pill.protoss { background: #e88a32; }
-.race-pill.zerg { background: #cf4d55; }
-.race-pill.unknown { background: #9299a2; }
+.race-pill.terran { background: #e5f0fb; color: #3276ba; }
+.race-pill.protoss { background: #fff0df; color: #d67d2f; }
+.race-pill.zerg { background: #fde7ec; color: #c84e64; }
+.race-pill.unknown { background: #eef0f3; color: #7f8790; }
 
 .format-pill,
 .map-pill {
   max-width: 100%;
-  min-height: 29px;
-  padding: 4px 7px;
+  min-height: 26px;
+  padding: 4px 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   border-radius: 999px;
-  background: hsl(var(--pill-hue) 68% 42%);
-  color: #fff;
-  font-size: 17px;
+  background: hsl(var(--pill-hue) 78% 93%);
+  color: hsl(var(--pill-hue) 58% 38%);
+  font-size: 13px;
   font-weight: 900;
   line-height: 1.2;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 1px rgb(0 0 0 / 25%);
+  text-shadow: none;
   white-space: nowrap;
 }
 
 .format-pill.empty,
 .map-pill.empty {
-  background: #a5abb4;
+  background: #eef0f3;
+  color: #7f8790;
 }
 
 .format-pill.spawn {
@@ -485,16 +487,18 @@ td:nth-child(11) {
 }
 
 .format-pill.ck {
-  background: #7657bf;
+  background: #eee9fb;
+  color: #7254b7;
 }
 
 .format-pill.university {
-  background: #2f916d;
+  background: #e2f3ec;
+  color: #2d8968;
 }
 
 .tier-text {
   color: hsl(var(--text-hue) 72% 37%);
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 950;
   white-space: nowrap;
 }
@@ -528,15 +532,17 @@ td:nth-child(11) {
 }
 
 .result-pill {
-  min-width: 37px;
-  min-height: 23px;
-  padding: 2px 8px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   color: #fff;
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 900;
 }
 

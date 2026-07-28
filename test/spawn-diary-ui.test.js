@@ -37,6 +37,7 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(html, /class="spawn-diary-page"/);
   assert.match(html, /class="site-brand"/);
   assert.match(html, /MATCH REVIEW JOURNAL/);
+  assert.match(html, /<th>경기<\/th>/);
   assert.match(html, /<option value="스폰">스폰<\/option>/);
   assert.match(html, /<option value="CK">CK<\/option>/);
   assert.match(html, /<option value="대학대전">대학대전<\/option>/);
@@ -49,6 +50,8 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(styles, /\.opponent-build-column,\s*\.my-build-column \{ width: 160px; \}/);
   assert.match(styles, /\.feedback-column \{ width: calc\(\(100% - 980px\) \/ 2 - 124px\); \}/);
   assert.match(styles, /\.reflection-column \{ width: calc\(\(100% - 980px\) \/ 2\); \}/);
+  assert.match(styles, /\.race-pill\.zerg \{ background: #fde7ec; color: #c84e64; \}/);
+  assert.match(styles, /background: hsl\(var\(--pill-hue\) 78% 93%\)/);
 });
 
 test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 보인다", () => {
