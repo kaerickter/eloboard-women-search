@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>스폰일지 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./spawn-diary.css?v=20260729-fit">
+    <link rel="stylesheet" href="./spawn-diary.css?v=20260729-columns">
   </head>
   <body>
     <nav class="site-nav" aria-label="페이지 이동">
@@ -71,6 +71,19 @@
         </div>
         <div class="table-scroll">
           <table>
+            <colgroup>
+              <col class="date-column">
+              <col class="format-column">
+              <col class="opponent-column">
+              <col class="tier-column">
+              <col class="race-column">
+              <col class="map-column">
+              <col class="result-column">
+              <col class="opponent-build-column">
+              <col class="my-build-column">
+              <col class="feedback-column">
+              <col class="reflection-column">
+            </colgroup>
             <thead>
               <tr>
                 <th>날짜</th>
@@ -199,6 +212,6 @@
         </form>
       </dialog>
     </main>
-    <script src="./spawn-diary.js?v=20260729-fit"></script>
+    <script src="./spawn-diary.js?v=20260729-columns"></script>
   </body>
 </html>

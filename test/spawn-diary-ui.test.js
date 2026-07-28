@@ -35,6 +35,9 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(html, /<option value="CK">CK<\/option>/);
   assert.match(html, /<option value="대학대전">대학대전<\/option>/);
   assert.match(html, /id="recordOpponentSuggestions"/);
+  assert.match(html, /class="date-column"/);
+  assert.match(html, /class="feedback-column"/);
+  assert.match(html, /class="reflection-column"/);
 });
 
 test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 보인다", () => {
