@@ -301,9 +301,9 @@ thead {
   border-radius: 16px !important;
 }
 
-.date-edit-button,
-.date-edit-button:hover,
-.date-edit-button:focus-visible {
+body.spawn-diary-page button.date-edit-button,
+body.spawn-diary-page button.date-edit-button:hover,
+body.spawn-diary-page button.date-edit-button:focus-visible {
   border: 0 !important;
   border-radius: 0 !important;
   color: var(--theme-ink) !important;
@@ -312,12 +312,12 @@ thead {
   outline: 0 !important;
 }
 
-.date-edit-button:hover,
-.date-edit-button:focus-visible {
+body.spawn-diary-page button.date-edit-button:hover,
+body.spawn-diary-page button.date-edit-button:focus-visible {
   background: #f5f4fa !important;
 }
 
-.quick button {
+body .matchup-shell .matchup-search .quick button {
   padding: 7px 11px !important;
   border: 1px solid #e1e4df !important;
   border-radius: 20px !important;
@@ -326,10 +326,24 @@ thead {
   box-shadow: none !important;
 }
 
-.quick button.on {
+body .matchup-shell .matchup-search .quick button.on {
   border-color: #c5dd5d !important;
   color: #27302a !important;
   background: #eef5c8 !important;
+}
+
+body.spawn-diary-page .diary-shell {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+body.spawn-diary-page col.feedback-column {
+  width: calc((100% - 980px) / 2 - 124px) !important;
+}
+
+body.spawn-diary-page col.reflection-column {
+  width: calc((100% - 980px) / 2) !important;
 }
 
 @media (max-width: 1100px) {
