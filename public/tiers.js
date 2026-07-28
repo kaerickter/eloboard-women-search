@@ -34,6 +34,7 @@ const tierAdminRevert = document.getElementById("tierAdminRevert");
 const tierAdminLogout = document.getElementById("tierAdminLogout");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
+const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
@@ -811,8 +812,16 @@ async function loadRoster(force = false) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "티어 명단을 불러오지 못했습니다.");
     state.players = Array.isArray(data.players) ? data.players : [];
+    keepRosterLiveStatuses();
     render();
-    await loadLive(force);
+    if (force) {
+      await loadLive(true);
+    } else if (state.liveByName.size) {
+      updateLiveStatusLine();
+      scheduleLivePoll();
+    } else {
+      await loadLive();
+    }
     if (data.refreshing) await syncDailyRoster();
   } catch (error) {
     board.innerHTML = '<div class="empty-card">' + escapeHtml(error.message) + "</div>";
@@ -828,8 +837,9 @@ async function syncDailyRoster() {
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.players) || !data.players.length) return;
     state.players = data.players;
+    keepRosterLiveStatuses();
     render();
-    await loadLive();
+    if (!state.liveByName.size) await loadLive();
   } catch {
     // 저장된 명단은 이미 표시 중이므로 다음 방문에서 다시 시도합니다.
   }
@@ -851,14 +861,54 @@ function mergeLiveStatuses(statuses) {
     if (statusSignature(state.liveByName.get(name)) !== statusSignature(status)) changed += 1;
     state.liveByName.set(name, status);
   }
+  saveLiveStatuses();
   return changed;
+}
+
+function saveLiveStatuses() {
+  try {
+    sessionStorage.setItem(LIVE_STATUS_CACHE_KEY, JSON.stringify([...state.liveByName.entries()]));
+  } catch {
+    // 저장 공간을 사용할 수 없는 환경에서도 LIVE 갱신은 계속 동작합니다.
+  }
+}
+
+function restoreLiveStatuses() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(LIVE_STATUS_CACHE_KEY) || "[]");
+    if (!Array.isArray(saved) || !saved.length) return false;
+    state.liveByName = new Map(saved.filter((entry) => Array.isArray(entry) && entry.length === 2));
+    return state.liveByName.size > 0;
+  } catch {
+    return false;
+  }
+}
+
+function keepRosterLiveStatuses() {
+  const rosterNames = new Set(state.players.map((player) => keyOf(player.name)));
+  state.liveByName = new Map(
+    [...state.liveByName.entries()].filter(([name]) => rosterNames.has(name))
+  );
+}
+
+function updateLiveStatusLine() {
+  const names = state.players
+    .filter((player) => matchesDivision(player) && matchesUniversity(player))
+    .map((player) => player.name);
+  const liveCount = names.reduce((count, name) => {
+    return count + Number(Boolean(state.liveByName.get(keyOf(name))?.isLive));
+  }, 0);
+  statusLine.textContent = liveCount
+    ? "현재 " + liveCount + "명이 방송 중입니다."
+    : "현재 확인된 LIVE 방송이 없습니다.";
 }
 
 function scheduleLivePoll() {
   clearTimeout(livePollTimer);
+  livePollTimer = null;
+  if (document.visibilityState !== "visible") return;
   livePollTimer = setTimeout(() => {
-    if (document.visibilityState === "visible") loadLive(false);
-    else scheduleLivePoll();
+    loadLive(false);
   }, LIVE_POLL_MS);
 }
 
@@ -881,12 +931,7 @@ async function loadLive(force = false) {
     }
     const statuses = await fetchLiveStatuses(names, force);
     const changed = mergeLiveStatuses(statuses);
-    const liveCount = names.reduce((count, name) => {
-      return count + Number(Boolean(state.liveByName.get(keyOf(name))?.isLive));
-    }, 0);
-    statusLine.textContent = liveCount
-      ? "현재 " + liveCount + "명이 방송 중입니다."
-      : "현재 확인된 LIVE 방송이 없습니다.";
+    updateLiveStatusLine();
     if (changed) render();
   } catch {
     statusLine.textContent = "LIVE 상태 확인이 지연되고 있습니다. 티어 명단은 정상적으로 볼 수 있습니다.";
@@ -1149,7 +1194,12 @@ tierAdminLogout.addEventListener("click", async () => {
 });
 document.addEventListener("visibilitychange", () => {
   syncProfileAnimations();
-  if (document.visibilityState === "visible") loadLive(false);
+  if (document.visibilityState === "visible") {
+    scheduleLivePoll();
+  } else {
+    clearTimeout(livePollTimer);
+    livePollTimer = null;
+  }
 });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
 document.addEventListener("click", (event) => {
@@ -1170,4 +1220,5 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeOpenCard();
 });
 
+restoreLiveStatuses();
 loadRoster();
