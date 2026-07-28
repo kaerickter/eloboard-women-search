@@ -80,7 +80,7 @@ body::before {
   padding: 12px max(18px, calc((100vw - 1200px) / 2)) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: safe center !important;
+  justify-content: center !important;
   flex-wrap: nowrap !important;
   gap: 8px !important;
   overflow-x: auto;
