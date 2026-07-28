@@ -16,12 +16,22 @@ const elements = {
   page: document.querySelector("#currentPage"),
   previous: document.querySelector("#previousButton"),
   next: document.querySelector("#nextButton"),
-  status: document.querySelector("#statusMessage")
+  status: document.querySelector("#statusMessage"),
+  recordOpen: document.querySelector("#recordOpenButton"),
+  recordDialog: document.querySelector("#recordDialog"),
+  recordClose: document.querySelector("#recordCloseButton"),
+  recordLogin: document.querySelector("#recordLoginForm"),
+  recordPassword: document.querySelector("#recordAdminPassword"),
+  recordForm: document.querySelector("#recordEntryForm"),
+  recordFormStatus: document.querySelector("#recordFormStatus"),
+  recordSave: document.querySelector("#recordSaveButton"),
+  recordMaps: document.querySelector("#recordMapOptions")
 };
 
 let entries = [];
 let filteredEntries = [];
 let currentPage = 1;
+let recordCsrf = "";
 
 function text(value) {
   return String(value ?? "").trim();
@@ -70,9 +80,12 @@ function updateSummary() {
 function populateMaps() {
   const maps = [...new Set(entries.map((entry) => text(entry.map_name)).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "ko"));
-  elements.map.insertAdjacentHTML("beforeend", maps
+  elements.map.innerHTML = '<option value="">전체 맵</option>' + maps
     .map((map) => `<option value="${escapeHtml(map)}">${escapeHtml(map)}</option>`)
-    .join(""));
+    .join("");
+  elements.recordMaps.innerHTML = maps
+    .map((map) => `<option value="${escapeHtml(map)}"></option>`)
+    .join("");
 }
 
 function render() {
@@ -146,6 +159,38 @@ async function loadDiary() {
   }
 }
 
+function showRecordForm(csrf) {
+  recordCsrf = csrf;
+  elements.recordLogin.hidden = true;
+  elements.recordForm.hidden = false;
+  elements.recordFormStatus.textContent = "";
+  const dateInput = elements.recordForm.elements.matchDate;
+  if (!dateInput.value) {
+    const now = new Date();
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    dateInput.value = localDate.toISOString().slice(0, 10);
+  }
+}
+
+async function openRecordDialog() {
+  elements.recordDialog.showModal();
+  elements.recordForm.hidden = true;
+  elements.recordLogin.hidden = false;
+  elements.recordPassword.value = "";
+  elements.recordFormStatus.textContent = "";
+  try {
+    const response = await fetch("/api/admin/status");
+    const payload = await response.json();
+    if (payload.authenticated && payload.csrf) {
+      showRecordForm(payload.csrf);
+    } else {
+      elements.recordPassword.focus();
+    }
+  } catch {
+    elements.recordFormStatus.textContent = "관리자 상태를 확인하지 못했습니다.";
+  }
+}
+
 elements.search.addEventListener("input", applyFilters);
 elements.result.addEventListener("change", applyFilters);
 elements.map.addEventListener("change", applyFilters);
@@ -165,6 +210,59 @@ elements.next.addEventListener("click", () => {
   if (currentPage * PAGE_SIZE < filteredEntries.length) {
     currentPage += 1;
     render();
+  }
+});
+elements.recordOpen.addEventListener("click", openRecordDialog);
+elements.recordClose.addEventListener("click", () => elements.recordDialog.close());
+elements.recordDialog.addEventListener("click", (event) => {
+  if (event.target === elements.recordDialog) elements.recordDialog.close();
+});
+elements.recordLogin.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const submitButton = elements.recordLogin.querySelector("button");
+  submitButton.disabled = true;
+  try {
+    const response = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: elements.recordPassword.value })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "로그인하지 못했습니다.");
+    showRecordForm(payload.csrf);
+  } catch (error) {
+    elements.recordPassword.setCustomValidity(error.message);
+    elements.recordPassword.reportValidity();
+    elements.recordPassword.setCustomValidity("");
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+elements.recordForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  elements.recordSave.disabled = true;
+  elements.recordFormStatus.textContent = "저장하고 있습니다.";
+  const formData = new FormData(elements.recordForm);
+  try {
+    const response = await fetch("/api/admin/spawn-diary", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": recordCsrf
+      },
+      body: JSON.stringify(Object.fromEntries(formData.entries()))
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "기록을 저장하지 못했습니다.");
+    elements.recordForm.reset();
+    elements.recordDialog.close();
+    elements.status.classList.add("success");
+    elements.status.textContent = "새 경기 기록을 저장했습니다.";
+    await loadDiary();
+  } catch (error) {
+    elements.recordFormStatus.textContent = error.message;
+  } finally {
+    elements.recordSave.disabled = false;
   }
 });
 
