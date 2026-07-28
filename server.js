@@ -6,6 +6,7 @@ const { Server: SocketIOServer } = require("socket.io");
 const { setupCollaboration } = require("./collaboration-server");
 const { normalizeBjListPlayerText } = require("./eloboard-utils");
 const { TierAdmin } = require("./tier-admin");
+const { SpawnDiaryAdmin } = require("./spawn-diary-admin");
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
@@ -99,6 +100,7 @@ const LIVE_CACHE_MS = 1000 * 15;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 8;
 const tierAdmin = new TierAdmin();
+const spawnDiaryAdmin = new SpawnDiaryAdmin();
 
 function withMenTierFallback(players) {
   const roster = Array.isArray(players) ? players : [];
@@ -1336,10 +1338,69 @@ const server = http.createServer(async (req, res) => {
       }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/spawn-diary-admin/status" && req.method === "GET") {
+    const session = spawnDiaryAdmin.session(req);
+    return send(res, 200, JSON.stringify({
+      configured: spawnDiaryAdmin.configured,
+      authenticated: Boolean(session),
+      csrf: session?.csrf || ""
+    }), "application/json; charset=utf-8");
+  }
+  if (url.pathname === "/api/spawn-diary-admin/login" && req.method === "POST") {
+    if (!requestIsSameOrigin(req)) {
+      return send(res, 403, JSON.stringify({ error: "허용되지 않은 요청입니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const body = await readJsonBody(req);
+      const result = spawnDiaryAdmin.login(req, body.password);
+      if (result.error) {
+        return send(res, result.status, JSON.stringify({ error: result.error }), "application/json; charset=utf-8");
+      }
+      return send(res, 200, JSON.stringify({
+        authenticated: true,
+        csrf: result.session.csrf
+      }), "application/json; charset=utf-8", { "Set-Cookie": result.cookie });
+    } catch (error) {
+      return send(res, 400, JSON.stringify({
+        error: error.message || "로그인 요청을 처리하지 못했습니다."
+      }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/spawn-diary-admin/lock" && req.method === "POST") {
+    if (!requestIsSameOrigin(req)) {
+      return send(res, 403, JSON.stringify({ error: "허용되지 않은 요청입니다." }), "application/json; charset=utf-8");
+    }
+    const session = spawnDiaryAdmin.authorize(req);
+    if (!session) {
+      return send(res, 401, JSON.stringify({ error: "스폰일지 관리자 로그인이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const body = await readJsonBody(req);
+      const result = body.action === "release"
+        ? spawnDiaryAdmin.releaseLock(session)
+        : (body.action === "heartbeat"
+          ? spawnDiaryAdmin.heartbeatLock(session)
+          : spawnDiaryAdmin.acquireLock(session));
+      return send(res, result.ok ? 200 : 423, JSON.stringify(result.ok ? result : {
+        ...result,
+        error: "다른 관리자가 기록을 작성 중입니다. 작성이 끝난 뒤 다시 시도해 주세요."
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 400, JSON.stringify({
+        error: error.message || "작성 권한을 확인하지 못했습니다."
+      }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/spawn-diary" && req.method === "POST") {
-    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+    const spawnSession = requestIsSameOrigin(req) ? spawnDiaryAdmin.authorize(req) : null;
+    if (!spawnSession) {
       return send(res, 403, JSON.stringify({
-        error: "관리자 인증이 필요합니다."
+        error: "스폰일지 관리자 인증이 필요합니다."
+      }), "application/json; charset=utf-8");
+    }
+    if (!spawnDiaryAdmin.holdsLock(spawnSession)) {
+      return send(res, 423, JSON.stringify({
+        error: "작성 권한 시간이 만료되었습니다. 작성창을 다시 열어 주세요."
       }), "application/json; charset=utf-8");
     }
     if (!tierAdmin.pool) {
@@ -1352,6 +1413,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const clean = (value, limit) => String(value ?? "").replace(/\r\n/g, "\n").trim().slice(0, limit);
       const matchDate = clean(body.matchDate, 10);
+      const gameFormat = clean(body.gameFormat, 40) || "스폰";
       const opponent = clean(body.opponent, 80);
       const resultValue = clean(body.result, 10);
       if (matchDate && !/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) {
@@ -1359,6 +1421,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (!opponent) {
         return send(res, 400, JSON.stringify({ error: "상대 이름을 입력해 주세요." }), "application/json; charset=utf-8");
+      }
+      if (!["스폰", "CK", "대학대전"].includes(gameFormat)) {
+        return send(res, 400, JSON.stringify({
+          error: "경기방식은 스폰, CK, 대학대전 중에서 선택해 주세요."
+        }), "application/json; charset=utf-8");
       }
       if (!["", "승", "패", "미정"].includes(resultValue)) {
         return send(res, 400, JSON.stringify({ error: "전적은 승, 패, 미정 중에서 선택해 주세요." }), "application/json; charset=utf-8");
@@ -1387,7 +1454,7 @@ const server = http.createServer(async (req, res) => {
           keywords, replay_number
       `, [
         matchDate || null,
-        clean(body.gameFormat, 40) || "스폰",
+        gameFormat,
         opponent,
         clean(body.tier, 40) || null,
         clean(body.opponentRace, 30) || null,
@@ -1403,6 +1470,7 @@ const server = http.createServer(async (req, res) => {
         Number(sourceRowResult.rows[0].next_row)
       ]);
       await client.query("COMMIT");
+      spawnDiaryAdmin.heartbeatLock(spawnSession);
       return send(res, 201, JSON.stringify({
         ok: true,
         entry: insertResult.rows[0]
@@ -1810,5 +1878,5 @@ server.listen(PORT, "0.0.0.0", () => {
   for (const url of lanUrls(PORT)) console.log("LAN: " + url);
 });
 
-module.exports = { server, io, tierAdmin };
+module.exports = { server, io, tierAdmin, spawnDiaryAdmin };
 

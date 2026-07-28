@@ -15,5 +15,7 @@ services:
         sync: false
       - key: TIER_ADMIN_PASSWORD
         sync: false
+      - key: SPAWN_DIARY_ADMIN_PASSWORD
+        sync: false
       - key: TIER_ADMIN_REQUIRE_DATABASE
         value: "true"

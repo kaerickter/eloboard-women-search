@@ -22,16 +22,28 @@ const elements = {
   recordClose: document.querySelector("#recordCloseButton"),
   recordLogin: document.querySelector("#recordLoginForm"),
   recordPassword: document.querySelector("#recordAdminPassword"),
+  recordDialogStatus: document.querySelector("#recordDialogStatus"),
   recordForm: document.querySelector("#recordEntryForm"),
   recordFormStatus: document.querySelector("#recordFormStatus"),
   recordSave: document.querySelector("#recordSaveButton"),
-  recordMaps: document.querySelector("#recordMapOptions")
+  recordMaps: document.querySelector("#recordMapOptions"),
+  recordDate: document.querySelector("#recordDateInput"),
+  recordOpponent: document.querySelector("#recordOpponentInput"),
+  recordOpponentSuggestions: document.querySelector("#recordOpponentSuggestions"),
+  recordTier: document.querySelector("#recordTierInput"),
+  recordRace: document.querySelector("#recordRaceInput")
 };
 
 let entries = [];
 let filteredEntries = [];
 let currentPage = 1;
 let recordCsrf = "";
+let recordPlayers = [];
+let recordLockOwned = false;
+let recordLockTimer = null;
+let recordSuggestionIndex = -1;
+let recordSuggestedPlayers = [];
+let recordSelectedPlayer = "";
 
 function text(value) {
   return String(value ?? "").trim();
@@ -159,17 +171,147 @@ async function loadDiary() {
   }
 }
 
-function showRecordForm(csrf) {
+function playerNameKey(value) {
+  return text(value).replace(/\s+/g, "").toLocaleLowerCase("ko");
+}
+
+function playerTierSnapshot(player) {
+  const tier = text(player?.tier);
+  if (!tier) return "";
+  if (tier === "FA") return "FA";
+  const label = tier.endsWith("티어") ? tier : tier + "티어";
+  return label + (player?.promotionLight ? "승급불" : "");
+}
+
+function playerRaceLabel(value) {
+  return ({ T: "테란", P: "프로토스", Z: "저그" })[text(value).toUpperCase()] || text(value);
+}
+
+async function loadRecordPlayers() {
+  if (recordPlayers.length) return recordPlayers;
+  const response = await fetch("/api/tiers?wait=1");
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "선수 목록을 불러오지 못했습니다.");
+  recordPlayers = (Array.isArray(payload.players) ? payload.players : [])
+    .filter((player) => text(player.name))
+    .sort((a, b) =>
+      Number(b.division === "women") - Number(a.division === "women") ||
+      text(a.name).localeCompare(text(b.name), "ko"));
+  return recordPlayers;
+}
+
+function hideOpponentSuggestions() {
+  recordSuggestedPlayers = [];
+  recordSuggestionIndex = -1;
+  elements.recordOpponentSuggestions.hidden = true;
+  elements.recordOpponentSuggestions.innerHTML = "";
+  elements.recordOpponent.setAttribute("aria-expanded", "false");
+}
+
+function selectRecordPlayer(player) {
+  recordSelectedPlayer = text(player.name);
+  elements.recordOpponent.value = recordSelectedPlayer;
+  elements.recordTier.value = playerTierSnapshot(player);
+  elements.recordRace.value = playerRaceLabel(player.race);
+  hideOpponentSuggestions();
+}
+
+function renderOpponentSuggestions() {
+  const query = playerNameKey(elements.recordOpponent.value);
+  if (!query) {
+    hideOpponentSuggestions();
+    return;
+  }
+  recordSuggestedPlayers = recordPlayers
+    .filter((player) => playerNameKey(player.name).includes(query))
+    .sort((a, b) =>
+      Number(playerNameKey(b.name).startsWith(query)) - Number(playerNameKey(a.name).startsWith(query)) ||
+      text(a.name).localeCompare(text(b.name), "ko"))
+    .slice(0, 8);
+  if (!recordSuggestedPlayers.length) {
+    hideOpponentSuggestions();
+    return;
+  }
+  recordSuggestionIndex = -1;
+  elements.recordOpponentSuggestions.innerHTML = recordSuggestedPlayers.map((player, index) => {
+    const tier = playerTierSnapshot(player) || "티어 미정";
+    const race = playerRaceLabel(player.race) || "종족 미정";
+    return `<button class="record-opponent-option" type="button" role="option" data-player-index="${index}">
+      <strong>${escapeHtml(player.name)}</strong>
+      <span>${escapeHtml(tier)} · ${escapeHtml(race)}</span>
+    </button>`;
+  }).join("");
+  elements.recordOpponentSuggestions.hidden = false;
+  elements.recordOpponent.setAttribute("aria-expanded", "true");
+}
+
+async function requestRecordLock(action) {
+  const response = await fetch("/api/spawn-diary-admin/lock", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": recordCsrf
+    },
+    body: JSON.stringify({ action }),
+    keepalive: action === "release"
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "작성 권한을 얻지 못했습니다.");
+  return payload;
+}
+
+function stopRecordLockHeartbeat() {
+  clearInterval(recordLockTimer);
+  recordLockTimer = null;
+}
+
+function startRecordLockHeartbeat() {
+  stopRecordLockHeartbeat();
+  recordLockTimer = setInterval(async () => {
+    try {
+      await requestRecordLock("heartbeat");
+    } catch (error) {
+      recordLockOwned = false;
+      stopRecordLockHeartbeat();
+      elements.recordSave.disabled = true;
+      elements.recordFormStatus.textContent = error.message;
+    }
+  }, 45000);
+}
+
+async function releaseRecordLock() {
+  stopRecordLockHeartbeat();
+  if (!recordLockOwned || !recordCsrf) return;
+  recordLockOwned = false;
+  await requestRecordLock("release").catch(() => {});
+}
+
+async function showRecordForm(csrf) {
   recordCsrf = csrf;
+  elements.recordDialogStatus.textContent = "작성 권한을 확인하고 있습니다.";
+  try {
+    await requestRecordLock("acquire");
+  } catch (error) {
+    elements.recordLogin.hidden = true;
+    elements.recordForm.hidden = true;
+    elements.recordDialogStatus.textContent = error.message;
+    return;
+  }
+  recordLockOwned = true;
+  startRecordLockHeartbeat();
   elements.recordLogin.hidden = true;
   elements.recordForm.hidden = false;
+  elements.recordSave.disabled = false;
+  elements.recordDialogStatus.textContent = "";
   elements.recordFormStatus.textContent = "";
-  const dateInput = elements.recordForm.elements.matchDate;
-  if (!dateInput.value) {
+  if (!elements.recordDate.value) {
     const now = new Date();
     const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    dateInput.value = localDate.toISOString().slice(0, 10);
+    elements.recordDate.value = localDate.toISOString().slice(0, 10);
   }
+  await loadRecordPlayers().catch((error) => {
+    elements.recordFormStatus.textContent = error.message;
+  });
 }
 
 async function openRecordDialog() {
@@ -177,17 +319,19 @@ async function openRecordDialog() {
   elements.recordForm.hidden = true;
   elements.recordLogin.hidden = false;
   elements.recordPassword.value = "";
+  elements.recordDialogStatus.textContent = "";
   elements.recordFormStatus.textContent = "";
   try {
-    const response = await fetch("/api/admin/status");
+    const response = await fetch("/api/spawn-diary-admin/status");
     const payload = await response.json();
+    if (!payload.configured) throw new Error("스폰일지 관리자 비밀번호가 아직 설정되지 않았습니다.");
     if (payload.authenticated && payload.csrf) {
-      showRecordForm(payload.csrf);
+      await showRecordForm(payload.csrf);
     } else {
       elements.recordPassword.focus();
     }
-  } catch {
-    elements.recordFormStatus.textContent = "관리자 상태를 확인하지 못했습니다.";
+  } catch (error) {
+    elements.recordDialogStatus.textContent = error.message || "관리자 상태를 확인하지 못했습니다.";
   }
 }
 
@@ -217,19 +361,67 @@ elements.recordClose.addEventListener("click", () => elements.recordDialog.close
 elements.recordDialog.addEventListener("click", (event) => {
   if (event.target === elements.recordDialog) elements.recordDialog.close();
 });
+elements.recordDialog.addEventListener("close", releaseRecordLock);
+window.addEventListener("pagehide", releaseRecordLock);
+elements.recordDate.addEventListener("click", () => {
+  try {
+    elements.recordDate.showPicker?.();
+  } catch {
+    // 브라우저 기본 달력 동작을 그대로 사용합니다.
+  }
+});
+elements.recordOpponent.addEventListener("input", () => {
+  if (playerNameKey(elements.recordOpponent.value) !== playerNameKey(recordSelectedPlayer)) {
+    recordSelectedPlayer = "";
+    elements.recordTier.value = "";
+    elements.recordRace.value = "";
+  }
+  renderOpponentSuggestions();
+});
+elements.recordOpponent.addEventListener("change", () => {
+  const exact = recordPlayers.find((player) =>
+    playerNameKey(player.name) === playerNameKey(elements.recordOpponent.value));
+  if (exact) selectRecordPlayer(exact);
+});
+elements.recordOpponent.addEventListener("keydown", (event) => {
+  if (elements.recordOpponentSuggestions.hidden || !recordSuggestedPlayers.length) return;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const direction = event.key === "ArrowDown" ? 1 : -1;
+    recordSuggestionIndex = (recordSuggestionIndex + direction + recordSuggestedPlayers.length) %
+      recordSuggestedPlayers.length;
+    elements.recordOpponentSuggestions.querySelectorAll(".record-opponent-option").forEach((option, index) => {
+      option.classList.toggle("is-active", index === recordSuggestionIndex);
+    });
+  } else if (event.key === "Enter" && recordSuggestionIndex >= 0) {
+    event.preventDefault();
+    selectRecordPlayer(recordSuggestedPlayers[recordSuggestionIndex]);
+  } else if (event.key === "Escape") {
+    hideOpponentSuggestions();
+  }
+});
+elements.recordOpponentSuggestions.addEventListener("click", (event) => {
+  const option = event.target.closest("[data-player-index]");
+  if (!option) return;
+  const player = recordSuggestedPlayers[Number(option.dataset.playerIndex)];
+  if (player) selectRecordPlayer(player);
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".record-opponent-field")) hideOpponentSuggestions();
+});
 elements.recordLogin.addEventListener("submit", async (event) => {
   event.preventDefault();
   const submitButton = elements.recordLogin.querySelector("button");
   submitButton.disabled = true;
   try {
-    const response = await fetch("/api/admin/login", {
+    const response = await fetch("/api/spawn-diary-admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: elements.recordPassword.value })
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "로그인하지 못했습니다.");
-    showRecordForm(payload.csrf);
+    await showRecordForm(payload.csrf);
   } catch (error) {
     elements.recordPassword.setCustomValidity(error.message);
     elements.recordPassword.reportValidity();
@@ -255,6 +447,7 @@ elements.recordForm.addEventListener("submit", async (event) => {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "기록을 저장하지 못했습니다.");
     elements.recordForm.reset();
+    recordSelectedPlayer = "";
     elements.recordDialog.close();
     elements.status.classList.add("success");
     elements.status.textContent = "새 경기 기록을 저장했습니다.";

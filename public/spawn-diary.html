@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>스폰일지 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./spawn-diary.css?v=20260729-write">
+    <link rel="stylesheet" href="./spawn-diary.css?v=20260729-lock">
   </head>
   <body>
     <nav class="site-nav" aria-label="페이지 이동">
@@ -109,32 +109,49 @@
         </div>
 
         <form id="recordLoginForm" class="record-login">
-          <label for="recordAdminPassword">관리자 비밀번호</label>
+          <label for="recordAdminPassword">스폰일지 관리자 비밀번호</label>
           <input id="recordAdminPassword" type="password" autocomplete="current-password" maxlength="200" required>
           <button type="submit">로그인</button>
         </form>
+        <p id="recordDialogStatus" class="record-dialog-status" role="status"></p>
 
         <form id="recordEntryForm" class="record-entry-form" hidden>
           <div class="record-form-grid">
             <label>
               <span>날짜</span>
-              <input name="matchDate" type="date" required>
+              <input id="recordDateInput" name="matchDate" type="date" required>
             </label>
             <label>
               <span>경기방식</span>
-              <input name="gameFormat" type="text" value="스폰" maxlength="40">
+              <select name="gameFormat">
+                <option value="스폰">스폰</option>
+                <option value="CK">CK</option>
+                <option value="대학대전">대학대전</option>
+              </select>
             </label>
-            <label>
+            <label class="record-opponent-field">
               <span>상대</span>
-              <input name="opponent" type="text" maxlength="80" required>
+              <input
+                id="recordOpponentInput"
+                name="opponent"
+                type="text"
+                maxlength="80"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="recordOpponentSuggestions"
+                aria-expanded="false"
+                placeholder="이름을 입력하면 비슷한 선수가 표시됩니다."
+                required>
+              <div id="recordOpponentSuggestions" class="record-opponent-suggestions" role="listbox" hidden></div>
             </label>
             <label>
-              <span>티어</span>
-              <input name="tier" type="text" maxlength="40" placeholder="예: 6티어승급불">
+              <span>티어 <small>저장 후 고정</small></span>
+              <input id="recordTierInput" name="tier" type="text" maxlength="40" placeholder="선수 선택 시 자동 입력">
             </label>
             <label>
               <span>종족</span>
-              <select name="opponentRace">
+              <select id="recordRaceInput" name="opponentRace">
                 <option value="">선택 안 함</option>
                 <option value="테란">테란</option>
                 <option value="프로토스">프로토스</option>
@@ -170,6 +187,7 @@
               <textarea name="reflection" rows="5" maxlength="4000" placeholder="경기를 하면서 느낀 점을 적어 주세요."></textarea>
             </label>
           </div>
+          <p class="tier-snapshot-note">티어는 저장하는 순간의 값으로 기록되며, 이후 티어표가 바뀌어도 과거 기록은 바뀌지 않습니다.</p>
           <datalist id="recordMapOptions"></datalist>
           <div class="record-form-actions">
             <p id="recordFormStatus" role="status"></p>
@@ -178,6 +196,6 @@
         </form>
       </dialog>
     </main>
-    <script src="./spawn-diary.js?v=20260729-write"></script>
+    <script src="./spawn-diary.js?v=20260729-lock"></script>
   </body>
 </html>

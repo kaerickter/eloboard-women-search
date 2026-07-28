@@ -13,12 +13,20 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(html, /href="\.\/tiers\.html">티어표<\/a>\s*<a class="site-tab active" href="\.\/spawn-diary\.html"/);
   assert.match(script, /fetch\("\/api\/spawn-diary"\)/);
   assert.match(script, /fetch\("\/api\/admin\/spawn-diary"/);
+  assert.match(script, /fetch\("\/api\/spawn-diary-admin\/login"/);
+  assert.match(script, /fetch\("\/api\/spawn-diary-admin\/lock"/);
+  assert.match(script, /showPicker/);
+  assert.match(script, /playerTierSnapshot/);
   assert.match(script, /const PAGE_SIZE = 50/);
   assert.match(server, /FROM spawn_diary_entries/);
   assert.match(server, /ORDER BY match_date DESC NULLS LAST/);
-  assert.match(server, /tierAdmin\.authorize\(req\)/);
+  assert.match(server, /spawnDiaryAdmin\.authorize\(req\)/);
   assert.match(server, /INSERT INTO spawn_diary_entries/);
   assert.match(html, /id="recordOpenButton"/);
+  assert.match(html, /<option value="스폰">스폰<\/option>/);
+  assert.match(html, /<option value="CK">CK<\/option>/);
+  assert.match(html, /<option value="대학대전">대학대전<\/option>/);
+  assert.match(html, /id="recordOpponentSuggestions"/);
 });
 
 test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 보인다", () => {

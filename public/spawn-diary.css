@@ -37,15 +37,16 @@ h1 {
 }
 
 .record-open-button {
-  min-height: 44px;
-  padding: 0 18px;
-  border: 1px solid var(--theme-ink);
-  border-radius: 7px;
+  min-width: 172px;
+  min-height: 56px;
+  padding: 0 25px;
+  border: 2px solid var(--theme-ink);
+  border-radius: 9px;
   background: var(--theme-ink);
   color: #fff;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -336,6 +337,16 @@ td:nth-child(11) {
   gap: 9px;
 }
 
+.record-dialog-status {
+  margin: 0;
+  padding: 0 28px;
+  color: var(--theme-negative);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.record-dialog-status:not(:empty) { padding-bottom: 22px; }
+
 .record-login label {
   grid-column: 1 / -1;
   font-size: 13px;
@@ -378,6 +389,12 @@ td:nth-child(11) {
   font-weight: 900;
 }
 
+.record-form-grid label span small {
+  margin-left: 4px;
+  color: var(--theme-accent-deep);
+  font-size: 10px;
+}
+
 .record-form-grid input,
 .record-form-grid select,
 .record-form-grid textarea { width: 100%; }
@@ -390,6 +407,54 @@ td:nth-child(11) {
 }
 
 .record-wide-field { grid-column: 1 / -1; }
+
+.record-opponent-field { position: relative; }
+
+.record-opponent-suggestions {
+  position: absolute;
+  inset: calc(100% + 5px) 0 auto;
+  z-index: 7;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--theme-line);
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(23, 33, 58, .16);
+}
+
+.record-opponent-option {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--theme-line);
+  background: #fff;
+  color: var(--theme-ink);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.record-opponent-option:last-child { border-bottom: 0; }
+.record-opponent-option:hover,
+.record-opponent-option.is-active { background: #f3f7cf; }
+.record-opponent-option strong { font-size: 13px; }
+.record-opponent-option span { color: var(--theme-muted); font-size: 11px; font-weight: 800; }
+
+.tier-snapshot-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--theme-surface-soft);
+  color: var(--theme-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.5;
+}
 
 .record-form-actions {
   margin-top: 17px;
