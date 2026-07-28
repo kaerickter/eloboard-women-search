@@ -40,6 +40,7 @@ const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let livePollTimer = null;
+let liveSocket = null;
 let pendingLiveReload = false;
 let pendingLiveForce = false;
 let profileObserver = null;
@@ -813,6 +814,7 @@ async function loadRoster(force = false) {
     if (!response.ok) throw new Error(data.error || "티어 명단을 불러오지 못했습니다.");
     state.players = Array.isArray(data.players) ? data.players : [];
     keepRosterLiveStatuses();
+    subscribeLiveStatuses();
     render();
     if (force) {
       await loadLive(true);
@@ -838,6 +840,7 @@ async function syncDailyRoster() {
     if (!response.ok || !Array.isArray(data.players) || !data.players.length) return;
     state.players = data.players;
     keepRosterLiveStatuses();
+    subscribeLiveStatuses();
     render();
     if (!state.liveByName.size) await loadLive();
   } catch {
@@ -901,6 +904,33 @@ function updateLiveStatusLine() {
   statusLine.textContent = liveCount
     ? "현재 " + liveCount + "명이 방송 중입니다."
     : "현재 확인된 LIVE 방송이 없습니다.";
+}
+
+function subscribeLiveStatuses() {
+  if (!liveSocket?.connected || !state.players.length) return;
+  liveSocket.emit("live:subscribe", {
+    names: state.players.map((player) => player.name)
+  });
+}
+
+function connectLiveStatusSharing() {
+  if (typeof window.io !== "function") return;
+  liveSocket = window.io({ transports: ["websocket", "polling"] });
+  liveSocket.on("connect", subscribeLiveStatuses);
+  liveSocket.on("live:statuses", (payload = {}) => {
+    const statuses = Array.isArray(payload.statuses) ? payload.statuses : [];
+    if (!statuses.length) return;
+    const rosterNames = new Set(state.players.map((player) => keyOf(player.name)));
+    const shared = new Map(
+      statuses
+        .filter((status) => rosterNames.has(keyOf(status?.name)))
+        .map((status) => [keyOf(status.name), status])
+    );
+    if (!shared.size) return;
+    const changed = mergeLiveStatuses(shared);
+    updateLiveStatusLine();
+    if (changed) render();
+  });
 }
 
 function scheduleLivePoll() {
@@ -1221,4 +1251,5 @@ document.addEventListener("keydown", (event) => {
 });
 
 restoreLiveStatuses();
+connectLiveStatusSharing();
 loadRoster();
