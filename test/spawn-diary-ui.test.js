@@ -24,6 +24,7 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(script, /class="race-pill/);
   assert.match(script, /coloredPill\("tier"/);
   assert.match(script, /coloredPill\("map"/);
+  assert.match(script, /coloredPill\("format"/);
   assert.match(script, /const PAGE_SIZE = 50/);
   assert.match(server, /FROM spawn_diary_entries/);
   assert.match(server, /ORDER BY match_date DESC NULLS LAST/);

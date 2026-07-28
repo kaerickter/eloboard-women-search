@@ -210,7 +210,7 @@ tbody tr:hover td { background: #fbfbeF; }
 th:last-child, td:last-child { border-right: 0; }
 tbody tr:last-child td { border-bottom: 0; }
 
-.date-column { width: 112px; }
+.date-column { width: 120px; }
 .format-column { width: 92px; }
 .opponent-column { width: 122px; }
 .tier-column { width: 150px; }
@@ -218,8 +218,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .map-column { width: 136px; }
 .result-column { width: 64px; }
 .opponent-build-column,
-.my-build-column { width: 102px; }
-.feedback-column,
+.my-build-column { width: 160px; }
+.feedback-column { width: calc((100% - 980px) / 2 - 124px); }
 .reflection-column { width: calc((100% - 980px) / 2); }
 
 th:nth-child(-n+9),
@@ -261,6 +261,7 @@ td:nth-child(11) {
 .race-pill.zerg { background: #cf4d55; }
 .race-pill.unknown { background: #9299a2; }
 
+.format-pill,
 .tier-pill,
 .map-pill {
   max-width: 100%;
@@ -281,6 +282,7 @@ td:nth-child(11) {
   white-space: nowrap;
 }
 
+.format-pill.empty,
 .tier-pill.empty,
 .map-pill.empty {
   background: #a5abb4;

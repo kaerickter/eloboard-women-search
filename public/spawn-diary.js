@@ -145,7 +145,7 @@ function render() {
           aria-label="${escapeHtml(formatDate(entry.match_date))} 기록 수정 또는 삭제">
           ${escapeHtml(formatDate(entry.match_date))}<small>수정</small>
         </button></td>
-        <td>${escapeHtml(entry.game_format)}</td>
+        <td>${coloredPill("format", entry.game_format, 211)}</td>
         <td>${escapeHtml(entry.opponent)}</td>
         <td>${coloredPill("tier", entry.tier, 47)}</td>
         <td><span class="race-pill ${raceKind(entry.opponent_race)}">${escapeHtml(entry.opponent_race || "미정")}</span></td>
