@@ -45,6 +45,10 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(html, /class="feedback-column"/);
   assert.match(html, /class="reflection-column"/);
   assert.match(styles, /width: calc\(66\.6667vw \+ 116px\)/);
+  assert.match(styles, /\.date-column \{ width: 120px; \}/);
+  assert.match(styles, /\.opponent-build-column,\s*\.my-build-column \{ width: 160px; \}/);
+  assert.match(styles, /\.feedback-column \{ width: calc\(\(100% - 980px\) \/ 2 - 124px\); \}/);
+  assert.match(styles, /\.reflection-column \{ width: calc\(\(100% - 980px\) \/ 2\); \}/);
 });
 
 test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 보인다", () => {
