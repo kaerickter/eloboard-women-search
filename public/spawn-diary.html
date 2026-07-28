@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#17213a">
+    <title>스폰일지 · ELO Kitten</title>
+    <link rel="stylesheet" href="./common-theme.css">
+    <link rel="stylesheet" href="./spawn-diary.css?v=20260729">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab active" href="./spawn-diary.html" aria-current="page">스폰일지</a>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab" href="./scoreboard.html">매치 점수판</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
+      <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+    </nav>
+
+    <main class="diary-shell">
+      <header class="diary-hero">
+        <div>
+          <p class="eyebrow">SPAWN MATCH JOURNAL</p>
+          <h1>스폰일지</h1>
+          <p class="diary-intro">구글시트에서 옮겨온 경기 기록을 검색하고 한눈에 확인할 수 있습니다.</p>
+        </div>
+        <span class="readonly-badge">현재 조회 전용</span>
+      </header>
+
+      <section class="summary-grid" aria-label="스폰일지 요약">
+        <article><span>전체 기록</span><strong id="totalCount">—</strong></article>
+        <article><span>승리</span><strong id="winCount">—</strong></article>
+        <article><span>패배</span><strong id="lossCount">—</strong></article>
+        <article><span>승률</span><strong id="winRate">—</strong></article>
+      </section>
+
+      <section class="filter-panel" aria-label="기록 검색 및 필터">
+        <label class="search-field" for="searchInput">
+          <span>전체 검색</span>
+          <input id="searchInput" type="search" placeholder="상대, 맵, 빌드, 피드백 검색">
+        </label>
+        <label for="resultFilter">
+          <span>결과</span>
+          <select id="resultFilter">
+            <option value="">전체 결과</option>
+            <option value="승">승리</option>
+            <option value="패">패배</option>
+            <option value="미정">미정</option>
+          </select>
+        </label>
+        <label for="mapFilter">
+          <span>맵</span>
+          <select id="mapFilter"><option value="">전체 맵</option></select>
+        </label>
+        <button id="resetButton" type="button">필터 초기화</button>
+      </section>
+
+      <section class="diary-panel">
+        <div class="table-heading">
+          <div>
+            <strong>경기 기록</strong>
+            <span id="filterSummary">기록을 불러오는 중입니다.</span>
+          </div>
+          <span id="pageSummary"></span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>경기방식</th>
+                <th>상대</th>
+                <th>티어</th>
+                <th>종족</th>
+                <th>맵</th>
+                <th>전적</th>
+                <th>상대빌드</th>
+                <th>내 빌드</th>
+                <th>피드백</th>
+                <th>느낀점</th>
+              </tr>
+            </thead>
+            <tbody id="diaryRows">
+              <tr><td class="loading-cell" colspan="11">스폰일지를 불러오고 있습니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" aria-label="페이지 이동">
+          <button id="previousButton" type="button">이전</button>
+          <strong id="currentPage">1 / 1</strong>
+          <button id="nextButton" type="button">다음</button>
+        </div>
+      </section>
+      <p id="statusMessage" class="status-message" role="status"></p>
+    </main>
+    <script src="./spawn-diary.js?v=20260729"></script>
+  </body>
+</html>
