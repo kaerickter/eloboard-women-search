@@ -1311,6 +1311,31 @@ const server = http.createServer(async (req, res) => {
       }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/spawn-diary" && req.method === "GET") {
+    if (!tierAdmin.pool) {
+      return send(res, 503, JSON.stringify({
+        error: "스폰일지 저장소가 연결되지 않았습니다."
+      }), "application/json; charset=utf-8");
+    }
+    try {
+      const result = await tierAdmin.pool.query(`
+        SELECT id, match_date, game_format, opponent, tier, opponent_race,
+          map_name, result, opponent_build, my_build, feedback, reflection,
+          keywords, replay_number
+        FROM spawn_diary_entries
+        ORDER BY match_date DESC NULLS LAST, source_row DESC, id DESC
+      `);
+      return send(res, 200, JSON.stringify({
+        entries: result.rows,
+        total: result.rowCount,
+        updatedAt: new Date().toISOString()
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 503, JSON.stringify({
+        error: "스폰일지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+      }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/status" && req.method === "GET") {
     const session = tierAdmin.session(req);
     return send(res, 200, JSON.stringify({

@@ -21,7 +21,7 @@ test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 �
   const pages = [
     "tiers.html", "index.html", "matchup.html", "university-matchup.html",
     "bingo-board.html", "kill-bet.html", "scoreboard.html", "lucky-roulette.html",
-    "live-vote.html", "men-records.html"
+    "live-vote.html", "men-records.html", "jungman-cup.html"
   ];
 
   for (const page of pages) {
