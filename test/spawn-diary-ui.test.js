@@ -8,6 +8,7 @@ const root = path.join(__dirname, "..");
 test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   const html = fs.readFileSync(path.join(root, "public", "spawn-diary.html"), "utf8");
   const script = fs.readFileSync(path.join(root, "public", "spawn-diary.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "public", "spawn-diary.css"), "utf8");
   const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
 
   assert.match(html, /href="\.\/tiers\.html">티어표<\/a>\s*<a class="site-tab active" href="\.\/spawn-diary\.html"/);
@@ -38,6 +39,7 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(html, /class="date-column"/);
   assert.match(html, /class="feedback-column"/);
   assert.match(html, /class="reflection-column"/);
+  assert.match(styles, /width: calc\(66\.6667vw \+ 316px\)/);
 });
 
 test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 보인다", () => {

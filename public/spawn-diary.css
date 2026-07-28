@@ -1,8 +1,8 @@
 * { box-sizing: border-box; }
 
 .diary-shell {
-  width: calc(100% - 16px);
-  max-width: none;
+  width: calc(66.6667vw + 316px);
+  max-width: calc(100% - 16px);
   margin: 0 auto;
   padding: 34px 0 64px;
 }
