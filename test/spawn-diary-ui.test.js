@@ -52,6 +52,8 @@ test("스폰일지 탭과 Neon 조회 API가 연결되어 있다", () => {
   assert.match(styles, /\.reflection-column \{ width: calc\(\(100% - 980px\) \/ 2\); \}/);
   assert.match(styles, /\.race-pill\.zerg \{ background: #fde7ec; color: #c84e64; \}/);
   assert.match(styles, /background: hsl\(var\(--pill-hue\) 78% 93%\)/);
+  assert.match(styles, /padding: 0 16\.5px !important/);
+  assert.match(styles, /font-size: 18px !important/);
 });
 
 test("기존 주요 페이지에서 스폰일지가 티어표 바로 다음에 보인다", () => {
