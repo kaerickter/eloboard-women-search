@@ -1484,6 +1484,100 @@ const server = http.createServer(async (req, res) => {
       client?.release();
     }
   }
+  const spawnDiaryEntryMatch = url.pathname.match(/^\/api\/admin\/spawn-diary\/(\d+)$/);
+  if (spawnDiaryEntryMatch && (req.method === "PUT" || req.method === "DELETE")) {
+    const spawnSession = requestIsSameOrigin(req) ? spawnDiaryAdmin.authorize(req) : null;
+    if (!spawnSession) {
+      return send(res, 403, JSON.stringify({
+        error: "스폰일지 관리자 인증이 필요합니다."
+      }), "application/json; charset=utf-8");
+    }
+    if (!spawnDiaryAdmin.holdsLock(spawnSession)) {
+      return send(res, 423, JSON.stringify({
+        error: "작성 권한 시간이 만료되었습니다. 수정창을 다시 열어 주세요."
+      }), "application/json; charset=utf-8");
+    }
+    if (!tierAdmin.pool) {
+      return send(res, 503, JSON.stringify({
+        error: "스폰일지 저장소가 연결되지 않았습니다."
+      }), "application/json; charset=utf-8");
+    }
+    const entryId = Number(spawnDiaryEntryMatch[1]);
+    try {
+      if (req.method === "DELETE") {
+        const deleteResult = await tierAdmin.pool.query(
+          "DELETE FROM spawn_diary_entries WHERE id = $1 RETURNING id",
+          [entryId]
+        );
+        if (!deleteResult.rowCount) {
+          return send(res, 404, JSON.stringify({ error: "삭제할 기록을 찾지 못했습니다." }), "application/json; charset=utf-8");
+        }
+        spawnDiaryAdmin.heartbeatLock(spawnSession);
+        return send(res, 200, JSON.stringify({ ok: true, deletedId: entryId }), "application/json; charset=utf-8");
+      }
+
+      const body = await readJsonBody(req);
+      const clean = (value, limit) => String(value ?? "").replace(/\r\n/g, "\n").trim().slice(0, limit);
+      const matchDate = clean(body.matchDate, 10);
+      const gameFormat = clean(body.gameFormat, 40) || "스폰";
+      const opponent = clean(body.opponent, 80);
+      const resultValue = clean(body.result, 10);
+      if (matchDate && !/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) {
+        return send(res, 400, JSON.stringify({ error: "날짜 형식이 올바르지 않습니다." }), "application/json; charset=utf-8");
+      }
+      if (!opponent) {
+        return send(res, 400, JSON.stringify({ error: "상대 이름을 입력해 주세요." }), "application/json; charset=utf-8");
+      }
+      if (!["스폰", "CK", "대학대전"].includes(gameFormat)) {
+        return send(res, 400, JSON.stringify({
+          error: "경기방식은 스폰, CK, 대학대전 중에서 선택해 주세요."
+        }), "application/json; charset=utf-8");
+      }
+      if (!["", "승", "패", "미정"].includes(resultValue)) {
+        return send(res, 400, JSON.stringify({
+          error: "전적은 승, 패, 미정 중에서 선택해 주세요."
+        }), "application/json; charset=utf-8");
+      }
+      const updateResult = await tierAdmin.pool.query(`
+        UPDATE spawn_diary_entries
+        SET match_date = $1, game_format = $2, opponent = $3, tier = $4,
+          opponent_race = $5, map_name = $6, result = $7, opponent_build = $8,
+          my_build = $9, feedback = $10, reflection = $11, keywords = $12,
+          replay_number = $13, updated_at = NOW()
+        WHERE id = $14
+        RETURNING id, match_date, game_format, opponent, tier, opponent_race,
+          map_name, result, opponent_build, my_build, feedback, reflection,
+          keywords, replay_number
+      `, [
+        matchDate || null,
+        gameFormat,
+        opponent,
+        clean(body.tier, 40) || null,
+        clean(body.opponentRace, 30) || null,
+        clean(body.mapName, 80) || null,
+        resultValue || "미정",
+        clean(body.opponentBuild, 300) || null,
+        clean(body.myBuild, 300) || null,
+        clean(body.feedback, 4000) || null,
+        clean(body.reflection, 4000) || null,
+        clean(body.keywords, 500) || null,
+        clean(body.replayNumber, 100) || null,
+        entryId
+      ]);
+      if (!updateResult.rowCount) {
+        return send(res, 404, JSON.stringify({ error: "수정할 기록을 찾지 못했습니다." }), "application/json; charset=utf-8");
+      }
+      spawnDiaryAdmin.heartbeatLock(spawnSession);
+      return send(res, 200, JSON.stringify({
+        ok: true,
+        entry: updateResult.rows[0]
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, error.statusCode || 500, JSON.stringify({
+        error: error.message || "경기 기록을 변경하지 못했습니다."
+      }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/status" && req.method === "GET") {
     const session = tierAdmin.session(req);
     return send(res, 200, JSON.stringify({

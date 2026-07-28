@@ -23,9 +23,12 @@ const elements = {
   recordLogin: document.querySelector("#recordLoginForm"),
   recordPassword: document.querySelector("#recordAdminPassword"),
   recordDialogStatus: document.querySelector("#recordDialogStatus"),
+  recordTitle: document.querySelector("#recordDialogTitle"),
+  recordDescription: document.querySelector("#recordDialogDescription"),
   recordForm: document.querySelector("#recordEntryForm"),
   recordFormStatus: document.querySelector("#recordFormStatus"),
   recordSave: document.querySelector("#recordSaveButton"),
+  recordDelete: document.querySelector("#recordDeleteButton"),
   recordMaps: document.querySelector("#recordMapOptions"),
   recordDate: document.querySelector("#recordDateInput"),
   recordOpponent: document.querySelector("#recordOpponentInput"),
@@ -44,6 +47,7 @@ let recordLockTimer = null;
 let recordSuggestionIndex = -1;
 let recordSuggestedPlayers = [];
 let recordSelectedPlayer = "";
+let editingEntry = null;
 
 function text(value) {
   return String(value ?? "").trim();
@@ -68,6 +72,14 @@ function resultKind(value) {
 function resultLabel(value) {
   const kind = resultKind(value);
   return kind === "win" ? "승" : kind === "loss" ? "패" : (text(value) || "미정");
+}
+
+function raceKind(value) {
+  const normalized = text(value).toLocaleLowerCase("ko");
+  if (normalized === "t" || normalized.includes("테란")) return "terran";
+  if (normalized === "p" || normalized.includes("프로토스")) return "protoss";
+  if (normalized === "z" || normalized.includes("저그")) return "zerg";
+  return "unknown";
 }
 
 function searchableText(entry) {
@@ -112,11 +124,14 @@ function render() {
     elements.rows.innerHTML = visibleEntries.map((entry) => {
       const kind = resultKind(entry.result);
       return `<tr>
-        <td>${escapeHtml(formatDate(entry.match_date))}</td>
+        <td><button class="date-edit-button" type="button" data-entry-id="${escapeHtml(entry.id)}"
+          aria-label="${escapeHtml(formatDate(entry.match_date))} 기록 수정 또는 삭제">
+          ${escapeHtml(formatDate(entry.match_date))}<small>수정</small>
+        </button></td>
         <td>${escapeHtml(entry.game_format)}</td>
         <td>${escapeHtml(entry.opponent)}</td>
         <td>${escapeHtml(entry.tier)}</td>
-        <td>${escapeHtml(entry.opponent_race)}</td>
+        <td><span class="race-pill ${raceKind(entry.opponent_race)}">${escapeHtml(entry.opponent_race || "미정")}</span></td>
         <td>${escapeHtml(entry.map_name)}</td>
         <td><span class="result-pill ${kind}">${escapeHtml(resultLabel(entry.result))}</span></td>
         <td>${escapeHtml(entry.opponent_build)}</td>
@@ -304,7 +319,36 @@ async function showRecordForm(csrf) {
   elements.recordSave.disabled = false;
   elements.recordDialogStatus.textContent = "";
   elements.recordFormStatus.textContent = "";
-  if (!elements.recordDate.value) {
+  elements.recordForm.reset();
+  recordSelectedPlayer = "";
+  if (editingEntry) {
+    elements.recordTitle.textContent = "경기 기록 수정";
+    elements.recordDescription.textContent = "내용을 고쳐 저장하거나 이 기록을 삭제할 수 있습니다.";
+    elements.recordDelete.hidden = false;
+    elements.recordSave.textContent = "수정 저장";
+    const values = {
+      matchDate: text(editingEntry.match_date).slice(0, 10),
+      gameFormat: text(editingEntry.game_format) || "스폰",
+      opponent: text(editingEntry.opponent),
+      tier: text(editingEntry.tier),
+      opponentRace: text(editingEntry.opponent_race),
+      mapName: text(editingEntry.map_name),
+      result: text(editingEntry.result) || "미정",
+      opponentBuild: text(editingEntry.opponent_build),
+      myBuild: text(editingEntry.my_build),
+      feedback: text(editingEntry.feedback),
+      reflection: text(editingEntry.reflection)
+    };
+    for (const [name, value] of Object.entries(values)) {
+      const field = elements.recordForm.elements[name];
+      if (field) field.value = value;
+    }
+    recordSelectedPlayer = values.opponent;
+  } else {
+    elements.recordTitle.textContent = "새 경기 기록";
+    elements.recordDescription.textContent = "저장하면 스폰일지 맨 위에 바로 추가됩니다.";
+    elements.recordDelete.hidden = true;
+    elements.recordSave.textContent = "기록 저장";
     const now = new Date();
     const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
     elements.recordDate.value = localDate.toISOString().slice(0, 10);
@@ -314,7 +358,8 @@ async function showRecordForm(csrf) {
   });
 }
 
-async function openRecordDialog() {
+async function openRecordDialog(entry = null) {
+  editingEntry = entry && entry.id ? entry : null;
   elements.recordDialog.showModal();
   elements.recordForm.hidden = true;
   elements.recordLogin.hidden = false;
@@ -356,7 +401,13 @@ elements.next.addEventListener("click", () => {
     render();
   }
 });
-elements.recordOpen.addEventListener("click", openRecordDialog);
+elements.rows.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-entry-id]");
+  if (!button) return;
+  const entry = entries.find((item) => String(item.id) === String(button.dataset.entryId));
+  if (entry) openRecordDialog(entry);
+});
+elements.recordOpen.addEventListener("click", () => openRecordDialog());
 elements.recordClose.addEventListener("click", () => elements.recordDialog.close());
 elements.recordDialog.addEventListener("click", (event) => {
   if (event.target === elements.recordDialog) elements.recordDialog.close();
@@ -436,8 +487,11 @@ elements.recordForm.addEventListener("submit", async (event) => {
   elements.recordFormStatus.textContent = "저장하고 있습니다.";
   const formData = new FormData(elements.recordForm);
   try {
-    const response = await fetch("/api/admin/spawn-diary", {
-      method: "POST",
+    const editingId = editingEntry?.id;
+    const response = await fetch(editingId
+      ? `/api/admin/spawn-diary/${encodeURIComponent(editingId)}`
+      : "/api/admin/spawn-diary", {
+      method: editingId ? "PUT" : "POST",
       headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": recordCsrf
@@ -448,13 +502,40 @@ elements.recordForm.addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error(payload.error || "기록을 저장하지 못했습니다.");
     elements.recordForm.reset();
     recordSelectedPlayer = "";
+    const successMessage = editingId ? "경기 기록을 수정했습니다." : "새 경기 기록을 저장했습니다.";
+    editingEntry = null;
     elements.recordDialog.close();
     elements.status.classList.add("success");
-    elements.status.textContent = "새 경기 기록을 저장했습니다.";
+    elements.status.textContent = successMessage;
     await loadDiary();
   } catch (error) {
     elements.recordFormStatus.textContent = error.message;
   } finally {
+    elements.recordSave.disabled = false;
+  }
+});
+elements.recordDelete.addEventListener("click", async () => {
+  const editingId = editingEntry?.id;
+  if (!editingId || !window.confirm("이 경기 기록을 삭제할까요? 삭제한 기록은 되돌릴 수 없습니다.")) return;
+  elements.recordDelete.disabled = true;
+  elements.recordSave.disabled = true;
+  elements.recordFormStatus.textContent = "삭제하고 있습니다.";
+  try {
+    const response = await fetch(`/api/admin/spawn-diary/${encodeURIComponent(editingId)}`, {
+      method: "DELETE",
+      headers: { "X-CSRF-Token": recordCsrf }
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "기록을 삭제하지 못했습니다.");
+    editingEntry = null;
+    elements.recordDialog.close();
+    elements.status.classList.add("success");
+    elements.status.textContent = "경기 기록을 삭제했습니다.";
+    await loadDiary();
+  } catch (error) {
+    elements.recordFormStatus.textContent = error.message;
+  } finally {
+    elements.recordDelete.disabled = false;
     elements.recordSave.disabled = false;
   }
 });

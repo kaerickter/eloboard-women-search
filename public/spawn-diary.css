@@ -226,8 +226,52 @@ td:nth-child(11) {
   padding: 14px 16px;
   text-align: left;
   vertical-align: top;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.75;
+}
+
+.race-pill {
+  min-width: 58px;
+  min-height: 25px;
+  padding: 3px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.race-pill.terran { background: #cf4d55; }
+.race-pill.protoss { background: #3276ba; }
+.race-pill.zerg { background: #7b4fa3; }
+.race-pill.unknown { background: #9299a2; }
+
+.date-edit-button {
+  width: 100%;
+  padding: 6px 3px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--theme-ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+}
+
+.date-edit-button small {
+  display: block;
+  margin-top: 3px;
+  color: var(--theme-accent-deep);
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.date-edit-button:hover,
+.date-edit-button:focus-visible {
+  background: #f3f7cf;
+  outline: 1px solid var(--theme-accent-deep);
 }
 
 .result-pill {
@@ -464,6 +508,12 @@ td:nth-child(11) {
   gap: 15px;
 }
 
+.record-form-actions > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
 .record-form-actions p {
   margin: 0;
   color: var(--theme-negative);
@@ -476,6 +526,12 @@ td:nth-child(11) {
   border-color: var(--theme-ink);
   background: var(--theme-ink);
   color: #fff;
+}
+
+.record-form-actions .record-delete-button {
+  border-color: var(--theme-negative);
+  background: #fff;
+  color: var(--theme-negative);
 }
 
 .record-form-actions button:disabled { cursor: wait; opacity: .55; }

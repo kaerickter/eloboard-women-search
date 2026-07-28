@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>스폰일지 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./spawn-diary.css?v=20260729-lock">
+    <link rel="stylesheet" href="./spawn-diary.css?v=20260729-edit">
   </head>
   <body>
     <nav class="site-nav" aria-label="페이지 이동">
@@ -103,7 +103,7 @@
         <div class="record-dialog-header">
           <div>
             <strong id="recordDialogTitle">새 경기 기록</strong>
-            <span>저장하면 스폰일지 맨 위에 바로 추가됩니다.</span>
+            <span id="recordDialogDescription">저장하면 스폰일지 맨 위에 바로 추가됩니다.</span>
           </div>
           <button id="recordCloseButton" type="button" aria-label="닫기">×</button>
         </div>
@@ -191,11 +191,14 @@
           <datalist id="recordMapOptions"></datalist>
           <div class="record-form-actions">
             <p id="recordFormStatus" role="status"></p>
-            <button id="recordSaveButton" type="submit">기록 저장</button>
+            <div>
+              <button id="recordDeleteButton" class="record-delete-button" type="button" hidden>기록 삭제</button>
+              <button id="recordSaveButton" type="submit">기록 저장</button>
+            </div>
           </div>
         </form>
       </dialog>
     </main>
-    <script src="./spawn-diary.js?v=20260729-lock"></script>
+    <script src="./spawn-diary.js?v=20260729-edit"></script>
   </body>
 </html>
