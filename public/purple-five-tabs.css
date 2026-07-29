@@ -48,6 +48,9 @@ body.spawn-diary-page .site-nav {
 body.spawn-diary-page .site-tab,
 body.spawn-diary-page .site-tab.live-vote-tab,
 body.spawn-diary-page .site-tab.cup-tab {
+  flex: 0 0 var(--menu-tab-width) !important;
+  width: var(--menu-tab-width) !important;
+  min-width: var(--menu-tab-width) !important;
   min-height: 72px !important;
   padding: 0 18px !important;
   border: 0 !important;
@@ -157,6 +160,11 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
   margin-right: auto !important;
   margin-left: auto !important;
   background: #f7f7fb !important;
+}
+
+.tier-shell,
+.shell {
+  padding-top: 0 !important;
 }
 
 .tier-hero,
