@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="참가자별 게임 점수를 기록하고 홀수팀과 짝수팀의 승부를 계산하는 매치 점수판">
+    <title>매치 점수판 · ELOBoard 도구</title>
+    <link rel="stylesheet" href="./scoreboard.css">
+    <link rel="stylesheet" href="./common-theme.css">
+    <link rel="stylesheet" href="./purple-five-tabs.css?v=20260729-nav-unified2">
+    <link rel="stylesheet" href="./collaboration.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-brand" href="./tiers.html" aria-label="ELO KITTEN 홈">
+        <span>EK</span><strong>ELO KITTEN</strong>
+      </a>
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab active" href="./match-scoreboard.html" aria-current="page">매치 점수판</a>
+      <a class="site-tab" href="./scoreboard.html">스코어보드</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
+      <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+      <span class="site-user"><strong>이아깽</strong><em>관리자</em></span>
+    </nav>
+
+    <main class="scoreboard-shell">
+      <header class="scoreboard-hero">
+        <div>
+          <p class="scoreboard-eyebrow">TEAM MATCH SCOREBOARD</p>
+          <input id="boardTitle" class="board-title" value="매치 카멜레온" aria-label="점수판 제목" maxlength="40">
+          <p>게임별 점수와 코멘트를 기록하고, 기본 또는 랜덤 번호를 지정해 홀수팀과 짝수팀의 결과를 확인하세요.</p>
+        </div>
+        <span class="save-state"><i></i> 방 참여 전에는 이 기기에 자동 저장</span>
+      </header>
+
+      <section class="scoreboard-controls" aria-label="점수판 설정">
+        <label>참가자 수 <input id="playerCount" type="number" min="1" max="30" value="7" inputmode="numeric"><small>명</small></label>
+        <label>게임 수 <input id="gameCount" type="number" min="1" max="20" value="9" inputmode="numeric"><small>게임</small></label>
+        <div class="size-summary"><strong id="sizeSummary">7 × 9</strong><span>현재 표 크기</span></div>
+        <button id="defaultButton" class="action-button secondary" type="button">기본번호 지정</button>
+        <button id="randomButton" class="action-button primary" type="button">랜덤 번호 지정</button>
+        <button id="teamSelectButton" class="action-button team-select" type="button" aria-pressed="false">팀 선택</button>
+        <button id="sortButton" class="action-button secondary" type="button" hidden>번호순 정렬</button>
+        <button id="resetButton" class="action-button dark" type="button">점수 초기화</button>
+      </section>
+
+      <section id="teamResult" class="team-result" aria-live="polite" hidden>
+        <div class="team-score odd-score"><span>홀수팀</span><strong id="oddTotal">0</strong></div>
+        <div class="winner"><small>최종 결과</small><strong id="winnerText">무승부</strong></div>
+        <div class="team-score even-score"><span>짝수팀</span><strong id="evenTotal">0</strong></div>
+      </section>
+
+      <section class="scoreboard-card">
+        <div class="table-scroll">
+          <table>
+            <thead id="scoreHead"></thead>
+            <tbody id="scoreBody"></tbody>
+          </table>
+        </div>
+        <p class="mobile-hint">표가 길어지면 좌우로 밀어서 확인할 수 있습니다.</p>
+      </section>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="./collaboration.js"></script>
+    <script src="./scoreboard.js"></script>
+  </body>
+</html>
