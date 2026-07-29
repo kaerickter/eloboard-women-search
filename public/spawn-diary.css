@@ -699,6 +699,35 @@ td:nth-child(11) {
   font-size: 10px;
 }
 
+.record-form-grid label:has([name="gameFormat"]) > span,
+.record-form-grid label:has([name="opponent"]) > span,
+.record-form-grid label:has([name="mapName"]) > span,
+.record-form-grid label:has([name="result"]) > span {
+  width: max-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #5752d4;
+  background: #eeecff;
+  font-size: 13px;
+}
+
+.record-form-grid [name="gameFormat"],
+.record-form-grid [name="opponent"],
+.record-form-grid [name="mapName"],
+.record-form-grid [name="result"] {
+  border: 2px solid #8f88ff !important;
+  background: #fbfaff !important;
+  box-shadow: 0 0 0 3px rgba(143, 136, 255, .13);
+}
+
+.record-form-grid [name="gameFormat"]:focus,
+.record-form-grid [name="opponent"]:focus,
+.record-form-grid [name="mapName"]:focus,
+.record-form-grid [name="result"]:focus {
+  border-color: #5752d4 !important;
+  box-shadow: 0 0 0 4px rgba(87, 82, 212, .2) !important;
+}
+
 .record-form-grid input,
 .record-form-grid select,
 .record-form-grid textarea { width: 100%; }
