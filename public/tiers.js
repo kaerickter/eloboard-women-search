@@ -742,11 +742,14 @@ function render() {
 
 function scrollToInitialTier() {
   if (!initialTierScrollPending) return;
+  if (scrollToTierSix()) initialTierScrollPending = false;
+}
+
+function scrollToTierSix() {
   const tierHeading = document.getElementById("tier-6");
   const tierRow = tierHeading?.closest(".tier-row");
-  if (!tierRow) return;
+  if (!tierRow) return false;
 
-  initialTierScrollPending = false;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       const navHeight = document.querySelector(".site-nav")?.getBoundingClientRect().height || 0;
@@ -755,6 +758,7 @@ function scrollToInitialTier() {
       window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
     });
   });
+  return true;
 }
 
 function bindCards() {
@@ -1123,6 +1127,7 @@ liveOnlyToggle.addEventListener("click", () => {
   saveTierViewState();
   closeOpenCard();
   render();
+  scrollToTierSix();
 });
 divisionFilters.addEventListener("click", (event) => {
   const button = event.target.closest("[data-division-filter]");
