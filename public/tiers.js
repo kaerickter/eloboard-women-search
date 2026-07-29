@@ -42,6 +42,8 @@ const tierAdminLogout = document.getElementById("tierAdminLogout");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
+const TIER_ROSTER_CACHE_KEY = "tier-board-roster-v1";
+const TIER_VIEW_STATE_KEY = "tier-board-view-state-v1";
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
@@ -68,6 +70,53 @@ const state = {
   selectedUniversity: ALL_UNIVERSITIES,
   liveOnly: false
 };
+
+function saveTierViewState() {
+  try {
+    sessionStorage.setItem(TIER_VIEW_STATE_KEY, JSON.stringify({
+      selectedDivision: state.selectedDivision,
+      selectedUniversity: state.selectedUniversity,
+      liveOnly: state.liveOnly
+    }));
+  } catch {
+    // 저장 공간을 사용할 수 없는 환경에서는 기본 상태로 계속 동작합니다.
+  }
+}
+
+function restoreTierViewState() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(TIER_VIEW_STATE_KEY) || "null");
+    if (!saved || typeof saved !== "object") return;
+    if ([ALL_DIVISIONS, "women", "men"].includes(saved.selectedDivision)) {
+      state.selectedDivision = saved.selectedDivision;
+    }
+    state.selectedUniversity = String(saved.selectedUniversity || ALL_UNIVERSITIES);
+    state.liveOnly = Boolean(saved.liveOnly);
+  } catch {
+    // 손상된 저장값은 무시합니다.
+  }
+}
+
+function saveTierRoster() {
+  try {
+    sessionStorage.setItem(TIER_ROSTER_CACHE_KEY, JSON.stringify(state.players));
+  } catch {
+    // 선수 목록은 다음 방문 시 서버에서 다시 불러옵니다.
+  }
+}
+
+function restoreTierRoster() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(TIER_ROSTER_CACHE_KEY) || "[]");
+    if (!Array.isArray(saved) || !saved.length) return false;
+    state.players = saved;
+    keepRosterLiveStatuses();
+    render();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function keyOf(value) {
   return String(value || "").replace(/\s+/g, "").toLowerCase();
@@ -820,6 +869,7 @@ async function loadRoster(force = false) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "티어 명단을 불러오지 못했습니다.");
     state.players = Array.isArray(data.players) ? data.players : [];
+    saveTierRoster();
     keepRosterLiveStatuses();
     subscribeLiveStatuses();
     render();
@@ -833,8 +883,12 @@ async function loadRoster(force = false) {
     }
     if (data.refreshing) await syncDailyRoster();
   } catch (error) {
-    board.innerHTML = '<div class="empty-card">' + escapeHtml(error.message) + "</div>";
-    statusLine.textContent = "잠시 후 새로고침해 주세요.";
+    if (!state.players.length) {
+      board.innerHTML = '<div class="empty-card">' + escapeHtml(error.message) + "</div>";
+      statusLine.textContent = "잠시 후 새로고침해 주세요.";
+    } else {
+      statusLine.textContent = "이전에 보던 티어표와 LIVE 표시를 유지하고 있습니다.";
+    }
   } finally {
     refreshButton.disabled = false;
   }
@@ -846,6 +900,7 @@ async function syncDailyRoster() {
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.players) || !data.players.length) return;
     state.players = data.players;
+    saveTierRoster();
     keepRosterLiveStatuses();
     subscribeLiveStatuses();
     render();
@@ -1045,6 +1100,7 @@ function centerTierAdminDialog() {
 refreshButton.addEventListener("click", () => loadRoster(true));
 liveOnlyToggle.addEventListener("click", () => {
   state.liveOnly = !state.liveOnly;
+  saveTierViewState();
   closeOpenCard();
   render();
 });
@@ -1053,6 +1109,7 @@ divisionFilters.addEventListener("click", (event) => {
   if (!button) return;
   state.selectedDivision = button.dataset.divisionFilter || ALL_DIVISIONS;
   state.selectedUniversity = ALL_UNIVERSITIES;
+  saveTierViewState();
   closeOpenCard();
   render();
   void loadLive(false);
@@ -1061,6 +1118,7 @@ universityFilters.addEventListener("click", (event) => {
   const button = event.target.closest("[data-university-filter]");
   if (!button) return;
   state.selectedUniversity = button.dataset.universityFilter || ALL_UNIVERSITIES;
+  saveTierViewState();
   closeOpenCard();
   render();
   void loadLive(false);
@@ -1257,6 +1315,8 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeOpenCard();
 });
 
+restoreTierViewState();
 restoreLiveStatuses();
+restoreTierRoster();
 connectLiveStatusSharing();
 loadRoster();

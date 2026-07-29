@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_NAME = "\uc774\uc544\uae7d";
 const DEFAULT_WR_ID = "780";
+const SEARCH_SESSION_KEY = "record-search-session-v1";
 const state = {
   query: "",
   data: null,
@@ -10,6 +11,41 @@ const state = {
   requestId: 0,
   activeController: null
 };
+
+function saveSearchSession() {
+  if (!state.data) return;
+  try {
+    sessionStorage.setItem(SEARCH_SESSION_KEY, JSON.stringify({
+      name: $("nameInput").value,
+      data: state.data,
+      selectedYear: state.selectedYear,
+      selectedMonth: state.selectedMonth,
+      opponentQuery: state.opponentQuery
+    }));
+  } catch {
+    // 저장 공간이 부족한 경우 검색 기능은 그대로 사용합니다.
+  }
+}
+
+function restoreSearchSession() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(SEARCH_SESSION_KEY) || "null");
+    if (!saved || typeof saved !== "object") return false;
+    validateSearchResponse(saved.data);
+    $("nameInput").value = String(saved.name || DEFAULT_NAME);
+    $("opponentInput").value = String(saved.opponentQuery || "");
+    state.query = $("nameInput").value.trim();
+    state.data = saved.data;
+    state.selectedYear = String(saved.selectedYear || "");
+    state.selectedMonth = String(saved.selectedMonth || "");
+    state.opponentQuery = $("opponentInput").value.trim();
+    render(saved.data);
+    setSearchState("success", "이전에 보던 검색 결과를 복원했습니다.");
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const TXT = {
   win: "\uc2b9",
@@ -468,6 +504,7 @@ async function load(name = "", refresh = false) {
   state.query = name;
   state.data = data;
   render(data);
+  saveSearchSession();
   const when = new Date(data.fetchedAt).toLocaleString("ko-KR");
   if (name && (!data.profile || data.resultState === "empty")) {
     setSearchState("empty", TXT.noResult);
@@ -506,15 +543,20 @@ $("nameInput").addEventListener("keydown", (event) => { if (event.key === "Enter
 $("opponentInput").addEventListener("input", (event) => {
   state.opponentQuery = event.target.value.trim();
   renderOpponent(state.data);
+  saveSearchSession();
 });
 $("yearSelect").addEventListener("change", (event) => {
   state.selectedYear = event.target.value;
   state.selectedMonth = "";
   render(state.data);
+  saveSearchSession();
 });
 $("monthSelect").addEventListener("change", (event) => {
   state.selectedMonth = event.target.value;
   render(state.data);
+  saveSearchSession();
 });
-if (!$("nameInput").value.trim()) $("nameInput").value = DEFAULT_NAME;
-search(false);
+if (!restoreSearchSession()) {
+  if (!$("nameInput").value.trim()) $("nameInput").value = DEFAULT_NAME;
+  search(false);
+}

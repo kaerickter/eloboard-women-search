@@ -1,6 +1,8 @@
 "use strict";
 
 const PAGE_SIZE = 50;
+const DIARY_DATA_CACHE_KEY = "spawn-diary-data-v1";
+const DIARY_VIEW_STATE_KEY = "spawn-diary-view-state-v1";
 const elements = {
   rows: document.querySelector("#diaryRows"),
   search: document.querySelector("#searchInput"),
@@ -48,6 +50,57 @@ let recordSuggestionIndex = -1;
 let recordSuggestedPlayers = [];
 let recordSelectedPlayer = "";
 let editingEntry = null;
+
+function saveDiaryData() {
+  try {
+    sessionStorage.setItem(DIARY_DATA_CACHE_KEY, JSON.stringify(entries));
+  } catch {
+    // 저장 공간을 사용할 수 없으면 서버 데이터만 사용합니다.
+  }
+}
+
+function saveDiaryViewState() {
+  try {
+    sessionStorage.setItem(DIARY_VIEW_STATE_KEY, JSON.stringify({
+      search: elements.search.value,
+      result: elements.result.value,
+      map: elements.map.value,
+      page: currentPage
+    }));
+  } catch {
+    // 필터 상태 저장을 지원하지 않는 환경에서는 기본값을 사용합니다.
+  }
+}
+
+function readDiaryViewState() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(DIARY_VIEW_STATE_KEY) || "null");
+    return saved && typeof saved === "object" ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function restoreDiaryData() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(DIARY_DATA_CACHE_KEY) || "[]");
+    if (!Array.isArray(saved) || !saved.length) return false;
+    entries = saved;
+    updateSummary();
+    populateMaps();
+    const view = readDiaryViewState();
+    if (view) {
+      elements.search.value = text(view.search);
+      elements.result.value = text(view.result);
+      elements.map.value = text(view.map);
+      currentPage = Math.max(1, Number(view.page) || 1);
+    }
+    applyFilters(false);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function text(value) {
   return String(value ?? "").trim();
@@ -190,7 +243,7 @@ function render() {
   elements.next.disabled = currentPage >= pageCount;
 }
 
-function applyFilters() {
+function applyFilters(resetPage = true) {
   const query = text(elements.search.value).toLocaleLowerCase("ko");
   const result = elements.result.value;
   const map = elements.map.value;
@@ -204,8 +257,9 @@ function applyFilters() {
       (!map || text(entry.map_name) === map) &&
       (!query || searchableText(entry).includes(query));
   });
-  currentPage = 1;
+  if (resetPage) currentPage = 1;
   render();
+  saveDiaryViewState();
 }
 
 async function loadDiary() {
@@ -214,13 +268,22 @@ async function loadDiary() {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "스폰일지를 불러오지 못했습니다.");
     entries = Array.isArray(payload.entries) ? payload.entries : [];
-    filteredEntries = entries;
+    saveDiaryData();
     updateSummary();
     populateMaps();
-    render();
+    const view = readDiaryViewState();
+    if (view) {
+      elements.search.value = text(view.search);
+      elements.result.value = text(view.result);
+      elements.map.value = text(view.map);
+      currentPage = Math.max(1, Number(view.page) || 1);
+    }
+    applyFilters(false);
   } catch (error) {
-    elements.rows.innerHTML = '<tr><td class="empty-cell" colspan="11">기록을 불러오지 못했습니다.</td></tr>';
-    elements.filterSummary.textContent = "연결 상태를 확인해 주세요.";
+    if (!entries.length) {
+      elements.rows.innerHTML = '<tr><td class="empty-cell" colspan="11">기록을 불러오지 못했습니다.</td></tr>';
+      elements.filterSummary.textContent = "연결 상태를 확인해 주세요.";
+    }
     elements.status.textContent = error.message;
   }
 }
@@ -432,12 +495,14 @@ elements.previous.addEventListener("click", () => {
   if (currentPage > 1) {
     currentPage -= 1;
     render();
+    saveDiaryViewState();
   }
 });
 elements.next.addEventListener("click", () => {
   if (currentPage * PAGE_SIZE < filteredEntries.length) {
     currentPage += 1;
     render();
+    saveDiaryViewState();
   }
 });
 elements.rows.addEventListener("click", (event) => {
@@ -586,4 +651,5 @@ elements.recordDelete.addEventListener("click", async () => {
   }
 });
 
+restoreDiaryData();
 loadDiary();
