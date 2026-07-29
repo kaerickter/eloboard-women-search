@@ -860,6 +860,26 @@ body.spawn-diary-page button#recordSaveButton {
   font-size: 15px;
 }
 
+body.spawn-diary-page .record-opponent-suggestions button.record-opponent-option {
+  border: 0 !important;
+  border-bottom: 1px solid var(--theme-line) !important;
+  border-radius: 0 !important;
+  color: var(--theme-ink) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+body.spawn-diary-page .record-opponent-suggestions button.record-opponent-option:last-child {
+  border-bottom: 0 !important;
+}
+
+body.spawn-diary-page .record-opponent-suggestions button.record-opponent-option:hover,
+body.spawn-diary-page .record-opponent-suggestions button.record-opponent-option.is-active {
+  color: var(--theme-ink) !important;
+  background: #f3f7cf !important;
+  box-shadow: none !important;
+}
+
 @media (max-width: 900px) {
   .diary-shell { width: min(100% - 20px, 1900px); padding-top: 24px; }
   .diary-hero { align-items: flex-start; }
