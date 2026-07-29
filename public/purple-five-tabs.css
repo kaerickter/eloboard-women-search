@@ -230,6 +230,50 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
   color: #aaa5ff !important;
 }
 
+/* Keep page introductions compact so primary data remains visible. */
+.tier-hero,
+.shell > .hero,
+.matchup-hero {
+  min-height: 137px !important;
+  padding: 26px max(48px, calc((100vw - 1664px) / 2)) 30px !important;
+}
+
+.diary-hero-band,
+.diary-hero-band .diary-hero {
+  min-height: 137px !important;
+}
+
+.diary-hero-band .diary-hero {
+  padding-top: 26px !important;
+  padding-bottom: 30px !important;
+}
+
+.tier-hero h1,
+.shell > .hero h1,
+.matchup-hero h1,
+.diary-hero h1 {
+  font-size: clamp(22px, 2.4vw, 30px) !important;
+  letter-spacing: -0.9px !important;
+}
+
+.matchup-hero > p:last-child,
+.diary-hero .diary-intro {
+  margin-top: 10px !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+.diary-hero .diary-heading-row {
+  gap: 14px !important;
+}
+
+.diary-hero .diary-hero-logo {
+  width: 68px !important;
+  height: 68px !important;
+  flex-basis: 68px !important;
+  border-radius: 11px !important;
+}
+
 .search-panel,
 .panel,
 .period-panel,

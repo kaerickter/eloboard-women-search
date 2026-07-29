@@ -277,6 +277,37 @@ body::before {
   background: var(--theme-bg) !important;
 }
 
+/* Compact standalone page titles by roughly 40 percent. */
+.cup-hero {
+  min-height: 147px !important;
+  padding: 25px 28px !important;
+}
+
+.cup-hero h1 {
+  font-size: clamp(26px, 4.2vw, 52px) !important;
+}
+
+.cup-hero p:last-child {
+  margin-top: 10px !important;
+  font-size: 13px !important;
+}
+
+.cup-rule-card {
+  padding: 14px 18px !important;
+}
+
+.vote-hero h1 {
+  font-size: clamp(25px, 4.2vw, 43px) !important;
+}
+
+.hero-copy h1 {
+  font-size: clamp(18px, 1.8vw, 27px) !important;
+}
+
+.scoreboard-hero .board-title {
+  font-size: clamp(20px, 2.4vw, 31px) !important;
+}
+
 .workspace,
 .guide {
   border-top: 1px solid var(--theme-line);
