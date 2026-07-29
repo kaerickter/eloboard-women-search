@@ -863,6 +863,24 @@ body.spawn-diary-page .record-dialog-header {
   padding: 17px 22px;
 }
 
+body.spawn-diary-page .record-dialog-header strong {
+  font-size: 23px;
+}
+
+body.spawn-diary-page .record-dialog-header span {
+  font-size: 14px;
+}
+
+body.spawn-diary-page .record-dialog-status,
+body.spawn-diary-page .record-login label {
+  font-size: 15px;
+}
+
+body.spawn-diary-page .record-login input,
+body.spawn-diary-page .record-login button {
+  font-size: 17px;
+}
+
 body.spawn-diary-page .record-entry-form {
   padding: 24px;
 }
@@ -871,14 +889,42 @@ body.spawn-diary-page .record-form-grid {
   gap: 17px;
 }
 
-body.spawn-diary-page .record-entry-form input,
-body.spawn-diary-page .record-entry-form select {
-  min-height: 50px;
+body.spawn-diary-page .record-form-grid label > span {
   font-size: 15px;
 }
 
+body.spawn-diary-page .record-form-grid label > span small {
+  font-size: 12px;
+}
+
+body.spawn-diary-page .record-entry-form input,
+body.spawn-diary-page .record-entry-form select {
+  min-height: 50px;
+  font-size: 17px;
+}
+
 body.spawn-diary-page .record-entry-form textarea {
+  font-size: 22.5px;
+}
+
+body.spawn-diary-page .tier-snapshot-note {
+  font-size: 13px;
+}
+
+body.spawn-diary-page .record-form-actions p {
   font-size: 15px;
+}
+
+body.spawn-diary-page .record-form-actions button {
+  font-size: 17px;
+}
+
+body.spawn-diary-page .record-opponent-option strong {
+  font-size: 15px;
+}
+
+body.spawn-diary-page .record-opponent-option span {
+  font-size: 13px;
 }
 
 body.spawn-diary-page button#recordSaveButton {
@@ -886,7 +932,7 @@ body.spawn-diary-page button#recordSaveButton {
   min-height: 52px;
   padding: 0 28px;
   border-radius: 9px !important;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 body.spawn-diary-page .record-opponent-suggestions button.record-opponent-option {
