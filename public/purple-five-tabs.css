@@ -346,6 +346,74 @@ body.spawn-diary-page col.reflection-column {
   width: calc((100% - 980px) / 2) !important;
 }
 
+.tier-filter-toolbar {
+  margin: -8px 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tier-filter-toolbar .division-filters {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.tier-filter-toolbar .tier-live-controls {
+  margin-left: auto;
+}
+
+body .tier-shell .division-filters .division-filter-button {
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  color: #666379 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body .tier-shell .division-filters .division-filter-button:hover,
+body .tier-shell .division-filters .division-filter-button:focus-visible {
+  border-color: #d8d4eb !important;
+  color: #3f3c54 !important;
+  background: #f7f6fb !important;
+  outline: 0 !important;
+}
+
+body .tier-shell .division-filters .division-filter-button.is-active {
+  border-color: #5752d4 !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #5752d4, #7771e7) !important;
+  box-shadow: 0 5px 12px rgba(87, 82, 212, 0.2) !important;
+}
+
+body .matchup-shell .matchup-search .mode-tabs button[data-mode] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: #8a9299 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+body .matchup-shell .matchup-search .mode-tabs button[data-mode].selected {
+  color: #5752d4 !important;
+  background: #eeecff !important;
+}
+
+body .matchup-shell .matchup-search .mode-tabs button[data-mode].selected::after {
+  background: #5752d4 !important;
+}
+
+body .matchup-shell .mode-tabs .men-mode-link,
+body .matchup-shell .mode-tabs .men-mode-tab {
+  color: #8a9299 !important;
+  background: #fff !important;
+}
+
+body .matchup-shell .mode-tabs .men-mode-tab.active {
+  color: #5752d4 !important;
+  background: #eeecff !important;
+}
+
 @media (max-width: 1100px) {
   .site-nav,
   body.spawn-diary-page .site-nav {
@@ -363,5 +431,15 @@ body.spawn-diary-page col.reflection-column {
   .matchup-shell,
   .diary-shell {
     width: min(100% - 24px, 1760px) !important;
+  }
+
+  .tier-filter-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tier-filter-toolbar .tier-live-controls {
+    margin-left: 0;
+    justify-content: flex-start;
   }
 }

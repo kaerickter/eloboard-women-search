@@ -4,6 +4,13 @@ const refreshButton = document.getElementById("refreshButton");
 const countdown = document.getElementById("refreshCountdown");
 const liveOnlyToggle = document.getElementById("liveOnlyToggle");
 const divisionFilters = document.getElementById("divisionFilters");
+const tierLiveControls = document.querySelector(".tier-live-controls");
+if (divisionFilters && tierLiveControls) {
+  const tierFilterToolbar = document.createElement("div");
+  tierFilterToolbar.className = "tier-filter-toolbar";
+  divisionFilters.before(tierFilterToolbar);
+  tierFilterToolbar.append(divisionFilters, tierLiveControls);
+}
 const universityFilters = document.getElementById("universityFilters");
 const universityFilterSummary = document.getElementById("universityFilterSummary");
 const tierAdminOpen = document.getElementById("tierAdminOpen");
