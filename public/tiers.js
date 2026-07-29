@@ -48,6 +48,7 @@ const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 let livePollTimer = null;
 let liveSocket = null;
 let pendingLiveReload = false;
@@ -59,6 +60,7 @@ let tierAdminSelectedName = "";
 let tierAdminSuggestionIndex = -1;
 let tierAdminDrag = null;
 let tierAdminStorage = { mode: "unknown", durable: false, message: "" };
+let initialTierScrollPending = true;
 
 const state = {
   players: [],
@@ -735,6 +737,24 @@ function render() {
   }).join("");
 
   bindCards();
+  scrollToInitialTier();
+}
+
+function scrollToInitialTier() {
+  if (!initialTierScrollPending) return;
+  const tierHeading = document.getElementById("tier-6");
+  const tierRow = tierHeading?.closest(".tier-row");
+  if (!tierRow) return;
+
+  initialTierScrollPending = false;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const navHeight = document.querySelector(".site-nav")?.getBoundingClientRect().height || 0;
+      const toolbarHeight = document.querySelector(".tier-filter-toolbar")?.getBoundingClientRect().height || 0;
+      const top = window.scrollY + tierRow.getBoundingClientRect().top - navHeight - toolbarHeight - 12;
+      window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+    });
+  });
 }
 
 function bindCards() {

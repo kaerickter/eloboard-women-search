@@ -433,11 +433,20 @@ body.spawn-diary-page col.reflection-column {
 }
 
 .tier-filter-toolbar {
-  margin: -8px 0 22px;
+  position: sticky;
+  top: 72px;
+  z-index: 18;
+  margin: 0 0 22px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  border: 1px solid #e3e1ef;
+  border-radius: 0 0 12px 12px;
+  background: rgba(247, 247, 251, 0.97);
+  box-shadow: 0 10px 24px rgba(37, 31, 85, 0.1);
+  backdrop-filter: blur(12px);
 }
 
 .tier-filter-toolbar .division-filters {
