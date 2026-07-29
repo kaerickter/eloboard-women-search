@@ -1325,7 +1325,10 @@ const server = http.createServer(async (req, res) => {
           map_name, result, opponent_build, my_build, feedback, reflection,
           keywords, replay_number
         FROM spawn_diary_entries
-        ORDER BY match_date DESC NULLS LAST, source_row DESC, id DESC
+        ORDER BY
+          CASE WHEN source_sheet_id = 'site-manual' THEN 0 ELSE 1 END,
+          CASE WHEN source_sheet_id = 'site-manual' THEN source_row END DESC NULLS LAST,
+          match_date DESC NULLS LAST, source_row DESC, id DESC
       `);
       return send(res, 200, JSON.stringify({
         entries: result.rows,
