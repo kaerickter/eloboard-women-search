@@ -796,6 +796,70 @@ td:nth-child(11) {
 
 .record-form-actions button:disabled { cursor: wait; opacity: .55; }
 
+body.spawn-diary-page button.record-open-button {
+  min-width: 195px;
+  min-height: 57px;
+  padding: 0 26px;
+  border: 2px solid rgba(255, 255, 255, .95) !important;
+  border-radius: 9px !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #665ee0, #887ef2) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, .42),
+    0 0 10px rgba(255, 255, 255, .88),
+    0 0 24px rgba(210, 205, 255, .58),
+    0 9px 22px rgba(57, 49, 156, .35) !important;
+  font-size: 18px;
+}
+
+body.spawn-diary-page button.record-open-button:hover,
+body.spawn-diary-page button.record-open-button:focus-visible {
+  border-color: #fff !important;
+  background: linear-gradient(135deg, #746bec, #978eff) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, .6),
+    0 0 14px rgba(255, 255, 255, 1),
+    0 0 30px rgba(210, 205, 255, .72),
+    0 11px 25px rgba(57, 49, 156, .4) !important;
+  outline: 0;
+}
+
+body.spawn-diary-page .record-dialog {
+  width: min(1176px, calc(100% - 24px));
+  max-height: min(95vh, 1080px);
+}
+
+body.spawn-diary-page .record-dialog-header {
+  min-height: 86px;
+  padding: 17px 22px;
+}
+
+body.spawn-diary-page .record-entry-form {
+  padding: 24px;
+}
+
+body.spawn-diary-page .record-form-grid {
+  gap: 17px;
+}
+
+body.spawn-diary-page .record-entry-form input,
+body.spawn-diary-page .record-entry-form select {
+  min-height: 50px;
+  font-size: 15px;
+}
+
+body.spawn-diary-page .record-entry-form textarea {
+  font-size: 15px;
+}
+
+body.spawn-diary-page button#recordSaveButton {
+  min-width: 170px;
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 9px !important;
+  font-size: 15px;
+}
+
 @media (max-width: 900px) {
   .diary-shell { width: min(100% - 20px, 1900px); padding-top: 24px; }
   .diary-hero { align-items: flex-start; }

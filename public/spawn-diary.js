@@ -483,9 +483,10 @@ elements.recordOpponent.addEventListener("keydown", (event) => {
     elements.recordOpponentSuggestions.querySelectorAll(".record-opponent-option").forEach((option, index) => {
       option.classList.toggle("is-active", index === recordSuggestionIndex);
     });
-  } else if (event.key === "Enter" && recordSuggestionIndex >= 0) {
+  } else if (event.key === "Enter") {
     event.preventDefault();
-    selectRecordPlayer(recordSuggestedPlayers[recordSuggestionIndex]);
+    const selectedIndex = recordSuggestionIndex >= 0 ? recordSuggestionIndex : 0;
+    selectRecordPlayer(recordSuggestedPlayers[selectedIndex]);
   } else if (event.key === "Escape") {
     hideOpponentSuggestions();
   }
@@ -498,6 +499,11 @@ elements.recordOpponentSuggestions.addEventListener("click", (event) => {
 });
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".record-opponent-field")) hideOpponentSuggestions();
+});
+elements.recordForm.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+    event.preventDefault();
+  }
 });
 elements.recordLogin.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -522,6 +528,7 @@ elements.recordLogin.addEventListener("submit", async (event) => {
 });
 elements.recordForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (event.submitter !== elements.recordSave) return;
   elements.recordSave.disabled = true;
   elements.recordFormStatus.textContent = "저장하고 있습니다.";
   const formData = new FormData(elements.recordForm);
