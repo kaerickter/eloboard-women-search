@@ -227,9 +227,10 @@ h1 {
 
 .university-filter-panel {
   position: sticky;
-  top: 18px;
-  max-height: calc(100vh - 36px);
+  top: 150px;
+  max-height: calc(100vh - 162px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   min-width: 0;
   padding: 0 4px 4px 20px;
   border-left: 1px solid var(--theme-line);
