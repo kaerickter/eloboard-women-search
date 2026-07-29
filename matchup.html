@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>상대전적 비교 · ELOBoard</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./matchup.css">
+    <link rel="stylesheet" href="./common-theme.css">
+    <link rel="stylesheet" href="./purple-five-tabs.css?v=20260729-nav-unified2">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-brand" href="./tiers.html" aria-label="ELO KITTEN 홈">
+        <span>EK</span><strong>ELO KITTEN</strong>
+      </a>
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup active" href="./matchup.html" aria-current="page">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab" href="./scoreboard.html">매치 점수판</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
+      <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+      <span class="site-user"><strong>이아깽</strong><em>관리자</em></span>
+    </nav>
+
+    <main class="matchup-shell">
+      <section class="matchup-hero">
+        <p class="matchup-eyebrow">HEAD TO HEAD RECORDS</p>
+        <h1>누가 더 강했는지,<br><em>실제 전적으로 확인하세요.</em></h1>
+        <p>eloboard의 공개 상대전적을 자동으로 불러옵니다. 전체 기록과 최근 90일의 흐름을 한 번에 비교하세요.</p>
+      </section>
+
+      <section class="matchup-search">
+        <div class="mode-tabs" role="tablist" aria-label="비교 방식">
+          <button type="button" data-mode="one">1 : 1 비교</button>
+          <button type="button" data-mode="many" class="selected">1 : 다수 비교</button>
+          <button type="button" data-mode="group">다수 : 다수 비교 <b>NEW</b></button>
+          <a class="men-mode-tab" href="./men-records.html">남성전적 <b>NEW</b></a>
+        </div>
+        <div id="standardPicker" class="picker-grid">
+          <div class="player-picker main-picker" data-side="main">
+            <div class="picker-title"><span id="mainLabel">기준 선수</span><button id="clearMains" type="button">초기화</button></div>
+            <div id="mainChips" class="chips" aria-live="polite"></div>
+            <input id="mainInput" placeholder="선수 이름을 검색하세요" autocomplete="off" aria-label="기준 선수 검색" aria-controls="mainSuggestions">
+            <div id="mainSuggestions" class="suggestions" hidden></div>
+          </div>
+          <strong class="versus">VS</strong>
+          <div class="player-picker opponent-picker" data-side="opponent">
+            <div class="picker-title"><span id="opponentLabel">상대 선수 <small id="multiHint">여러 명 선택 가능</small></span><button id="clearOpponents" type="button">초기화</button></div>
+            <div id="opponentChips" class="chips" aria-live="polite"></div>
+            <input id="opponentInput" placeholder="선수 이름을 검색하세요" autocomplete="off" aria-label="상대 선수 검색" aria-controls="opponentSuggestions">
+            <div id="opponentSuggestions" class="suggestions" hidden></div>
+          </div>
+          <button id="searchButton" class="matchup-search-button" type="button">전적 검색 <span>→</span></button>
+        </div>
+        <div class="selection-actions">
+          <p id="selectionGuide">기준 선수 1명과 비교할 상대를 선택하세요.</p>
+          <button id="clearAll" type="button">전체 초기화</button>
+        </div>
+        <div class="quick"><span id="quickLabel">상대 빠른 선택</span><div id="quickPlayers"></div></div>
+        <div id="pairEditor" class="pair-editor" hidden>
+          <div class="pair-editor-head">
+            <div><strong>A팀 선수와 B팀 선수를 한 줄씩 비교</strong><small>각 줄의 두 선수가 한 쌍으로 조회됩니다.</small></div>
+            <button id="resetPairs" type="button">전체 초기화</button>
+          </div>
+          <div class="pair-column-head"><span>A팀 선수</span><i></i><span>B팀 선수</span><i></i></div>
+          <div id="pairRows" class="pair-rows"></div>
+          <div class="pair-editor-actions">
+            <button id="addPairRow" class="add-pair-row" type="button">＋ 비교 행 추가</button>
+            <button id="searchAllPairs" class="matchup-search-button" type="button">입력한 전체 전적 비교 <span>→</span></button>
+          </div>
+        </div>
+        <datalist id="playerList"></datalist>
+      </section>
+
+      <section class="matchup-results">
+        <div class="results-head">
+          <div><p class="matchup-eyebrow">LIVE SEARCH RESULT</p><h2><span id="resultAvatar" class="result-avatar"></span><span><strong id="resultMain">이아깽</strong> <span id="resultHeading">기준 상대전적</span></span></h2><p id="resultStatus">검색할 선수를 선택해 주세요.</p></div>
+          <div class="range-switch"><button type="button" data-range="all" class="selected">전체 전적</button><button type="button" data-range="90">최근 90일</button></div>
+        </div>
+        <p id="errorMessage" class="matchup-error" hidden></p>
+        <div class="summary-grid">
+          <article><span id="summaryTitle">전체 종합</span><div><strong id="summaryWins">0승</strong><b id="summaryLosses">0패</b></div><div class="summary-bar"><i id="summaryBar"></i></div><small>승률 <em id="summaryRate">0%</em></small></article>
+          <article><span id="bestTitle">가장 우세한 상대</span><div class="best"><i id="bestRace" class="race T">-</i><strong id="bestName">-</strong></div><small id="bestDescription">선택한 상대 중 최고 승률</small></article>
+          <article><span>최근 경기</span><div id="latestDate" class="latest-date">경기 없음</div><small id="updatedAt">검색 후 표시됩니다</small></article>
+        </div>
+        <div class="matchup-table-card">
+          <div class="table-tools"><div><strong>상대별 실제 전적</strong><small>승리와 패배 비율을 그래프로 비교하세요</small></div><label>정렬 <select id="sortSelect"><option value="games">경기 많은 순</option><option value="rate">승률 높은 순</option><option value="recent">최근 경기 순</option></select></label></div>
+          <div id="recordRows" class="record-graph-grid"></div>
+        </div>
+        <p class="matchup-source">출처: eloboard.com 공개 전적 · 검색할 때마다 최신 데이터를 조회합니다.</p>
+      </section>
+    </main>
+    <script src="./matchup.js"></script>
+  </body>
+</html>

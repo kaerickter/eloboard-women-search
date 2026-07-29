@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="방송용 팀 매치 스코어보드와 숲 채팅 매크로를 관리합니다."
+    >
+    <title>방송 스코어보드 · ELOBoard 도구</title>
+    <link rel="stylesheet" href="./common-theme.css">
+    <link rel="stylesheet" href="./purple-five-tabs.css?v=20260729-nav-unified2">
+    <style>
+      html,
+      body {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        height: 100vh;
+        display: flex;
+        overflow: hidden;
+        flex-direction: column;
+        background: #24207a;
+      }
+
+      .site-nav {
+        flex: 0 0 auto;
+      }
+
+      .scoreboard-workspace {
+        min-height: 0;
+        flex: 1 1 auto;
+        position: relative;
+        background: #24207a;
+      }
+
+      .scoreboard-workspace iframe {
+        width: 100%;
+        height: 100%;
+        display: block;
+        border: 0;
+        background: #24207a;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab active" href="./scoreboard.html" aria-current="page">스코어보드</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
+      <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+    </nav>
+
+    <main class="scoreboard-workspace">
+      <iframe
+        src="https://live-match-board.kaerickter.chatgpt.site/"
+        title="방송용 팀 매치 스코어보드"
+        allow="clipboard-write; fullscreen"
+        loading="eager"
+      ></iframe>
+    </main>
+  </body>
+</html>

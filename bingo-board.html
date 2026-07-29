@@ -1,0 +1,1564 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>방송용 빙고판</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #1b2430;
+      --muted: #687386;
+      --line: #d9dee8;
+      --accent: #e85a73;
+      --accent-2: #2f8f83;
+      --gold: #e7b75f;
+      --mint: #bfe7db;
+      --peach: #ffe3d4;
+      --cell: #ffffff;
+      --cell-checked: #fff0f3;
+      --team-1: #ef5b78;
+      --team-2: #3b82f6;
+      --shadow: 0 18px 40px rgba(24, 32, 46, .12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(420px, 1.15fr) minmax(360px, .85fr);
+      min-height: calc(100vh - 59px);
+    }
+
+    .site-nav {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: rgba(255, 249, 239, .9);
+      border-bottom: 1px solid rgba(214, 183, 149, .46);
+      backdrop-filter: blur(12px);
+    }
+
+    .site-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 18px;
+      border: 1px solid rgba(214, 183, 149, .68);
+      border-radius: 999px;
+      color: #553344;
+      background: rgba(255, 255, 255, .86);
+      box-shadow: 0 8px 22px rgba(88, 61, 45, .08);
+      text-decoration: none;
+      font-weight: 900;
+    }
+
+    .site-tab.active {
+      border-color: #d596a8;
+      background: linear-gradient(135deg, #fff2f6, #e9fff6);
+      color: #70384c;
+    }
+
+    .site-tab.search {
+      color: #17201a;
+    }
+
+    .broadcast {
+      position: relative;
+      isolation: isolate;
+      display: grid;
+      place-items: center;
+      padding: clamp(20px, 4vw, 56px);
+      background:
+        linear-gradient(115deg, rgba(255, 255, 255, .42) 0 1px, transparent 1px 68px),
+        radial-gradient(circle at 18% 16%, rgba(255, 226, 210, .88), transparent 28%),
+        radial-gradient(circle at 83% 18%, rgba(191, 231, 219, .74), transparent 30%),
+        radial-gradient(circle at 50% 100%, rgba(232, 90, 115, .22), transparent 42%),
+        linear-gradient(135deg, #fff9ef 0%, #f7e8d9 38%, #d6eee5 100%);
+      overflow: hidden;
+    }
+
+    .broadcast::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      z-index: -1;
+      border: 1px solid rgba(255, 255, 255, .8);
+      border-radius: 26px;
+      box-shadow: inset 0 0 0 1px rgba(231, 183, 95, .16);
+    }
+
+    .broadcast::after {
+      content: "";
+      position: absolute;
+      inset: auto 7% 5% 7%;
+      height: 18%;
+      z-index: -1;
+      background:
+        radial-gradient(ellipse at center, rgba(99, 79, 60, .17), transparent 66%);
+      filter: blur(2px);
+    }
+
+    .stage {
+      position: relative;
+      width: min(92vh, 100%);
+      max-width: 820px;
+      padding: clamp(18px, 2.4vw, 32px);
+      color: #302235;
+      background: rgba(255, 255, 255, .56);
+      border: 1px solid rgba(255, 255, 255, .86);
+      border-radius: clamp(22px, 3vw, 34px);
+      box-shadow:
+        0 26px 70px rgba(88, 61, 45, .18),
+        inset 0 1px 0 rgba(255, 255, 255, .88);
+      backdrop-filter: blur(14px);
+    }
+
+    .stage.has-bingo {
+      background:
+        linear-gradient(135deg, rgba(255, 245, 193, .74), rgba(221, 248, 232, .66));
+      box-shadow:
+        0 26px 70px rgba(113, 88, 35, .22),
+        0 0 0 6px rgba(231, 183, 95, .18),
+        inset 0 1px 0 rgba(255, 255, 255, .88);
+    }
+
+    .stage::before,
+    .stage::after {
+      content: "";
+      position: absolute;
+      top: 22px;
+      width: clamp(44px, 7vw, 72px);
+      height: clamp(13px, 1.8vw, 18px);
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, transparent 0 20%, rgba(255, 255, 255, .65) 20% 28%, transparent 28% 48%, rgba(255, 255, 255, .65) 48% 56%, transparent 56%),
+        linear-gradient(90deg, #f6b3c1, #e85a73);
+      box-shadow: 0 8px 18px rgba(200, 78, 102, .22);
+    }
+
+    .stage::before {
+      left: clamp(18px, 2.4vw, 30px);
+      transform: rotate(-8deg);
+    }
+
+    .stage::after {
+      right: clamp(18px, 2.4vw, 30px);
+      transform: rotate(8deg);
+    }
+
+    .stage-title {
+      width: fit-content;
+      max-width: 86%;
+      margin: 0 auto clamp(18px, 2vw, 26px);
+      padding: clamp(8px, 1.2vw, 12px) clamp(24px, 3.8vw, 44px);
+      border: 1px solid rgba(231, 183, 95, .46);
+      border-radius: 999px;
+      text-align: center;
+      font-size: clamp(30px, 4.1vw, 58px);
+      line-height: 1.05;
+      letter-spacing: 0;
+      font-weight: 900;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 247, 235, .82));
+      color: #553344;
+      text-shadow: 0 2px 0 rgba(255, 255, 255, .8);
+      box-shadow:
+        0 13px 28px rgba(118, 76, 54, .12),
+        inset 0 -2px 0 rgba(231, 183, 95, .18);
+      overflow-wrap: anywhere;
+    }
+
+    .timer-display {
+      min-width: min(86%, 420px);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+
+    .preview-board,
+    .edit-board {
+      display: grid;
+      gap: clamp(8px, 1.2vw, 14px);
+      aspect-ratio: 1;
+    }
+
+    .preview-board {
+      padding: clamp(8px, 1.3vw, 14px);
+      border: 1px solid rgba(255, 255, 255, .78);
+      border-radius: clamp(18px, 2.4vw, 28px);
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, .52), rgba(255, 255, 255, .22));
+      box-shadow:
+        0 18px 38px rgba(88, 61, 45, .13),
+        inset 0 1px 0 rgba(255, 255, 255, .8);
+    }
+
+    .preview-board.has-bingo {
+      background:
+        linear-gradient(135deg, rgba(255, 244, 186, .72), rgba(211, 244, 228, .56));
+      box-shadow:
+        0 22px 44px rgba(150, 115, 42, .2),
+        0 0 0 5px rgba(231, 183, 95, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .86);
+    }
+
+    .preview-cell,
+    .edit-cell {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: 0;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      text-align: center;
+      line-height: 1.08;
+      letter-spacing: 0;
+      overflow: hidden;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    .preview-cell {
+      padding: 7%;
+      background:
+        linear-gradient(180deg, #ffffff 0%, #fffaf4 100%);
+      color: #33253a;
+      font-size: clamp(19px, 4.2vw, 52px);
+      font-weight: 900;
+      cursor: pointer;
+      border-color: rgba(255, 255, 255, .86);
+      border-radius: clamp(12px, 1.6vw, 18px);
+      box-shadow:
+        0 10px 18px rgba(116, 83, 63, .13),
+        inset 0 -7px 0 rgba(231, 183, 95, .12),
+        inset 0 1px 0 rgba(255, 255, 255, .96);
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    .preview-cell:hover {
+      transform: translateY(-2px);
+    }
+
+    .preview-cell.checked {
+      background:
+        linear-gradient(180deg, #eefbf3 0%, #d8f2e3 100%);
+      color: #1e6248;
+      border-color: #8ed5ae;
+      box-shadow:
+        0 10px 22px rgba(47, 143, 131, .18),
+        inset 0 -7px 0 rgba(47, 143, 131, .12),
+        inset 0 1px 0 rgba(255, 255, 255, .9);
+    }
+
+    .preview-cell.checked::after,
+    .edit-cell.checked::after {
+      display: none;
+    }
+
+    .preview-cell.bingo-line {
+      background:
+        linear-gradient(180deg, #fff2b8 0%, #ffd66e 100%);
+      color: #5c3900;
+      border-color: #f0bd3d;
+      box-shadow:
+        0 0 0 4px rgba(255, 246, 197, .98),
+        0 0 0 8px rgba(231, 183, 95, .42),
+        0 14px 30px rgba(231, 183, 95, .32),
+        inset 0 -7px 0 rgba(231, 183, 95, .12),
+        inset 0 1px 0 rgba(255, 255, 255, .94);
+    }
+
+    .preview-cell.territory-cell,
+    .edit-cell.territory-cell {
+      color: var(--claim-ink, #fff);
+      background: var(--claim-color);
+      border-color: var(--claim-color);
+    }
+
+    .preview-cell.territory-cell {
+      box-shadow:
+        0 12px 24px color-mix(in srgb, var(--claim-color) 36%, transparent),
+        inset 0 -7px 0 rgba(0, 0, 0, .1),
+        inset 0 1px 0 rgba(255, 255, 255, .32);
+    }
+
+    .preview-cell.territory-cell.team-bingo {
+      border-color: #fff;
+      box-shadow:
+        0 0 0 4px rgba(255, 255, 255, .95),
+        0 0 0 9px var(--claim-color),
+        0 16px 32px color-mix(in srgb, var(--claim-color) 48%, transparent),
+        inset 0 -7px 0 rgba(0, 0, 0, .12);
+    }
+
+    .edit-cell.territory-cell.team-bingo {
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .86);
+    }
+
+    .editor {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+      padding: 28px;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      overflow-y: auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .section {
+      display: grid;
+      gap: 10px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .label {
+      color: #2d3848;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .segmented {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr 1.35fr;
+      width: min(100%, 290px);
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #eef1f5;
+    }
+
+    .segmented button {
+      min-height: 36px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .segmented button.active {
+      color: var(--ink);
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(20, 28, 40, .12);
+    }
+
+    .segmented button.mode-active {
+      color: #fff;
+      background: linear-gradient(135deg, var(--team-1), var(--team-2));
+      box-shadow: 0 3px 10px rgba(49, 78, 135, .24);
+    }
+
+    .territory-controls {
+      display: grid;
+      gap: 12px;
+    }
+
+    .territory-controls[hidden] {
+      display: none;
+    }
+
+    .team-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .team-button {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 46px;
+      border: 3px solid transparent;
+      border-radius: 10px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 900;
+      box-shadow: 0 8px 18px rgba(24, 32, 46, .12);
+    }
+
+    .team-button[data-team="1"] {
+      background: var(--team-1);
+    }
+
+    .team-button[data-team="2"] {
+      background: var(--team-2);
+    }
+
+    .team-button.active {
+      border-color: #fff;
+      outline: 5px solid #ffd75e;
+      outline-offset: 2px;
+      transform: translateY(-3px) scale(1.035);
+      box-shadow:
+        0 0 0 9px color-mix(in srgb, var(--team-button-color) 24%, transparent),
+        0 0 26px color-mix(in srgb, var(--team-button-color) 70%, transparent),
+        0 14px 26px rgba(24, 32, 46, .2);
+    }
+
+    .team-button.active::after {
+      content: "✓ 선택됨";
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border: 2px solid rgba(255, 255, 255, .9);
+      border-radius: 999px;
+      color: var(--team-button-color);
+      background: #fff;
+      box-shadow: 0 3px 9px rgba(24, 32, 46, .18);
+      font-size: 12px;
+      line-height: 1.1;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .current-team-indicator {
+      display: grid;
+      place-items: center;
+      min-height: 58px;
+      padding: 10px 14px;
+      border: 4px solid #172033;
+      border-radius: 12px;
+      color: var(--indicator-ink, #fff);
+      background: var(--indicator-color, var(--team-1));
+      text-align: center;
+      font-size: 18px;
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(24, 32, 46, .2);
+    }
+
+    .team-color-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .team-color-row input[type="text"] {
+      min-width: 0;
+      height: 34px;
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      outline: none;
+      font-weight: 800;
+    }
+
+    .team-color-row input[type="color"] {
+      width: 46px;
+      height: 30px;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .territory-guide {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .field {
+      width: 100%;
+      min-height: 42px;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fff;
+      outline: none;
+    }
+
+    .field:focus {
+      border-color: var(--accent-2);
+      box-shadow: 0 0 0 3px rgba(21, 111, 122, .16);
+    }
+
+    .number-field {
+      width: 96px;
+    }
+
+    .timer-settings {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid #dce4ee;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f7f8ff, #fff8fc);
+      box-shadow: 0 8px 20px rgba(91, 88, 145, .08);
+    }
+
+    .timer-inputs,
+    .timer-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .timer-inputs label,
+    .target-row label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .timer-inputs input,
+    .target-row input {
+      width: 100%;
+      min-width: 0;
+      min-height: 38px;
+      padding: 0 9px;
+      border: 1px solid #c8d2e2;
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fff;
+      text-align: center;
+      font-weight: 900;
+      outline: none;
+    }
+
+    .timer-inputs input:focus,
+    .target-row input:focus {
+      border-color: #9aa8e8;
+      box-shadow: 0 0 0 3px rgba(154, 168, 232, .2);
+    }
+
+    .timer-actions {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .timer-button {
+      min-height: 40px;
+      border: 1px solid #d9dff2;
+      border-radius: 8px;
+      color: #303858;
+      background: #f0f2ff;
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .timer-button.primary {
+      border-color: #8d9cdf;
+      color: #fff;
+      background: linear-gradient(135deg, #8295df, #b48de1);
+    }
+
+    .target-time {
+      display: grid;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid #dce4ee;
+    }
+
+    .target-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .target-title strong {
+      font-size: 13px;
+    }
+
+    .target-title span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .target-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.25fr;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .time-up-effect {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(31, 27, 48, .46);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .2s ease, visibility .2s ease;
+      pointer-events: none;
+    }
+
+    .time-up-effect.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .time-up-card {
+      display: grid;
+      gap: 8px;
+      min-width: min(90vw, 360px);
+      padding: 30px;
+      border: 5px solid #fff;
+      border-radius: 24px;
+      color: #fff;
+      background: linear-gradient(135deg, #e85a73, #8b7bd9);
+      text-align: center;
+      box-shadow: 0 24px 70px rgba(37, 29, 62, .4);
+      transform: scale(.88);
+    }
+
+    .time-up-effect.show .time-up-card {
+      animation: timeUpPop .6s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+
+    .time-up-card span {
+      font-size: 24px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 900;
+    }
+
+    .time-up-card strong {
+      font-size: 38px;
+    }
+
+    @keyframes timeUpPop {
+      from { transform: scale(.86) translateY(14px); }
+      to { transform: scale(1) translateY(0); }
+    }
+
+    .button {
+      min-height: 40px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .button.primary {
+      border-color: var(--accent-2);
+      color: #fff;
+      background: var(--accent-2);
+    }
+
+    .button.warn {
+      border-color: #f0c2c8;
+      color: #8e1725;
+      background: #fff5f6;
+    }
+
+    .button:active {
+      transform: translateY(1px);
+    }
+
+    .edit-board {
+      width: min(100%, 520px);
+      gap: 8px;
+    }
+
+    .edit-cell {
+      background: #fafbfc;
+      border-color: var(--line);
+    }
+
+    .edit-cell.checked {
+      background: #eaf8ef;
+      border-color: #9bd8b6;
+      color: #1e6248;
+    }
+
+    .edit-cell.bingo-line {
+      background: #fff2bf;
+      border-color: #e7b75f;
+      color: #6b4300;
+    }
+
+    .edit-cell input {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      padding: 10%;
+      border: 0;
+      color: inherit;
+      background: transparent;
+      text-align: center;
+      font-size: clamp(15px, 2.2vw, 22px);
+      font-weight: 800;
+      outline: none;
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .bingo-message {
+      min-height: 32px;
+      margin-top: clamp(12px, 1.8vw, 20px);
+      color: #7b4b17;
+      text-align: center;
+      font-size: clamp(18px, 2.25vw, 30px);
+      font-weight: 900;
+      text-shadow: 0 2px 0 rgba(255, 255, 255, .85);
+    }
+
+    .bingo-message .team-score {
+      display: inline-block;
+      margin: 2px 6px;
+      padding: 6px 12px;
+      border: 3px solid currentColor;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .86);
+    }
+
+    @media (max-width: 920px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .broadcast {
+        min-height: 62vh;
+      }
+
+      .editor {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 560px) {
+      .site-nav {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .broadcast,
+      .editor {
+        padding: 18px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .number-field {
+        flex: 1 1 92px;
+      }
+
+      .button {
+        flex: 1 1 auto;
+      }
+
+      .target-row {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .target-row .timer-button {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="./common-theme.css">
+  <link rel="stylesheet" href="./collaboration.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+      <a class="site-tab search" href="./index.html">전적검색</a>
+    <a class="site-tab search" href="./matchup.html">상대전적</a>
+    <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+    <a class="site-tab active" href="./bingo-board.html">빙고판 열기</a>
+    <a class="site-tab search" href="./kill-bet.html">킬 내기</a>
+    <a class="site-tab search" href="./scoreboard.html">매치 점수판</a>
+    <a class="site-tab search" href="./lucky-roulette.html">행운 돌림판</a>
+    <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
+    <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+  </nav>
+  <main class="app">
+    <section class="broadcast" aria-label="방송 송출용 빙고판">
+      <div class="stage" id="stage">
+        <div class="stage-title timer-display" id="timerDisplay" role="timer" aria-live="polite">00:00:00</div>
+        <div class="preview-board" id="previewBoard"></div>
+        <div class="bingo-message" id="bingoMessage"></div>
+      </div>
+    </section>
+
+    <aside class="editor" aria-label="빙고판 수정">
+      <div class="topbar">
+        <div>
+          <h1>빙고판 수정</h1>
+          <p class="hint">오른쪽에서 수정하면 왼쪽 송출 화면에 바로 반영됩니다.</p>
+        </div>
+        <button class="button" id="openBroadcast" type="button" title="송출 화면만 새 창으로 열기">새 창</button>
+      </div>
+
+      <section class="section">
+        <div class="label">스톱워치 설정</div>
+        <div class="timer-settings">
+          <div class="timer-inputs">
+            <label><span>시</span><input id="timerHours" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+            <label><span>분</span><input id="timerMinutes" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+            <label><span>초</span><input id="timerSeconds" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          </div>
+          <div class="timer-actions">
+            <button id="timerStartButton" class="timer-button primary" type="button">시작</button>
+            <button id="timerResetButton" class="timer-button" type="button">초기화</button>
+          </div>
+          <div class="target-time">
+            <div class="target-title">
+              <strong>종료 시각</strong>
+              <span>한국 시간 기준</span>
+            </div>
+            <div class="target-row">
+              <label><span>시</span><input id="targetHour" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+              <label><span>분</span><input id="targetMinute" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+              <button id="targetStartButton" class="timer-button primary" type="button">시각 시작</button>
+            </div>
+          </div>
+          <div class="status" id="timerStatus">시간을 설정한 뒤 시작을 눌러주세요.</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="label">판 크기 / 모드</div>
+        <div class="segmented" role="group" aria-label="빙고판 크기 선택">
+          <button type="button" class="active" data-size="4">4x4</button>
+          <button type="button" data-size="5">5x5</button>
+          <button type="button" data-mode="territory">땅따먹기</button>
+        </div>
+      </section>
+
+      <section class="section territory-controls" id="territoryControls" hidden>
+        <div class="label">현재 차례</div>
+        <div class="team-picker" role="group" aria-label="점령할 팀 선택">
+          <button class="team-button active" type="button" data-team="1">1팀</button>
+          <button class="team-button" type="button" data-team="2">2팀</button>
+        </div>
+        <div class="current-team-indicator" id="currentTeamIndicator" aria-live="polite">현재 선택: 1팀</div>
+        <div class="team-color-row">
+          <label for="team1Name">1팀</label>
+          <input id="team1Name" type="text" value="1팀" maxlength="16" aria-label="1팀 팀명">
+          <input id="team1Color" type="color" value="#ef5b78">
+        </div>
+        <div class="team-color-row">
+          <label for="team2Name">2팀</label>
+          <input id="team2Name" type="text" value="2팀" maxlength="16" aria-label="2팀 팀명">
+          <input id="team2Color" type="color" value="#3b82f6">
+        </div>
+        <p class="territory-guide">팀을 고른 뒤 숫자를 누르면 점령합니다. 상대 팀이 같은 칸을 누르면 그 팀 색으로 바뀌며, 자기 칸을 다시 누르면 점령이 해제됩니다.</p>
+      </section>
+
+      <section class="section">
+        <div class="label">랜덤 숫자 채우기</div>
+        <div class="row">
+          <input class="field number-field" id="rangeStart" type="number" value="1" aria-label="시작 숫자">
+          <span>~</span>
+          <input class="field number-field" id="rangeEnd" type="number" value="30" aria-label="끝 숫자">
+          <button class="button primary" id="randomFill" type="button">랜덤 채우기</button>
+        </div>
+        <div class="status" id="status">예: 1 ~ 30 입력 후 랜덤 채우기</div>
+      </section>
+
+      <section class="section">
+        <div class="label">직접 수정</div>
+        <div class="edit-board" id="editBoard"></div>
+        <div class="row">
+          <button class="button" id="clearMarks" type="button">체크 지우기</button>
+          <button class="button warn" id="clearAll" type="button">전체 비우기</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div class="time-up-effect" id="timeUpEffect" role="status" aria-live="assertive">
+    <div class="time-up-card">
+      <span>00:00:00</span>
+      <strong>시간 종료</strong>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="./collaboration.js"></script>
+  <script>
+    const state = {
+      size: 4,
+      title: "빙고",
+      cells: Array.from({ length: 25 }, () => ""),
+      checked: Array.from({ length: 25 }, () => false),
+      mode: "classic",
+      owners: Array.from({ length: 25 }, () => 0),
+      teamColors: ["#ef5b78", "#3b82f6"],
+      teamNames: ["1팀", "2팀"]
+    };
+
+    const previewBoard = document.getElementById("previewBoard");
+    const editBoard = document.getElementById("editBoard");
+    const stage = document.getElementById("stage");
+    const rangeStart = document.getElementById("rangeStart");
+    const rangeEnd = document.getElementById("rangeEnd");
+    const status = document.getElementById("status");
+    const bingoMessage = document.getElementById("bingoMessage");
+    const sizeButtons = document.querySelectorAll("[data-size]");
+    const territoryButton = document.querySelector("[data-mode='territory']");
+    const territoryControls = document.getElementById("territoryControls");
+    const teamButtons = document.querySelectorAll("[data-team]");
+    const currentTeamIndicator = document.getElementById("currentTeamIndicator");
+    const teamNameInputs = [
+      document.getElementById("team1Name"),
+      document.getElementById("team2Name")
+    ];
+    const teamColorInputs = [
+      document.getElementById("team1Color"),
+      document.getElementById("team2Color")
+    ];
+    const timerHours = document.getElementById("timerHours");
+    const timerMinutes = document.getElementById("timerMinutes");
+    const timerSeconds = document.getElementById("timerSeconds");
+    const timerDisplay = document.getElementById("timerDisplay");
+    const timerStartButton = document.getElementById("timerStartButton");
+    const timerResetButton = document.getElementById("timerResetButton");
+    const targetHour = document.getElementById("targetHour");
+    const targetMinute = document.getElementById("targetMinute");
+    const targetStartButton = document.getElementById("targetStartButton");
+    const timerStatus = document.getElementById("timerStatus");
+    const timeUpEffect = document.getElementById("timeUpEffect");
+    const channel = "BroadcastChannel" in window ? new BroadcastChannel("broadcast-bingo") : null;
+    let syncing = false;
+    let realtimeRoom = null;
+    let activeTeam = 1;
+    let timerRemaining = 0;
+    let timerInterval = null;
+    let timerLastTick = 0;
+    let timerSyncing = false;
+
+    const saved = localStorage.getItem("broadcast-bingo-state");
+    if (saved) {
+      try {
+        Object.assign(state, JSON.parse(saved));
+      } catch {
+        localStorage.removeItem("broadcast-bingo-state");
+      }
+    }
+
+    state.mode = state.mode === "territory" ? "territory" : "classic";
+    state.owners = Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(state.owners?.[index])) ? Number(state.owners[index]) : 0);
+    state.teamColors = Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(state.teamColors?.[index] || "")
+      ? state.teamColors[index]
+      : ["#ef5b78", "#3b82f6"][index]);
+    state.teamNames = Array.from({ length: 2 }, (_, index) => String(state.teamNames?.[index] || `${index + 1}팀`).slice(0, 16));
+
+    function activeCount() {
+      return state.size * state.size;
+    }
+
+    function save() {
+      localStorage.setItem("broadcast-bingo-state", JSON.stringify(state));
+      if (!syncing && channel) {
+        channel.postMessage({ type: "state", state });
+      }
+    }
+
+    function shuffle(values) {
+      const copy = [...values];
+      for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function getBingoLineIndexes(team = 0) {
+      const lines = [];
+      const size = state.size;
+
+      for (let row = 0; row < size; row += 1) {
+        lines.push(Array.from({ length: size }, (_, col) => row * size + col));
+      }
+
+      for (let col = 0; col < size; col += 1) {
+        lines.push(Array.from({ length: size }, (_, row) => row * size + col));
+      }
+
+      lines.push(Array.from({ length: size }, (_, i) => i * size + i));
+      lines.push(Array.from({ length: size }, (_, i) => i * size + (size - 1 - i)));
+
+      return lines.filter(line => line.every(index => (
+        state.mode === "territory"
+          ? state.owners[index] === team
+          : state.checked[index]
+      )));
+    }
+
+    function readableInk(hex) {
+      const value = hex.replace("#", "");
+      const red = Number.parseInt(value.slice(0, 2), 16);
+      const green = Number.parseInt(value.slice(2, 4), 16);
+      const blue = Number.parseInt(value.slice(4, 6), 16);
+      return (red * 299 + green * 587 + blue * 114) / 1000 > 150 ? "#18202b" : "#ffffff";
+    }
+
+    function fitText(element) {
+      const text = element.textContent.trim();
+      const length = text.length;
+      element.style.fontSize = "";
+      element.style.lineHeight = "";
+
+      if (!length) return;
+
+      if (length > 14) {
+        element.style.fontSize = "clamp(12px, 1.7vw, 22px)";
+      } else if (length > 8) {
+        element.style.fontSize = "clamp(13px, 2vw, 26px)";
+      } else if (length > 4) {
+        element.style.fontSize = "clamp(15px, 1.9vw, 24px)";
+      }
+
+      let current = Number.parseFloat(getComputedStyle(element).fontSize);
+      while ((element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight) && current > 12) {
+        current -= 1;
+        element.style.fontSize = `${current}px`;
+        element.style.lineHeight = "1.12";
+      }
+    }
+
+    function fitInput(input) {
+      const length = input.value.trim().length;
+      input.style.fontSize = "";
+      if (length > 12) {
+        input.style.fontSize = "13px";
+      } else if (length > 6) {
+        input.style.fontSize = "15px";
+      } else if (length > 3) {
+        input.style.fontSize = "17px";
+      }
+    }
+
+    function render() {
+      const count = activeCount();
+      const isTerritory = state.mode === "territory";
+      const bingoLines = isTerritory ? [] : getBingoLineIndexes();
+      const team1Lines = isTerritory ? getBingoLineIndexes(1) : [];
+      const team2Lines = isTerritory ? getBingoLineIndexes(2) : [];
+      const highlighted = new Set(bingoLines.flat());
+      const team1Highlighted = new Set(team1Lines.flat());
+      const team2Highlighted = new Set(team2Lines.flat());
+      const grid = `repeat(${state.size}, minmax(0, 1fr))`;
+
+      document.documentElement.style.setProperty("--team-1", state.teamColors[0]);
+      document.documentElement.style.setProperty("--team-2", state.teamColors[1]);
+      previewBoard.style.gridTemplateColumns = grid;
+      editBoard.style.gridTemplateColumns = grid;
+      previewBoard.classList.toggle("has-bingo", bingoLines.length > 0 || team1Lines.length > 0 || team2Lines.length > 0);
+      stage.classList.toggle("has-bingo", bingoLines.length > 0 || team1Lines.length > 0 || team2Lines.length > 0);
+      previewBoard.innerHTML = "";
+      editBoard.innerHTML = "";
+
+      for (let i = 0; i < count; i += 1) {
+        const previewCell = document.createElement("button");
+        previewCell.type = "button";
+        previewCell.className = "preview-cell";
+        previewCell.textContent = state.cells[i] || "";
+        const owner = state.owners[i];
+        const ownerLabel = owner ? `, ${state.teamNames[owner - 1]} 점령` : "";
+        previewCell.setAttribute("aria-label", `${i + 1}번 칸${ownerLabel}`);
+        previewCell.addEventListener("click", () => handleCellClick(i));
+        if (isTerritory && owner) {
+          previewCell.classList.add("territory-cell");
+          previewCell.style.setProperty("--claim-color", state.teamColors[owner - 1]);
+          previewCell.style.setProperty("--claim-ink", readableInk(state.teamColors[owner - 1]));
+          if ((owner === 1 ? team1Highlighted : team2Highlighted).has(i)) previewCell.classList.add("team-bingo");
+        } else {
+          if (state.checked[i]) previewCell.classList.add("checked");
+          if (highlighted.has(i)) previewCell.classList.add("bingo-line");
+        }
+        previewBoard.appendChild(previewCell);
+        fitText(previewCell);
+
+        const editCell = document.createElement("div");
+        editCell.className = "edit-cell";
+        if (isTerritory && owner) {
+          editCell.classList.add("territory-cell");
+          editCell.style.setProperty("--claim-color", state.teamColors[owner - 1]);
+          editCell.style.setProperty("--claim-ink", readableInk(state.teamColors[owner - 1]));
+          if ((owner === 1 ? team1Highlighted : team2Highlighted).has(i)) editCell.classList.add("team-bingo");
+        } else {
+          if (state.checked[i]) editCell.classList.add("checked");
+          if (highlighted.has(i)) editCell.classList.add("bingo-line");
+        }
+
+        const input = document.createElement("input");
+        input.value = state.cells[i] || "";
+        input.maxLength = 34;
+        input.setAttribute("aria-label", `${i + 1}번 칸 내용`);
+        input.addEventListener("input", event => {
+          state.cells[i] = event.target.value;
+          realtimeRoom?.sendSet(`cells.${i}`, state.cells[i]);
+          fitInput(event.target);
+          save();
+          renderPreviewOnly();
+        });
+        input.addEventListener("dblclick", () => handleCellClick(i));
+        editCell.appendChild(input);
+        editBoard.appendChild(editCell);
+        fitInput(input);
+      }
+
+      sizeButtons.forEach(button => {
+        button.classList.toggle("active", Number(button.dataset.size) === state.size);
+      });
+
+      territoryButton.classList.toggle("mode-active", isTerritory);
+      territoryControls.hidden = !isTerritory;
+      teamButtons.forEach(button => {
+        const team = Number(button.dataset.team);
+        button.classList.toggle("active", team === activeTeam);
+        button.textContent = state.teamNames[team - 1];
+        button.style.setProperty("--team-button-color", state.teamColors[team - 1]);
+        button.style.color = readableInk(state.teamColors[team - 1]);
+        button.setAttribute("aria-pressed", String(team === activeTeam));
+      });
+      currentTeamIndicator.textContent = `현재 선택: ${state.teamNames[activeTeam - 1]}`;
+      currentTeamIndicator.style.setProperty("--indicator-color", state.teamColors[activeTeam - 1]);
+      currentTeamIndicator.style.setProperty("--indicator-ink", readableInk(state.teamColors[activeTeam - 1]));
+      teamNameInputs.forEach((input, index) => { input.value = state.teamNames[index]; });
+      teamColorInputs.forEach((input, index) => { input.value = state.teamColors[index]; });
+
+      bingoMessage.innerHTML = "";
+      if (isTerritory) {
+        [[1, team1Lines.length], [2, team2Lines.length]].forEach(([team, lines]) => {
+          const score = document.createElement("span");
+          score.className = "team-score";
+          score.style.color = state.teamColors[team - 1];
+          score.textContent = `${state.teamNames[team - 1]} ${lines} BINGO`;
+          bingoMessage.appendChild(score);
+        });
+      } else {
+        bingoMessage.textContent = bingoLines.length ? `${bingoLines.length} BINGO!` : "";
+      }
+      save();
+    }
+
+    if (channel) {
+      channel.addEventListener("message", event => {
+        if (event.data?.type === "state") {
+          syncing = true;
+          Object.assign(state, event.data.state);
+          render();
+          syncing = false;
+          return;
+        }
+        if (event.data?.type === "timer") {
+          applyRemoteTimer(event.data.timer);
+        }
+      });
+    }
+
+    function renderPreviewOnly() {
+      const cells = previewBoard.querySelectorAll(".preview-cell");
+      cells.forEach((cell, index) => {
+        cell.textContent = state.cells[index] || "";
+        fitText(cell);
+      });
+      save();
+    }
+
+    function toggleCheck(index) {
+      state.checked[index] = !state.checked[index];
+      realtimeRoom?.sendSet(`checked.${index}`, state.checked[index], 0);
+      render();
+    }
+
+    function claimTerritory(index) {
+      state.owners[index] = state.owners[index] === activeTeam ? 0 : activeTeam;
+      realtimeRoom?.sendSet(`owners.${index}`, state.owners[index], 0);
+      render();
+    }
+
+    function handleCellClick(index) {
+      if (state.mode === "territory") {
+        claimTerritory(index);
+      } else {
+        toggleCheck(index);
+      }
+    }
+
+    function setSize(size) {
+      state.size = size;
+      state.checked = state.checked.map((checked, index) => index < activeCount() && checked);
+      state.owners = state.owners.map((owner, index) => index < activeCount() ? owner : 0);
+      realtimeRoom?.sendSet("size", state.size, 0);
+      state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
+      state.owners.forEach((value, index) => realtimeRoom?.sendSet(`owners.${index}`, value, 0));
+      render();
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      realtimeRoom?.sendSet("mode", state.mode);
+      status.textContent = mode === "territory"
+        ? "현재 팀을 선택한 뒤 숫자를 눌러 땅을 점령하세요."
+        : "일반 빙고 모드로 돌아왔습니다.";
+      render();
+    }
+
+    function randomFill() {
+      const start = Number(rangeStart.value);
+      const end = Number(rangeEnd.value);
+      const count = activeCount();
+      const low = Math.min(start, end);
+      const high = Math.max(start, end);
+      const poolSize = high - low + 1;
+
+      if (!Number.isInteger(start) || !Number.isInteger(end)) {
+        status.textContent = "시작과 끝 숫자를 정확히 입력해 주세요.";
+        return;
+      }
+
+      if (poolSize < count) {
+        status.textContent = `${state.size}x${state.size}에는 숫자 ${count}개가 필요합니다. 범위를 더 넓혀 주세요.`;
+        return;
+      }
+
+      const pool = Array.from({ length: poolSize }, (_, index) => String(low + index));
+      shuffle(pool).slice(0, count).forEach((value, index) => {
+        state.cells[index] = value;
+        state.checked[index] = false;
+        state.owners[index] = 0;
+        realtimeRoom?.sendSet(`cells.${index}`, value, 0);
+        realtimeRoom?.sendSet(`checked.${index}`, false, 0);
+        realtimeRoom?.sendSet(`owners.${index}`, 0, 0);
+      });
+
+      status.textContent = `${low} ~ ${high} 중 ${count}개를 랜덤으로 넣었습니다.`;
+      render();
+    }
+
+    function openBroadcastWindow() {
+      const popup = window.open("", "bingoBroadcast", "width=1100,height=900");
+      if (!popup) {
+        status.textContent = "팝업이 차단되었습니다. 브라우저의 팝업 허용을 확인해 주세요.";
+        return;
+      }
+
+      const html = `<!doctype html>${document.documentElement.outerHTML}`;
+      popup.document.open();
+      popup.document.write(html);
+      popup.document.close();
+      popup.document.body.classList.add("broadcast-only");
+
+      const style = popup.document.createElement("style");
+      style.textContent = `
+        .site-nav { display: none; }
+        .collaboration-bar { display: none; }
+        .app { display: block; min-height: 100vh; }
+        .editor { display: none; }
+        .broadcast { min-height: 100vh; }
+        .stage { width: min(92vh, 92vw); }
+      `;
+      popup.document.head.appendChild(style);
+      window.setTimeout(broadcastTimer, 250);
+    }
+
+    function clampNumber(value, min, max) {
+      const number = Number.parseInt(value, 10);
+      if (Number.isNaN(number)) return min;
+      return Math.min(max, Math.max(min, number));
+    }
+
+    function configuredSeconds() {
+      const hours = clampNumber(timerHours.value, 0, 23);
+      const minutes = clampNumber(timerMinutes.value, 0, 59);
+      const seconds = clampNumber(timerSeconds.value, 0, 59);
+      timerHours.value = hours;
+      timerMinutes.value = minutes;
+      timerSeconds.value = seconds;
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    function formatTime(totalSeconds) {
+      const safeSeconds = Math.max(0, Math.ceil(totalSeconds));
+      const hours = Math.floor(safeSeconds / 3600);
+      const minutes = Math.floor((safeSeconds % 3600) / 60);
+      const seconds = safeSeconds % 60;
+      return [hours, minutes, seconds].map(part => String(part).padStart(2, "0")).join(":");
+    }
+
+    function renderTimer() {
+      timerDisplay.textContent = formatTime(timerRemaining || configuredSeconds());
+    }
+
+    function stopTimer() {
+      window.clearInterval(timerInterval);
+      timerInterval = null;
+      timerStartButton.textContent = "시작";
+    }
+
+    function broadcastTimer() {
+      if (timerSyncing || !channel) return;
+      channel.postMessage({
+        type: "timer",
+        timer: {
+          remaining: timerRemaining,
+          running: Boolean(timerInterval),
+          endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
+        }
+      });
+    }
+
+    function showTimeUpEffect() {
+      timeUpEffect.classList.add("show");
+      window.setTimeout(() => timeUpEffect.classList.remove("show"), 2600);
+    }
+
+    function finishTimer() {
+      stopTimer();
+      timerRemaining = 0;
+      timerDisplay.textContent = "00:00:00";
+      timerStatus.textContent = "시간이 종료됐습니다.";
+      showTimeUpEffect();
+      broadcastTimer();
+    }
+
+    function tickTimer() {
+      const now = Date.now();
+      timerRemaining = Math.max(0, timerRemaining - (now - timerLastTick) / 1000);
+      timerLastTick = now;
+      timerDisplay.textContent = formatTime(timerRemaining);
+      if (timerRemaining <= 0) finishTimer();
+    }
+
+    function startTimerInterval() {
+      timerLastTick = Date.now();
+      timerStartButton.textContent = "일시정지";
+      timerInterval = window.setInterval(tickTimer, 200);
+      timerDisplay.textContent = formatTime(timerRemaining);
+    }
+
+    function toggleTimer() {
+      if (timerInterval) {
+        stopTimer();
+        timerStatus.textContent = "일시정지했습니다.";
+        broadcastTimer();
+        return;
+      }
+      if (timerRemaining <= 0) timerRemaining = configuredSeconds();
+      if (timerRemaining <= 0) {
+        timerStatus.textContent = "시간을 먼저 설정하세요.";
+        return;
+      }
+      startTimerInterval();
+      timerStatus.textContent = "스톱워치가 진행 중입니다.";
+      broadcastTimer();
+    }
+
+    function resetTimer() {
+      stopTimer();
+      timerRemaining = 0;
+      timerHours.value = 0;
+      timerMinutes.value = 0;
+      timerSeconds.value = 0;
+      targetHour.value = 0;
+      targetMinute.value = 0;
+      timerStatus.textContent = "스톱워치를 초기화했습니다.";
+      renderTimer();
+      broadcastTimer();
+    }
+
+    function kstClockParts(date = new Date()) {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      }).formatToParts(date);
+      return Object.fromEntries(parts.map(part => [part.type, Number(part.value)]));
+    }
+
+    function secondsUntilKstTarget(hour, minute) {
+      const now = kstClockParts();
+      const nowSeconds = now.hour * 3600 + now.minute * 60 + now.second;
+      const targetSeconds = hour * 3600 + minute * 60;
+      const daySeconds = 24 * 3600;
+      return (targetSeconds - nowSeconds + daySeconds) % daySeconds || daySeconds;
+    }
+
+    function startTargetTimeTimer() {
+      const hour = clampNumber(targetHour.value, 0, 23);
+      const minute = clampNumber(targetMinute.value, 0, 59);
+      targetHour.value = hour;
+      targetMinute.value = minute;
+      stopTimer();
+      timerRemaining = secondsUntilKstTarget(hour, minute);
+      timerHours.value = 0;
+      timerMinutes.value = 0;
+      timerSeconds.value = 0;
+      startTimerInterval();
+      timerStatus.textContent = `한국 시간 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}에 종료됩니다.`;
+      broadcastTimer();
+    }
+
+    function applyRemoteTimer(timer) {
+      if (!timer) return;
+      timerSyncing = true;
+      stopTimer();
+      timerRemaining = timer.running && timer.endAt
+        ? Math.max(0, (Number(timer.endAt) - Date.now()) / 1000)
+        : Math.max(0, Number(timer.remaining) || 0);
+      if (timer.running && timerRemaining > 0) startTimerInterval();
+      renderTimer();
+      timerSyncing = false;
+    }
+
+    [timerHours, timerMinutes, timerSeconds].forEach(input => {
+      input.addEventListener("input", () => {
+        if (!timerInterval) {
+          timerRemaining = configuredSeconds();
+          renderTimer();
+          broadcastTimer();
+        }
+      });
+    });
+    timerStartButton.addEventListener("click", toggleTimer);
+    timerResetButton.addEventListener("click", resetTimer);
+    targetStartButton.addEventListener("click", startTargetTimeTimer);
+
+    sizeButtons.forEach(button => {
+      button.addEventListener("click", () => setSize(Number(button.dataset.size)));
+    });
+    territoryButton.addEventListener("click", () => setMode(state.mode === "territory" ? "classic" : "territory"));
+    teamButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        activeTeam = Number(button.dataset.team);
+        status.textContent = `${state.teamNames[activeTeam - 1]}을(를) 선택했습니다. 숫자를 눌러 점령하세요.`;
+        render();
+      });
+    });
+    teamNameInputs.forEach((input, index) => {
+      input.addEventListener("input", event => {
+        state.teamNames[index] = event.target.value.slice(0, 16);
+        realtimeRoom?.sendSet(`teamNames.${index}`, state.teamNames[index]);
+        render();
+      });
+    });
+    teamColorInputs.forEach((input, index) => {
+      input.addEventListener("input", event => {
+        state.teamColors[index] = event.target.value;
+        realtimeRoom?.sendSet(`teamColors.${index}`, state.teamColors[index]);
+        render();
+      });
+    });
+
+    document.getElementById("randomFill").addEventListener("click", randomFill);
+    document.getElementById("clearMarks").addEventListener("click", () => {
+      if (state.mode === "territory") {
+        state.owners = state.owners.map(() => 0);
+        state.owners.forEach((value, index) => realtimeRoom?.sendSet(`owners.${index}`, value, 0));
+      } else {
+        state.checked = state.checked.map(() => false);
+        state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
+      }
+      render();
+    });
+    document.getElementById("clearAll").addEventListener("click", () => {
+      state.cells = state.cells.map(() => "");
+      state.checked = state.checked.map(() => false);
+      state.owners = state.owners.map(() => 0);
+      state.cells.forEach((value, index) => realtimeRoom?.sendSet(`cells.${index}`, value, 0));
+      state.checked.forEach((value, index) => realtimeRoom?.sendSet(`checked.${index}`, value, 0));
+      state.owners.forEach((value, index) => realtimeRoom?.sendSet(`owners.${index}`, value, 0));
+      status.textContent = "빙고판을 비웠습니다.";
+      render();
+    });
+    document.getElementById("openBroadcast").addEventListener("click", openBroadcastWindow);
+
+    realtimeRoom = new RealtimeRoom({
+      feature: "bingo",
+      getState: () => state,
+      applyState: nextState => {
+        syncing = true;
+        Object.assign(state, nextState);
+        RealtimeRoom.preserveFocus(render);
+        syncing = false;
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#17213a">
+    <title>실시간투표확인 · ELO Kitten</title>
+    <link rel="stylesheet" href="./common-theme.css">
+    <link rel="stylesheet" href="./live-vote.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab" href="./scoreboard.html">매치 점수판</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="site-tab live-vote-tab active" href="./live-vote.html" aria-current="page">실시간투표확인</a>
+      <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+    </nav>
+
+    <main class="vote-shell">
+      <section class="vote-hero">
+        <div>
+          <p class="vote-eyebrow">SOOP POST #202619457 · LIVE</p>
+          <h1>실시간 투표 현황</h1>
+          <p class="vote-intro">댓글의 좋아요 수를 약 5초마다 자동으로 집계합니다.</p>
+        </div>
+        <div class="vote-leader-card" aria-live="polite">
+          <div class="vote-leader-top">
+            <span class="vote-leader-label"><span class="vote-pulse"></span>현재 1위</span>
+            <strong id="refreshCountdown">5초 후 갱신</strong>
+          </div>
+          <div class="vote-leader-avatar" id="leaderAvatar">
+            <span class="vote-crown" aria-hidden="true">♛</span>
+            <span class="vote-avatar-fallback">1</span>
+          </div>
+          <strong class="vote-leader-name" id="leaderNickname">집계 중</strong>
+          <p class="vote-leader-comment" id="leaderComment">최신 댓글을 불러오고 있습니다.</p>
+          <div class="vote-leader-likes" id="leaderLikes">👍 —</div>
+          <small class="vote-leader-gap" id="leaderGap">2위와 표 차이 계산 중</small>
+        </div>
+      </section>
+
+      <section class="vote-summary" aria-label="집계 요약">
+        <article>
+          <span>집계 댓글</span>
+          <strong id="commentTotal">—</strong>
+        </article>
+        <article>
+          <span>누적 좋아요</span>
+          <strong id="likeTotal">—</strong>
+        </article>
+        <article>
+          <span>마지막 갱신</span>
+          <strong id="updatedAt">—</strong>
+        </article>
+      </section>
+
+      <section class="vote-board">
+        <div class="vote-board-head">
+          <div>
+            <p class="vote-eyebrow">REAL-TIME LEADERBOARD</p>
+            <h2>댓글 순위표</h2>
+          </div>
+          <div class="vote-tools">
+            <label class="vote-search">
+              <span aria-hidden="true">⌕</span>
+              <input id="voteSearch" type="search" placeholder="닉네임 또는 댓글 검색" aria-label="닉네임 또는 댓글 검색">
+            </label>
+            <button id="refreshVote" type="button">지금 갱신</button>
+          </div>
+        </div>
+
+        <p id="voteStatus" class="vote-status" role="status">실시간 데이터를 불러오고 있습니다.</p>
+        <div id="voteRows" class="vote-rows" aria-live="polite"></div>
+      </section>
+
+      <footer class="vote-footer">
+        <span>SOOP 공개 댓글 데이터 자동 집계</span>
+        <a href="https://www.sooplive.com/station/ititit/post/202619457" target="_blank" rel="noreferrer">원문에서 보기 ↗</a>
+      </footer>
+    </main>
+
+    <script src="./live-vote.js"></script>
+  </body>
+</html>

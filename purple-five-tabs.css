@@ -1,0 +1,487 @@
+:root {
+  --theme-bg: #f7f7fb;
+  --theme-surface: #ffffff;
+  --theme-surface-soft: #f8f7ff;
+  --theme-ink: #18172b;
+  --theme-muted: #777489;
+  --theme-line: #e4e1ef;
+  --theme-accent: #8f88ff;
+  --theme-accent-deep: #5752d4;
+  --theme-positive: #23815d;
+  --theme-negative: #e14d5a;
+  --theme-shadow: 0 12px 34px rgba(37, 31, 85, 0.08);
+  --matchup-lime: #7771e7;
+  --matchup-ink: #242080;
+  --matchup-muted: #777489;
+  --bg: var(--theme-bg);
+  --surface: var(--theme-surface);
+  --soft: var(--theme-surface-soft);
+  --ink: var(--theme-ink);
+  --muted: var(--theme-muted);
+  --line: var(--theme-line);
+  --blue: var(--theme-accent-deep);
+}
+
+html,
+body {
+  background: #f7f7fb !important;
+}
+
+body::before {
+  height: 3px !important;
+  background: linear-gradient(90deg, #5752d4, #8f88ff, #5752d4) !important;
+}
+
+.site-nav,
+body.spawn-diary-page .site-nav {
+  --menu-tab-width: 145px;
+  min-height: 72px !important;
+  padding: 0 max(28px, calc((100vw - 1760px) / 2)) !important;
+  justify-content: safe center !important;
+  gap: 4px !important;
+  border-bottom-color: #2b2a3a !important;
+  background: rgba(21, 21, 33, 0.98) !important;
+  box-shadow: 0 8px 28px rgba(16, 14, 35, 0.13) !important;
+}
+
+.site-tab,
+body.spawn-diary-page .site-tab,
+body.spawn-diary-page .site-tab.live-vote-tab,
+body.spawn-diary-page .site-tab.cup-tab {
+  flex: 0 0 var(--menu-tab-width) !important;
+  width: var(--menu-tab-width) !important;
+  min-width: var(--menu-tab-width) !important;
+  min-height: 72px !important;
+  padding: 0 18px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: #c7c5d6 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 17px !important;
+  font-weight: 800 !important;
+}
+
+.site-tab:hover,
+.site-tab:focus-visible,
+body.spawn-diary-page .site-tab:hover,
+body.spawn-diary-page .site-tab:focus-visible {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.site-tab.active,
+.site-tab.search.active,
+.site-tab.matchup.active,
+.site-tab.university.active,
+body.spawn-diary-page .site-tab.active {
+  position: relative;
+  color: #fff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.site-tab.active::after,
+.site-tab.search.active::after,
+.site-tab.matchup.active::after,
+.site-tab.university.active::after,
+body.spawn-diary-page .site-tab.active::after {
+  position: absolute;
+  right: 18px;
+  bottom: 0;
+  left: 18px;
+  height: 4px;
+  border-radius: 4px 4px 0 0;
+  background: #928bff;
+  content: "";
+}
+
+.site-tab.live-vote-tab::before,
+body.spawn-diary-page .site-tab.live-vote-tab::before {
+  display: none !important;
+}
+
+.site-brand {
+  min-width: 160px;
+  margin-right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff !important;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-brand span {
+  width: 31px;
+  height: 31px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: #17136d !important;
+  background: #bdb9ff !important;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.site-brand strong {
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.site-user {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #fff !important;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.site-user em {
+  padding: 4px 7px;
+  border: 1px solid #504d66;
+  border-radius: 999px;
+  border-color: #504d66 !important;
+  color: #aaa8b9 !important;
+  background: transparent !important;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.tier-shell,
+.shell,
+.matchup-shell,
+.diary-shell {
+  width: min(1760px, calc(100% - 48px)) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+  background: #f7f7fb !important;
+}
+
+.tier-shell,
+.shell {
+  padding-top: 0 !important;
+}
+
+.tier-hero,
+.shell > .hero,
+.matchup-hero,
+.diary-hero-band {
+  position: relative;
+  overflow: hidden;
+  color: #fff !important;
+  border: 0 !important;
+  background:
+    radial-gradient(circle at 87% -40%, transparent 0 105px, rgba(157, 150, 255, 0.09) 106px 145px, transparent 146px),
+    radial-gradient(circle at 87% -40%, transparent 0 165px, rgba(157, 150, 255, 0.07) 166px 210px, transparent 211px),
+    linear-gradient(115deg, #1a1929 2%, #20203a 48%, #242080 100%) !important;
+  box-shadow: none !important;
+}
+
+.tier-hero,
+.shell > .hero,
+.matchup-hero {
+  width: 100vw;
+  min-height: 228px;
+  margin-left: calc(50% - 50vw);
+  padding: 48px max(48px, calc((100vw - 1664px) / 2)) 58px !important;
+  align-items: center !important;
+  border-radius: 0 !important;
+}
+
+.diary-hero-band {
+  min-height: 228px;
+}
+
+.diary-hero-band .diary-hero {
+  min-height: 228px;
+}
+
+.tier-hero h1,
+.shell > .hero h1,
+.matchup-hero h1,
+.diary-hero h1 {
+  color: #fff !important;
+  font-size: clamp(36px, 4vw, 50px) !important;
+  letter-spacing: -1.5px !important;
+}
+
+.tier-hero p,
+.shell > .hero p,
+.matchup-hero p,
+.diary-hero p {
+  color: #bbb8d0 !important;
+}
+
+.tier-hero .eyebrow,
+.shell > .hero .eyebrow,
+.matchup-eyebrow,
+.diary-hero .eyebrow {
+  color: #aaa5ff !important;
+  font-weight: 900 !important;
+  letter-spacing: 1.7px !important;
+}
+
+.matchup-hero h1 em {
+  color: #aaa5ff !important;
+}
+
+.search-panel,
+.panel,
+.period-panel,
+.matchup-search,
+.matchup-results .summary-grid article,
+.matchup-table-card,
+.university-summary article,
+.tier-group,
+.university-filter-panel,
+.summary-grid article,
+.filter-panel,
+.diary-panel {
+  border-color: #e3e1ef !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: 0 10px 30px rgba(37, 31, 85, 0.07) !important;
+}
+
+.search-panel {
+  margin-top: 18px;
+  padding: 22px !important;
+}
+
+button:not(.site-tab):not(.live-only-toggle),
+.source-link,
+.matchup-search-button,
+.record-open-button {
+  border-color: #5752d4 !important;
+  border-radius: 9px !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #5752d4, #7771e7) !important;
+  box-shadow: 0 7px 18px rgba(87, 82, 212, 0.2) !important;
+}
+
+button.ghost,
+.range-switch button,
+.mode-tabs button,
+.quick button,
+.details,
+.pagination button {
+  border-color: #dfdced !important;
+  color: #56536b !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.mode-tabs button.selected,
+.range-switch button.selected,
+.division-filter-button.is-active,
+.university-filter-button.is-active {
+  color: #5752d4 !important;
+  background: #eeecff !important;
+}
+
+.mode-tabs button.selected::after {
+  background: #7771e7 !important;
+}
+
+input:focus,
+select:focus,
+.main-picker input:focus,
+.opponent-picker input:focus {
+  border-color: #8d86ef !important;
+  box-shadow: 0 0 0 3px #eeecff !important;
+}
+
+.summary-bar i,
+.mini i {
+  background: linear-gradient(90deg, #5752d4, #8f88ff) !important;
+}
+
+.summary-grid small em,
+.results-head h2 strong,
+.score b,
+.rate-positive,
+.recent small {
+  color: #5752d4 !important;
+}
+
+.tier-content-layout,
+.matchup-results,
+.diary-content {
+  padding-top: 32px !important;
+}
+
+.tier-card,
+.player-card,
+.matchup-tr,
+.period-stat,
+.record-row {
+  border-color: #eceaf3 !important;
+}
+
+.tier-card:hover,
+.player-card:hover,
+.record-row:hover {
+  border-color: #b9b4ef !important;
+  background: #fbfaff !important;
+}
+
+.table-tools,
+.table-heading,
+thead {
+  border-color: #e8e6f1 !important;
+  background: #f8f7fc !important;
+}
+
+.record-dialog,
+.tier-admin-dialog {
+  border-color: #dcd8ee !important;
+  border-radius: 16px !important;
+}
+
+body.spawn-diary-page button.date-edit-button,
+body.spawn-diary-page button.date-edit-button:hover,
+body.spawn-diary-page button.date-edit-button:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--theme-ink) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+body.spawn-diary-page button.date-edit-button:hover,
+body.spawn-diary-page button.date-edit-button:focus-visible {
+  background: #f5f4fa !important;
+}
+
+body .matchup-shell .matchup-search .quick button {
+  padding: 7px 11px !important;
+  border: 1px solid #e1e4df !important;
+  border-radius: 20px !important;
+  color: #27302a !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+body .matchup-shell .matchup-search .quick button.on {
+  border-color: #c5dd5d !important;
+  color: #27302a !important;
+  background: #eef5c8 !important;
+}
+
+body.spawn-diary-page .diary-shell {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+body.spawn-diary-page col.feedback-column {
+  width: calc((100% - 980px) / 2 - 124px) !important;
+}
+
+body.spawn-diary-page col.reflection-column {
+  width: calc((100% - 980px) / 2) !important;
+}
+
+.tier-filter-toolbar {
+  margin: -8px 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tier-filter-toolbar .division-filters {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.tier-filter-toolbar .tier-live-controls {
+  margin-left: auto;
+}
+
+body .tier-shell .division-filters .division-filter-button {
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  color: #666379 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body .tier-shell .division-filters .division-filter-button:hover,
+body .tier-shell .division-filters .division-filter-button:focus-visible {
+  border-color: #d8d4eb !important;
+  color: #3f3c54 !important;
+  background: #f7f6fb !important;
+  outline: 0 !important;
+}
+
+body .tier-shell .division-filters .division-filter-button.is-active {
+  border-color: #5752d4 !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #5752d4, #7771e7) !important;
+  box-shadow: 0 5px 12px rgba(87, 82, 212, 0.2) !important;
+}
+
+body .matchup-shell .matchup-search .mode-tabs button[data-mode] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: #8a9299 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+body .matchup-shell .matchup-search .mode-tabs button[data-mode].selected {
+  color: #5752d4 !important;
+  background: #eeecff !important;
+}
+
+body .matchup-shell .matchup-search .mode-tabs button[data-mode].selected::after {
+  background: #5752d4 !important;
+}
+
+body .matchup-shell .mode-tabs .men-mode-link,
+body .matchup-shell .mode-tabs .men-mode-tab {
+  color: #8a9299 !important;
+  background: #fff !important;
+}
+
+body .matchup-shell .mode-tabs .men-mode-tab.active {
+  color: #5752d4 !important;
+  background: #eeecff !important;
+}
+
+@media (max-width: 1100px) {
+  .site-nav,
+  body.spawn-diary-page .site-nav {
+    justify-content: safe start !important;
+  }
+
+  .site-tab,
+  body.spawn-diary-page .site-tab {
+    flex-basis: 126px !important;
+    width: 126px !important;
+  }
+
+  .tier-shell,
+  .shell,
+  .matchup-shell,
+  .diary-shell {
+    width: min(100% - 24px, 1760px) !important;
+  }
+
+  .tier-filter-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tier-filter-toolbar .tier-live-controls {
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}

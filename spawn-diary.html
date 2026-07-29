@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#17213a">
+    <title>스폰일지 · ELO Kitten</title>
+    <link rel="stylesheet" href="./common-theme.css">
+    <link rel="stylesheet" href="./spawn-diary.css?v=20260729-animated-castle">
+    <link rel="stylesheet" href="./purple-five-tabs.css?v=20260729-nav-unified2">
+  </head>
+  <body class="spawn-diary-page">
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-brand" href="./tiers.html" aria-label="ELO KITTEN 홈">
+        <span>EK</span><strong>ELO KITTEN</strong>
+      </a>
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab active" href="./spawn-diary.html" aria-current="page">스폰일지</a>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab" href="./scoreboard.html">매치 점수판</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
+      <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+      <span class="site-user"><strong>이아깽</strong><em>관리자</em></span>
+    </nav>
+
+    <main class="diary-shell">
+      <section class="diary-hero-band">
+        <header class="diary-hero">
+          <div class="diary-heading-row">
+            <img
+              class="diary-hero-logo"
+              src="./spawn-diary-castle.gif"
+              alt="움직이는 뉴 캐슬 고양이 문장">
+            <div class="diary-heading-copy">
+              <p class="eyebrow">MATCH REVIEW JOURNAL</p>
+              <h1>이아깽의 스폰일지</h1>
+              <p class="diary-intro">Google 시트에서 옮긴 실제 경기 기록을 Neon 데이터베이스에서 불러왔습니다.</p>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <div class="hero-badges">
+              <span>Neon 실제 데이터</span>
+              <span>관리자 작성 가능</span>
+            </div>
+            <button id="recordOpenButton" class="record-open-button" type="button">새 기록 작성</button>
+          </div>
+        </header>
+      </section>
+
+      <div class="diary-content">
+        <section class="summary-grid" aria-label="스폰일지 요약">
+          <article><span>전체 기록</span><strong id="totalCount">—</strong></article>
+          <article><span>승리</span><strong id="winCount">—</strong></article>
+          <article><span>패배</span><strong id="lossCount">—</strong></article>
+          <article><span>승률</span><strong id="winRate">—</strong></article>
+        </section>
+
+        <section class="filter-panel" aria-label="기록 검색 및 필터">
+        <label class="search-field" for="searchInput">
+          <span>전체 검색</span>
+          <input id="searchInput" type="search" placeholder="상대, 맵, 빌드, 피드백 검색">
+        </label>
+        <label for="resultFilter">
+          <span>결과</span>
+          <select id="resultFilter">
+            <option value="">전체 결과</option>
+            <option value="승">승리</option>
+            <option value="패">패배</option>
+            <option value="미정">미정</option>
+          </select>
+        </label>
+        <label for="mapFilter">
+          <span>맵</span>
+          <select id="mapFilter"><option value="">전체 맵</option></select>
+        </label>
+        <button id="resetButton" type="button">필터 초기화</button>
+        </section>
+
+        <section class="diary-panel">
+        <div class="table-heading">
+          <div>
+            <strong>경기 기록</strong>
+            <span id="filterSummary">기록을 불러오는 중입니다.</span>
+          </div>
+          <span id="pageSummary"></span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <colgroup>
+              <col class="date-column">
+              <col class="format-column">
+              <col class="opponent-column">
+              <col class="tier-column">
+              <col class="race-column">
+              <col class="map-column">
+              <col class="result-column">
+              <col class="opponent-build-column">
+              <col class="my-build-column">
+              <col class="feedback-column">
+              <col class="reflection-column">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>경기</th>
+                <th>상대</th>
+                <th>티어</th>
+                <th>종족</th>
+                <th>맵</th>
+                <th>전적</th>
+                <th>상대빌드</th>
+                <th>내 빌드</th>
+                <th>피드백</th>
+                <th>느낀점</th>
+              </tr>
+            </thead>
+            <tbody id="diaryRows">
+              <tr><td class="loading-cell" colspan="11">스폰일지를 불러오고 있습니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" aria-label="페이지 이동">
+          <button id="previousButton" type="button">이전</button>
+          <strong id="currentPage">1 / 1</strong>
+          <button id="nextButton" type="button">다음</button>
+        </div>
+        </section>
+        <p id="statusMessage" class="status-message" role="status"></p>
+      </div>
+
+      <dialog id="recordDialog" class="record-dialog" aria-labelledby="recordDialogTitle">
+        <div class="record-dialog-header">
+          <div>
+            <strong id="recordDialogTitle">새 경기 기록</strong>
+            <span id="recordDialogDescription">저장하면 스폰일지 맨 위에 바로 추가됩니다.</span>
+          </div>
+          <button id="recordCloseButton" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <form id="recordLoginForm" class="record-login">
+          <label for="recordAdminPassword">스폰일지 관리자 비밀번호</label>
+          <input id="recordAdminPassword" type="password" autocomplete="current-password" maxlength="200" required>
+          <button type="submit">로그인</button>
+        </form>
+        <p id="recordDialogStatus" class="record-dialog-status" role="status"></p>
+
+        <form id="recordEntryForm" class="record-entry-form" hidden>
+          <div class="record-form-grid">
+            <label>
+              <span>날짜</span>
+              <input id="recordDateInput" name="matchDate" type="date" required>
+            </label>
+            <label>
+              <span>경기방식</span>
+              <select name="gameFormat">
+                <option value="스폰">스폰</option>
+                <option value="CK">CK</option>
+                <option value="대학대전">대학대전</option>
+              </select>
+            </label>
+            <label class="record-opponent-field">
+              <span>상대</span>
+              <input
+                id="recordOpponentInput"
+                name="opponent"
+                type="text"
+                maxlength="80"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="recordOpponentSuggestions"
+                aria-expanded="false"
+                placeholder="이름을 입력하면 비슷한 선수가 표시됩니다."
+                required>
+              <div id="recordOpponentSuggestions" class="record-opponent-suggestions" role="listbox" hidden></div>
+            </label>
+            <label>
+              <span>티어 <small>저장 후 고정</small></span>
+              <input id="recordTierInput" name="tier" type="text" maxlength="40" placeholder="선수 선택 시 자동 입력">
+            </label>
+            <label>
+              <span>종족</span>
+              <select id="recordRaceInput" name="opponentRace">
+                <option value="">선택 안 함</option>
+                <option value="테란">테란</option>
+                <option value="프로토스">프로토스</option>
+                <option value="저그">저그</option>
+              </select>
+            </label>
+            <label>
+              <span>맵</span>
+              <input name="mapName" type="text" maxlength="80" list="recordMapOptions">
+            </label>
+            <label>
+              <span>전적</span>
+              <select name="result">
+                <option value="미정">미정</option>
+                <option value="승">승</option>
+                <option value="패">패</option>
+              </select>
+            </label>
+            <label>
+              <span>상대빌드</span>
+              <input name="opponentBuild" type="text" maxlength="300">
+            </label>
+            <label>
+              <span>내 빌드</span>
+              <input name="myBuild" type="text" maxlength="300">
+            </label>
+            <label class="record-wide-field">
+              <span>피드백</span>
+              <textarea name="feedback" rows="5" maxlength="4000" placeholder="경기에서 고칠 점과 다음에 적용할 내용을 적어 주세요."></textarea>
+            </label>
+            <label class="record-wide-field">
+              <span>느낀점</span>
+              <textarea name="reflection" rows="5" maxlength="4000" placeholder="경기를 하면서 느낀 점을 적어 주세요."></textarea>
+            </label>
+          </div>
+          <p class="tier-snapshot-note">티어는 저장하는 순간의 값으로 기록되며, 이후 티어표가 바뀌어도 과거 기록은 바뀌지 않습니다.</p>
+          <datalist id="recordMapOptions"></datalist>
+          <div class="record-form-actions">
+            <p id="recordFormStatus" role="status"></p>
+            <div>
+              <button id="recordDeleteButton" class="record-delete-button" type="button" hidden>기록 삭제</button>
+              <button id="recordSaveButton" type="submit">기록 저장</button>
+            </div>
+          </div>
+        </form>
+      </dialog>
+    </main>
+    <script src="./spawn-diary.js?v=20260729-tab-state"></script>
+  </body>
+</html>

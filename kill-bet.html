@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="4명부터 16명까지 사용할 수 있는 킬 내기 점수판">
+  <title>킬 내기</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #fff1a8;
+      --page-deep: #ffd35a;
+      --panel: #fff9dd;
+      --panel-edge: #d79621;
+      --ink: #4b2b00;
+      --name: #285066;
+      --score: #c05c00;
+      --fail: #8f1f1f;
+      --button: #ffe08a;
+      --button-edge: #c68218;
+      --button-hover: #ffc64b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px 14px 40px;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.7), transparent 34%),
+        linear-gradient(135deg, var(--page), var(--page-deep));
+      font-family: Arial, "Malgun Gothic", sans-serif;
+      color: var(--ink);
+    }
+
+    .page-shell {
+      width: 100%;
+      display: grid;
+      gap: 18px;
+    }
+
+    .top-nav {
+      width: calc(100% + 28px);
+      margin: -24px -14px 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      padding: 13px 14px 10px;
+      background: rgba(255, 255, 255, 0.58);
+      border-bottom: 1px solid rgba(75, 43, 0, 0.12);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+    }
+
+    .nav-button {
+      display: inline-grid;
+      place-items: center;
+      height: 38px;
+      border: 1px solid rgba(168, 94, 26, 0.38);
+      border-radius: 999px;
+      padding: 0 20px;
+      background: #fffdf2;
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 900;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(112, 72, 0, 0.08);
+    }
+
+    .nav-button:hover {
+      border-color: var(--button-edge);
+      background: #fff7d4;
+    }
+
+    .nav-button.active {
+      border-color: #142017;
+      background: #142017;
+      color: #fffef5;
+      pointer-events: none;
+    }
+
+    .nav-button.outline {
+      border-color: rgba(166, 55, 94, 0.45);
+      color: #8c3155;
+    }
+
+    .kill-area {
+      width: 100%;
+      justify-items: center;
+      display: grid;
+      gap: 12px;
+    }
+
+    .page-title {
+      margin: 0;
+      color: var(--score);
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .kill-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .chicken-kill-setting {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 54px;
+      padding: 8px 14px;
+      border: 1px solid var(--line, #d9dbd3);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--ink);
+      font-size: 19px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .chicken-kill-setting input {
+      width: 86px;
+      min-width: 0;
+      height: 42px;
+      padding: 6px 9px;
+      border: 1px solid var(--button-edge);
+      background: #fff;
+      color: var(--score);
+      font-size: 22px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .board {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      justify-content: center;
+      align-items: start;
+      gap: 18px;
+    }
+
+    .mode-section.wide {
+      grid-column: 1 / -1;
+      justify-self: center;
+    }
+
+    .mode-section {
+      width: max-content;
+      max-width: 100%;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.22);
+      border: 2px dashed rgba(198, 130, 24, 0.45);
+      border-radius: 8px;
+    }
+
+    .mode-title {
+      margin: 0 0 8px;
+      color: var(--ink);
+      font-size: 20px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .team-grid {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: max-content;
+      justify-content: start;
+      gap: 12px;
+      overflow-x: auto;
+      padding: 2px 2px 8px;
+    }
+
+    .counter-row.hidden,
+    .score-panel.hidden {
+      display: none;
+    }
+
+    .score-panel {
+      width: min(94vw, 344px);
+      padding: 16px 10px 16px 16px;
+      background: var(--panel);
+      border: 3px solid var(--panel-edge);
+      border-radius: 8px;
+      box-shadow: 0 18px 38px rgba(112, 72, 0, 0.26);
+    }
+
+    .title-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .title-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--score);
+      font-size: 24px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .team-input {
+      width: 56px;
+      border: 0;
+      border-bottom: 2px solid rgba(192, 92, 0, 0.45);
+      background: transparent;
+      color: var(--score);
+      font: inherit;
+      font-weight: 900;
+      text-align: center;
+      outline: none;
+    }
+
+    .team-input:focus {
+      border-bottom-color: var(--name);
+    }
+
+    .total-count {
+      min-width: 76px;
+      color: var(--score);
+      text-align: right;
+    }
+
+    .reset-button,
+    .step-button,
+    .fail-button,
+    .cancel-button {
+      border: 2px solid var(--button-edge);
+      border-radius: 7px;
+      background: var(--button);
+      color: var(--ink);
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: inset 0 -2px 0 rgba(132, 83, 0, 0.14);
+    }
+
+    .reset-button:hover,
+    .step-button:hover,
+    .fail-button:hover,
+    .cancel-button:hover:not(:disabled) {
+      background: var(--button-hover);
+    }
+
+    .reset-button:active,
+    .step-button:active,
+    .fail-button:active,
+    .cancel-button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .reset-button {
+      width: 48px;
+      height: 30px;
+      justify-self: end;
+      padding: 0;
+      font-size: 13px;
+    }
+
+    .panel-chicken-field {
+      display: inline-flex;
+      height: 30px;
+      align-items: center;
+      gap: 3px;
+      margin-right: 14px;
+      padding: 0 5px;
+      border: 1px solid var(--button-edge);
+      border-radius: 6px;
+      background: #fff;
+      font-size: 17px;
+    }
+
+    .panel-chicken-input {
+      width: 38px;
+      min-width: 0;
+      height: 26px;
+      padding: 0 2px;
+      border: 0;
+      background: transparent;
+      color: var(--score);
+      font-size: 14px;
+      font-weight: 900;
+      text-align: center;
+      outline: none;
+    }
+
+    .rows {
+      display: grid;
+      gap: 9px;
+    }
+
+    .counter-row {
+      display: grid;
+      grid-template-columns: 66px 54px 36px 36px 48px 48px;
+      align-items: center;
+      justify-content: end;
+      gap: 4px;
+      min-height: 38px;
+    }
+
+    .name-input {
+      width: 66px;
+      min-width: 0;
+      border: 0;
+      border-bottom: 2px solid rgba(40, 80, 102, 0.35);
+      padding: 3px 2px 4px;
+      background: transparent;
+      color: var(--name);
+      font-family: "Segoe Print", "Comic Sans MS", "Malgun Gothic", cursive, sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0;
+      outline: none;
+    }
+
+    .name-input::placeholder {
+      color: rgba(40, 80, 102, 0.45);
+    }
+
+    .name-input:focus {
+      border-bottom-color: var(--score);
+    }
+
+    .count {
+      color: var(--score);
+      font-size: 20px;
+      font-weight: 900;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .step-button {
+      width: 38px;
+      height: 32px;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .fail-button {
+      height: 32px;
+      padding: 0 7px;
+      color: var(--fail);
+      font-size: 15px;
+      white-space: nowrap;
+    }
+
+    .cancel-button {
+      width: 48px;
+      height: 32px;
+      justify-self: end;
+      padding: 0 6px;
+      color: var(--name);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .cancel-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.38;
+    }
+
+    .fail-button.has-fails {
+      background: #ffd1bc;
+      border-color: #b54825;
+    }
+
+    @media (max-width: 390px) {
+      body {
+        padding-inline: 8px;
+      }
+
+      .top-nav {
+        width: calc(100% + 16px);
+        margin-inline: -8px;
+      }
+
+      .nav-button {
+        height: 34px;
+        padding: 0 13px;
+        font-size: 13px;
+      }
+
+      .score-panel {
+        padding: 12px 8px 12px 12px;
+      }
+
+      .counter-row {
+        grid-template-columns: 54px 48px 32px 32px 44px 44px;
+        gap: 4px;
+      }
+
+      .title-main {
+        font-size: 21px;
+      }
+
+      .team-input {
+        width: 44px;
+      }
+
+      .name-input {
+        width: 54px;
+        font-size: 16px;
+      }
+
+      .count {
+        font-size: 18px;
+      }
+
+      .step-button {
+        width: 34px;
+        height: 30px;
+      }
+
+      .fail-button {
+        height: 30px;
+        padding: 0 5px;
+        font-size: 13px;
+      }
+
+      .cancel-button {
+        width: 44px;
+        height: 30px;
+        padding: 0 4px;
+        font-size: 13px;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .board {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+
+      .mode-section {
+        width: min(100%, 680px);
+      }
+
+      .team-grid {
+        justify-content: center;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="./common-theme.css">
+  <link rel="stylesheet" href="./collaboration.css">
+</head>
+<body>
+    <nav class="top-nav" aria-label="페이지 전환">
+        <a class="nav-button" href="./tiers.html">티어표</a>
+        <a class="nav-button" href="./spawn-diary.html">스폰일지</a>
+        <a class="nav-button" href="./index.html">전적검색</a>
+      <a class="nav-button outline" href="./matchup.html">상대전적</a>
+      <a class="nav-button outline" href="./university-matchup.html">대학대결</a>
+      <a class="nav-button outline" href="./bingo-board.html">빙고판 열기</a>
+      <a class="nav-button active" href="./kill-bet.html" aria-current="page">킬 내기</a>
+      <a class="nav-button outline" href="./scoreboard.html">매치 점수판</a>
+      <a class="nav-button outline" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="nav-button live-vote-tab" href="./live-vote.html">실시간투표확인</a>
+      <a class="nav-button cup-tab" href="./jungman-cup.html">중만컵</a>
+    </nav>
+
+  <main class="page-shell">
+
+    <section class="kill-area" aria-label="킬 내기 점수판">
+      <div class="kill-title-row">
+        <h1 class="page-title">킬 내기</h1>
+        <label class="chicken-kill-setting">🍗 치킨 킬수
+          <input id="chickenKillValue" type="number" min="0" step="1" value="1" inputmode="numeric" aria-label="치킨 한 개당 킬수">
+        </label>
+      </div>
+      <div class="board"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="./collaboration.js"></script>
+  <script>
+    const board = document.querySelector(".board");
+    const modes = [
+      { label: "4명", teams: ["A"] },
+      { label: "4:4", teams: ["A", "B"] },
+      { label: "4:4:4", teams: ["A", "B", "C"], wide: true },
+      { label: "4:4:4:4", teams: ["A", "B", "C", "D"], wide: true },
+    ];
+
+    const storageKey = "eloboard.killBet.v1";
+    const savedState = loadState();
+    let realtimeRoom = null;
+    const chickenKillInput = document.querySelector("#chickenKillValue");
+    chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
+
+    function renderKillBoard() {
+      board.innerHTML = "";
+      modes.forEach((mode) => {
+        const section = document.createElement("section");
+        section.className = mode.wide ? "mode-section wide" : "mode-section";
+        section.innerHTML = `<h2 class="mode-title">${mode.label}</h2><div class="team-grid"></div>`;
+
+        const grid = section.querySelector(".team-grid");
+        mode.teams.forEach((team, teamIndex) => {
+          grid.append(createScorePanel(mode.label, team, teamIndex));
+        });
+
+        board.append(section);
+      });
+    }
+
+    chickenKillInput.addEventListener("input", () => {
+      const chickenKillValue = Math.max(0, Number(chickenKillInput.value) || 0);
+      chickenKillInput.value = String(chickenKillValue);
+      savedState.chickenKillValue = chickenKillValue;
+      realtimeRoom?.sendSet("chickenKillValue", chickenKillValue);
+      document.querySelectorAll(".score-panel").forEach((panel) => {
+        updateTotal([...panel.querySelectorAll(".counter-row")], panel.querySelector(".total-count"));
+      });
+      persistState();
+    });
+
+    function createScorePanel(modeLabel, teamName, teamIndex) {
+      const panelId = `${modeLabel}-${teamIndex}`;
+      const panel = document.createElement("article");
+      panel.className = "score-panel";
+      panel.dataset.panelId = panelId;
+      panel.setAttribute("aria-label", `${teamName}팀 카운터`);
+      panel.innerHTML = `
+        <div class="title-row">
+          <div class="title-main">
+            <input class="team-input" type="text" value="${getSavedPanel(panelId).team || teamName}" aria-label="팀 이름">
+            <span>:</span>
+            <output class="total-count" aria-label="자동 합산">0킬</output>
+          </div>
+          <label class="panel-chicken-field" aria-label="팀 치킨 수"><span aria-hidden="true">🍗</span><input class="panel-chicken-input" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+          <button class="reset-button" type="button">초기화</button>
+        </div>
+
+        <section class="rows">
+          ${createRows()}
+        </section>
+      `;
+
+      initPanel(panel, panelId, teamName);
+      return panel;
+    }
+
+    function createRows() {
+      return Array.from({ length: 4 }, (_, index) => `
+        <div class="counter-row">
+          <input class="name-input" type="text" value="" aria-label="${index + 1}번째 이름">
+          <output class="count">0</output>
+          <button class="step-button" type="button" data-step="-1" aria-label="${index + 1}번째 숫자 감소">-</button>
+          <button class="step-button" type="button" data-step="1" aria-label="${index + 1}번째 숫자 증가">+</button>
+          <button class="fail-button" type="button" aria-label="${index + 1}번째 실패 카운트">실패</button>
+          <button class="cancel-button" type="button" aria-label="${index + 1}번째 실패 취소">취소</button>
+        </div>
+      `).join("");
+    }
+
+    function initPanel(panel, panelId, defaultTeamName) {
+      const rows = [...panel.querySelectorAll(".counter-row")];
+      const totalCount = panel.querySelector(".total-count");
+      const resetButton = panel.querySelector(".reset-button");
+      const teamInput = panel.querySelector(".team-input");
+      const panelChickenInput = panel.querySelector(".panel-chicken-input");
+      const panelState = getSavedPanel(panelId);
+
+      teamInput.dataset.collabPath = `panels.${panelId}.team`;
+      panelChickenInput.dataset.collabPath = `panels.${panelId}.chicken`;
+      panelChickenInput.value = String(panelState.chicken ?? 0);
+      panelChickenInput.addEventListener("input", () => {
+        panelChickenInput.value = String(Math.max(0, Number(panelChickenInput.value) || 0));
+        updateTotal(rows, totalCount);
+        savePanel(panelId, panel);
+        realtimeRoom?.sendSet(`panels.${panelId}.chicken`, Number(panelChickenInput.value));
+      });
+
+      teamInput.addEventListener("input", () => {
+        savePanel(panelId, panel);
+        realtimeRoom?.sendSet(`panels.${panelId}.team`, teamInput.value);
+      });
+
+      rows.forEach((row, rowIndex) => {
+        const rowState = panelState.rows?.[rowIndex] || {};
+        const nameInput = row.querySelector(".name-input");
+
+        nameInput.dataset.collabPath = `panels.${panelId}.rows.${rowIndex}.name`;
+        nameInput.value = rowState.name || "";
+        row.dataset.fail = "0";
+        row.dataset.score = String(rowState.score ?? 0);
+        row.dataset.fail = String(rowState.fail ?? 0);
+        updateScoreDisplay(row);
+
+        nameInput.addEventListener("input", () => {
+          savePanel(panelId, panel);
+          realtimeRoom?.sendSet(`panels.${panelId}.rows.${rowIndex}.name`, nameInput.value);
+        });
+
+        row.querySelectorAll(".step-button").forEach((button) => {
+          button.addEventListener("click", () => {
+            const delta = Number(button.dataset.step);
+            row.dataset.score = String(Number(row.dataset.score) + delta);
+            updateScoreDisplay(row);
+            updateTotal(rows, totalCount);
+            savePanel(panelId, panel);
+            realtimeRoom?.increment(`panels.${panelId}.rows.${rowIndex}.score`, delta);
+          });
+        });
+
+        row.querySelector(".fail-button").addEventListener("click", () => {
+          row.dataset.fail = String(Number(row.dataset.fail) - 1);
+          updateScoreDisplay(row);
+          updateTotal(rows, totalCount);
+          savePanel(panelId, panel);
+          realtimeRoom?.increment(`panels.${panelId}.rows.${rowIndex}.fail`, -1);
+        });
+
+        row.querySelector(".cancel-button").addEventListener("click", () => {
+          if (Number(row.dataset.fail) >= 0) return;
+          row.dataset.fail = String(Number(row.dataset.fail) + 1);
+          updateScoreDisplay(row);
+          updateTotal(rows, totalCount);
+          savePanel(panelId, panel);
+          realtimeRoom?.increment(`panels.${panelId}.rows.${rowIndex}.fail`, 1);
+        });
+      });
+
+      resetButton.addEventListener("click", () => {
+        const shouldReset = window.confirm("이 팀 점수를 초기화할까요?");
+        if (!shouldReset) return;
+
+        teamInput.value = defaultTeamName;
+        rows.forEach((row) => {
+          row.querySelector(".name-input").value = "";
+          row.dataset.score = "0";
+          row.dataset.fail = "0";
+          updateScoreDisplay(row);
+        });
+        panelChickenInput.value = "0";
+        updateTotal(rows, totalCount);
+        savePanel(panelId, panel);
+        realtimeRoom?.sendSet(`panels.${panelId}`, savedState.panels[panelId], 0);
+      });
+
+      updateTotal(rows, totalCount);
+    }
+
+    function updateScoreDisplay(row) {
+      const output = row.querySelector(".count");
+      const failButton = row.querySelector(".fail-button");
+      const cancelButton = row.querySelector(".cancel-button");
+      const scoreValue = Number(row.dataset.score);
+      const failValue = Number(row.dataset.fail);
+      const failText = failValue === 0 ? "" : `(${failValue})`;
+
+      output.value = String(scoreValue + failValue);
+      output.textContent = `${scoreValue}${failText}`;
+      failButton.classList.toggle("has-fails", failValue < 0);
+      cancelButton.disabled = failValue >= 0;
+    }
+
+    function updateTotal(rows, totalCount) {
+      const baseTotal = rows.reduce((sum, row) => {
+        const score = Number(row.dataset.score);
+        const fail = Number(row.dataset.fail);
+        return sum + score + fail;
+      }, 0);
+      const panel = totalCount.closest(".score-panel");
+      const chicken = Math.max(0, Number(panel.querySelector(".panel-chicken-input").value) || 0);
+      const chickenKillValue = Math.max(0, Number(chickenKillInput.value) || 0);
+      const total = baseTotal + (chicken * chickenKillValue);
+
+      totalCount.value = `${total}킬`;
+      totalCount.textContent = `${total}킬`;
+    }
+
+    function getSavedPanel(panelId) {
+      return savedState.panels?.[panelId] || {};
+    }
+
+    function savePanel(panelId, panel) {
+      const nextState = {
+        ...savedState,
+        panels: {
+          ...(savedState.panels || {}),
+          [panelId]: {
+            team: panel.querySelector(".team-input").value,
+            chicken: Number(panel.querySelector(".panel-chicken-input").value),
+            rows: [...panel.querySelectorAll(".counter-row")].map((row) => ({
+              name: row.querySelector(".name-input").value,
+              score: Number(row.dataset.score),
+              fail: Number(row.dataset.fail),
+            })),
+          },
+        },
+      };
+
+      savedState.panels = nextState.panels;
+      persistState();
+    }
+
+    function persistState() {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(savedState));
+      } catch {
+        // 저장 공간이 막힌 환경에서는 화면 동작만 유지합니다.
+      }
+    }
+
+    function loadState() {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey)) || { panels: {} };
+      } catch {
+        return { panels: {} };
+      }
+    }
+
+    renderKillBoard();
+    realtimeRoom = new RealtimeRoom({
+      feature: "kill-bet",
+      getState: () => savedState,
+      applyState: nextState => {
+        savedState.chickenKillValue = nextState.chickenKillValue;
+        savedState.panels = nextState.panels || {};
+        chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
+        RealtimeRoom.preserveFocus(renderKillBoard);
+        persistState();
+      }
+    });
+  </script>
+</body>
+</html>
