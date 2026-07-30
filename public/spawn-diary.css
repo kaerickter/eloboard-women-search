@@ -410,14 +410,14 @@ th {
   z-index: 2;
   background: #f8f8fa;
   color: var(--theme-ink);
-  font-size: 17px;
+  font-size: 13.005px;
   font-weight: 900;
 }
 
 td {
   background: #fff;
   color: #293145;
-  font-size: 17px;
+  font-size: 13.005px;
   line-height: 1.35;
 }
 
@@ -454,7 +454,7 @@ td:nth-child(11) {
   padding: 7px 16px;
   text-align: left;
   vertical-align: middle;
-  font-size: 22px;
+  font-size: 16.83px;
   line-height: 1.4;
 }
 
@@ -999,6 +999,22 @@ body.spawn-diary-page .record-opponent-suggestions button.record-opponent-option
   color: var(--theme-ink) !important;
   background: #f3f7cf !important;
   box-shadow: none !important;
+}
+
+/* Keep the record table 15% more compact without changing the page chrome or dialogs. */
+body.spawn-diary-page .diary-panel .race-pill,
+body.spawn-diary-page .diary-panel .format-pill,
+body.spawn-diary-page .diary-panel .map-pill,
+body.spawn-diary-page .diary-panel .result-pill {
+  font-size: 9.945px;
+}
+
+body.spawn-diary-page .diary-panel .tier-text {
+  font-size: 10.71px;
+}
+
+body.spawn-diary-page .diary-panel .date-edit-button {
+  font-size: 13.005px;
 }
 
 @media (max-width: 900px) {
