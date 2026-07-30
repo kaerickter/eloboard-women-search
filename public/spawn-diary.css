@@ -1022,6 +1022,76 @@ body.spawn-diary-page .diary-panel .date-edit-button {
   font-size: 13.005px;
 }
 
+/* Keep the desktop diary inside one browser viewport.
+   The record list keeps its own scroll area while pagination stays visible. */
+@media (min-width: 901px) {
+  html:has(body.spawn-diary-page) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body.spawn-diary-page {
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.spawn-diary-page .site-nav {
+    flex: 0 0 66px;
+  }
+
+  body.spawn-diary-page .diary-shell {
+    min-height: 0;
+    flex: 1 1 auto;
+    padding-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  body.spawn-diary-page .diary-hero-band,
+  body.spawn-diary-page .summary-grid,
+  body.spawn-diary-page .filter-panel {
+    flex: 0 0 auto;
+  }
+
+  body.spawn-diary-page .diary-content {
+    min-height: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  body.spawn-diary-page .diary-panel {
+    min-height: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.spawn-diary-page .table-scroll {
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+  }
+
+  body.spawn-diary-page .pagination {
+    flex: 0 0 62px;
+  }
+
+  body.spawn-diary-page .status-message {
+    min-height: 0;
+    margin: 0;
+    position: absolute;
+    right: 4px;
+    bottom: 6px;
+    z-index: 3;
+    pointer-events: none;
+  }
+}
+
 @media (max-width: 900px) {
   .diary-shell { width: min(100% - 20px, 1900px); padding-top: 24px; }
   .diary-hero { align-items: flex-start; }
