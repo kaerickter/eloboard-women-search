@@ -107,6 +107,7 @@ body::before {
 .site-nav,
 .top-nav {
   --menu-tab-width: 145px;
+  box-sizing: border-box !important;
   position: sticky !important;
   top: 0 !important;
   z-index: 50 !important;
@@ -126,6 +127,12 @@ body::before {
   background: rgba(244, 243, 237, 0.94) !important;
   box-shadow: 0 8px 30px rgba(23, 33, 58, 0.04) !important;
   backdrop-filter: blur(16px) !important;
+}
+
+html body .site-nav,
+html body .top-nav {
+  padding-right: max(28px, calc((100vw - 1760px) / 2)) !important;
+  padding-left: max(28px, calc((100vw - 1760px) / 2)) !important;
 }
 
 .site-nav::-webkit-scrollbar,
@@ -318,16 +325,41 @@ body::before {
  * Keep page content constrained while extending the themed introduction
  * beneath the navigation to both viewport edges, as on the spawn diary.
  */
-.tier-hero,
-.hero,
-.shell > .hero,
-.matchup-hero,
-.cup-hero,
-.vote-hero,
-.scoreboard-hero {
-  width: 100dvw !important;
-  margin-left: calc(50% - 50dvw) !important;
+body:not(.spawn-diary-page) .tier-hero,
+body:not(.spawn-diary-page) .shell > .hero,
+body:not(.spawn-diary-page) .matchup-hero,
+body:not(.spawn-diary-page) .cup-hero,
+body:not(.spawn-diary-page) .scoreboard-hero {
+  box-sizing: border-box !important;
+  width: 142.8571dvw !important;
+  height: 209.2857px !important;
+  min-height: 209.2857px !important;
+  max-height: 209.2857px !important;
+  margin-left: calc(50% - 71.4286dvw) !important;
+  padding-top: 33.4286px !important;
+  padding-bottom: 38.5714px !important;
+  overflow: hidden !important;
   border-radius: 0 !important;
+}
+
+body:not(.spawn-diary-page) .tier-hero h1,
+body:not(.spawn-diary-page) .shell > .hero h1,
+body:not(.spawn-diary-page) .matchup-hero h1,
+body:not(.spawn-diary-page) .cup-hero h1,
+body:not(.spawn-diary-page) .scoreboard-hero .board-title {
+  font-size: clamp(28px, 2vw, 38.5714px) !important;
+  line-height: 1.05 !important;
+}
+
+body:not(.spawn-diary-page) .tier-hero p,
+body:not(.spawn-diary-page) .shell > .hero p,
+body:not(.spawn-diary-page) .matchup-hero p,
+body:not(.spawn-diary-page) .cup-hero p,
+body:not(.spawn-diary-page) .scoreboard-hero p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* Compact standalone page titles by roughly 40 percent. */
