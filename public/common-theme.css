@@ -66,12 +66,17 @@ html {
     zoom: 100%;
   }
 
+  html .site-nav,
+  html .top-nav {
+    zoom: 128.5714%;
+  }
+
   html:has(body.spawn-diary-page) .site-nav {
-    zoom: 77.7778%;
+    zoom: 100%;
   }
 
   html:has(.scoreboard-workspace) .site-nav {
-    zoom: 70%;
+    zoom: 90%;
   }
 }
 
