@@ -454,7 +454,7 @@ td:nth-child(11) {
   padding: 7px 16px;
   text-align: left;
   vertical-align: middle;
-  font-size: 18.513px;
+  font-size: 20.3643px;
   line-height: 1.4;
 }
 
@@ -1015,6 +1015,27 @@ body.spawn-diary-page .diary-panel .tier-text {
 
 body.spawn-diary-page .diary-panel .date-edit-button {
   font-size: 13.65525px;
+}
+
+/* Give the long notes more emphasis while keeping compact match details. */
+body.spawn-diary-page .diary-panel th:nth-child(2),
+body.spawn-diary-page .diary-panel th:nth-child(3),
+body.spawn-diary-page .diary-panel th:nth-child(5),
+body.spawn-diary-page .diary-panel th:nth-child(6),
+body.spawn-diary-page .diary-panel th:nth-child(7),
+body.spawn-diary-page .diary-panel td:nth-child(2),
+body.spawn-diary-page .diary-panel td:nth-child(3),
+body.spawn-diary-page .diary-panel td:nth-child(5),
+body.spawn-diary-page .diary-panel td:nth-child(6),
+body.spawn-diary-page .diary-panel td:nth-child(7) {
+  font-size: 12.289725px;
+}
+
+body.spawn-diary-page .diary-panel td:nth-child(2) .format-pill,
+body.spawn-diary-page .diary-panel td:nth-child(5) .race-pill,
+body.spawn-diary-page .diary-panel td:nth-child(6) .map-pill,
+body.spawn-diary-page .diary-panel td:nth-child(7) .result-pill {
+  font-size: 9.398025px;
 }
 
 @media (max-width: 900px) {
