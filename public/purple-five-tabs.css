@@ -424,12 +424,9 @@ body.spawn-diary-page .diary-shell {
   margin: 0 !important;
 }
 
-body.spawn-diary-page col.feedback-column {
-  width: calc((100% - 980px) / 2 - 124px) !important;
-}
-
+body.spawn-diary-page col.feedback-column,
 body.spawn-diary-page col.reflection-column {
-  width: calc((100% - 980px) / 2) !important;
+  width: calc((100% - 850.8px) / 2) !important;
 }
 
 .tier-filter-toolbar {
