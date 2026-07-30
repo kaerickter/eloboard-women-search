@@ -49,6 +49,16 @@ html {
   background: var(--theme-bg);
 }
 
+/*
+ * Chrome 100%에서도 기존 70% 확대 화면과 같은 정보 밀도를 유지한다.
+ * 작은 화면에서는 글자와 터치 영역이 지나치게 작아지지 않도록 원래 크기를 사용한다.
+ */
+@media (min-width: 901px) {
+  html {
+    zoom: 70%;
+  }
+}
+
 body {
   min-width: 320px;
   margin: 0 !important;
