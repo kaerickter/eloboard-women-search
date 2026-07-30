@@ -458,6 +458,12 @@ body.spawn-diary-page col.reflection-column {
   margin-left: auto;
 }
 
+@media (min-width: 901px) {
+  .tier-filter-toolbar {
+    top: 112px;
+  }
+}
+
 body .tier-shell .division-filters .division-filter-button {
   border: 1px solid transparent !important;
   border-radius: 7px !important;
