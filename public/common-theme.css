@@ -84,8 +84,9 @@ body {
   min-width: 320px;
   margin: 0 !important;
   padding: 0 !important;
+  overflow-x: clip;
   color: var(--theme-ink);
-  background: var(--theme-bg) !important;
+  background: #f7f7fb !important;
   font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif !important;
 }
 
@@ -307,6 +308,23 @@ body::before {
 .workspace,
 .guide {
   background: var(--theme-bg) !important;
+}
+
+/*
+ * Keep page content constrained while extending the themed introduction
+ * beneath the navigation to both viewport edges, as on the spawn diary.
+ */
+.tier-hero,
+.hero,
+.shell > .hero,
+.matchup-hero,
+.diary-hero-band,
+.cup-hero,
+.vote-hero,
+.scoreboard-hero {
+  width: 100dvw !important;
+  margin-left: calc(50% - 50dvw) !important;
+  border-radius: 0 !important;
 }
 
 /* Compact standalone page titles by roughly 40 percent. */
