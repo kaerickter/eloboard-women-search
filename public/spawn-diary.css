@@ -415,14 +415,14 @@ th {
   z-index: 2;
   background: #f8f8fa;
   color: var(--theme-ink);
-  font-size: 13.005px;
+  font-size: 15.005px;
   font-weight: 900;
 }
 
 td {
   background: #fff;
   color: #293145;
-  font-size: 13.005px;
+  font-size: 15.005px;
   line-height: 1.35;
 }
 
@@ -459,7 +459,7 @@ td:nth-child(11) {
   padding: 7px 16px;
   text-align: left;
   vertical-align: middle;
-  font-size: 16.83px;
+  font-size: 18.83px;
   line-height: 1.4;
 }
 
@@ -1011,15 +1011,15 @@ body.spawn-diary-page .diary-panel .race-pill,
 body.spawn-diary-page .diary-panel .format-pill,
 body.spawn-diary-page .diary-panel .map-pill,
 body.spawn-diary-page .diary-panel .result-pill {
-  font-size: 9.945px;
+  font-size: 11.945px;
 }
 
 body.spawn-diary-page .diary-panel .tier-text {
-  font-size: 10.71px;
+  font-size: 12.71px;
 }
 
 body.spawn-diary-page .diary-panel .date-edit-button {
-  font-size: 13.005px;
+  font-size: 15.005px;
 }
 
 /* Keep the desktop diary inside one browser viewport.
