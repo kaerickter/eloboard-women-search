@@ -120,7 +120,7 @@ body.spawn-diary-page .site-tab.active {
 }
 
 .diary-content {
-  width: min(1800px, calc(100% - 48px));
+  width: min(1821.428px, calc(100% - 48px));
   margin-right: auto;
   margin-left: auto;
 }
@@ -438,9 +438,9 @@ tbody tr:last-child td { border-bottom: 0; }
 .map-column { width: 94.485px; }
 .result-column { width: 47.242px; }
 .opponent-build-column,
-.my-build-column { width: 107.139px; }
+.my-build-column { width: 117.853px; }
 .feedback-column,
-.reflection-column { width: calc((100% - 755.88px) / 2); }
+.reflection-column { width: calc((100% - 777.308px) / 2); }
 
 th:nth-child(-n+9),
 td:nth-child(-n+9) {

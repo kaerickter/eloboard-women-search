@@ -426,7 +426,7 @@ body.spawn-diary-page .diary-shell {
 
 body.spawn-diary-page col.feedback-column,
 body.spawn-diary-page col.reflection-column {
-  width: calc((100% - 755.88px) / 2) !important;
+  width: calc((100% - 777.308px) / 2) !important;
 }
 
 .tier-filter-toolbar {
