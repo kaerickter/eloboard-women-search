@@ -84,10 +84,14 @@ body {
   min-width: 320px;
   margin: 0 !important;
   padding: 0 !important;
-  overflow-x: clip;
   color: var(--theme-ink);
-  background: #f7f7fb !important;
+  background: var(--theme-bg) !important;
   font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif !important;
+}
+
+body:not(.spawn-diary-page) {
+  overflow-x: clip;
+  background: #f7f7fb !important;
 }
 
 body::before {
@@ -318,7 +322,6 @@ body::before {
 .hero,
 .shell > .hero,
 .matchup-hero,
-.diary-hero-band,
 .cup-hero,
 .vote-hero,
 .scoreboard-hero {
