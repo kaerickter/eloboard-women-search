@@ -430,17 +430,17 @@ tbody tr:hover td { background: #fbfbeF; }
 th:last-child, td:last-child { border-right: 0; }
 tbody tr:last-child td { border-bottom: 0; }
 
-.date-column { width: 94.955px; }
-.format-column { width: 77.863px; }
-.opponent-column { width: 98.754px; }
-.tier-column { width: 104.451px; }
-.race-column { width: 74.065px; }
-.map-column { width: 106.35px; }
-.result-column { width: 53.175px; }
+.date-column { width: 84.361px; }
+.format-column { width: 69.176px; }
+.opponent-column { width: 87.736px; }
+.tier-column { width: 92.798px; }
+.race-column { width: 65.802px; }
+.map-column { width: 94.485px; }
+.result-column { width: 47.242px; }
 .opponent-build-column,
-.my-build-column { width: 120.593px; }
+.my-build-column { width: 107.139px; }
 .feedback-column,
-.reflection-column { width: calc((100% - 850.8px) / 2); }
+.reflection-column { width: calc((100% - 755.88px) / 2); }
 
 th:nth-child(-n+9),
 td:nth-child(-n+9) {
