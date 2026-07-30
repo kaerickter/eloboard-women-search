@@ -58,7 +58,10 @@ html {
     zoom: 70%;
   }
 
-  html:has(body.spawn-diary-page),
+  html:has(body.spawn-diary-page) {
+    zoom: 90%;
+  }
+
   html:has(.scoreboard-workspace) {
     zoom: 100%;
   }
