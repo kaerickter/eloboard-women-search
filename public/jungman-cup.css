@@ -278,6 +278,14 @@ select {
   background: #f5f6ee;
 }
 
+.fixture.is-today,
+.fixture.is-today:hover {
+  position: relative;
+  background: #f7fbd3;
+  box-shadow: inset 0 0 0 2px #bdcf24, 0 0 18px rgba(189, 207, 36, 0.34);
+  animation: today-fixture-glow 2.4s ease-in-out infinite;
+}
+
 .fixture-team {
   min-width: 0;
   padding: 13px 9px;
@@ -316,10 +324,38 @@ select {
 }
 
 .fixture-vs time {
-  margin-top: 4px;
+  margin-top: 5px;
   color: var(--cup-navy);
-  font-size: 11px;
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.15;
   letter-spacing: -0.02em;
+}
+
+.today-badge {
+  width: max-content;
+  margin: 6px auto 0;
+  padding: 4px 9px;
+  display: block;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--cup-red);
+  box-shadow: 0 5px 13px rgba(207, 92, 101, 0.3);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+@keyframes today-fixture-glow {
+  0%, 100% { box-shadow: inset 0 0 0 2px #bdcf24, 0 0 10px rgba(189, 207, 36, 0.24); }
+  50% { box-shadow: inset 0 0 0 3px #d6e743, 0 0 25px rgba(189, 207, 36, 0.52); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fixture.is-today {
+    animation: none;
+  }
 }
 
 .match-panel {

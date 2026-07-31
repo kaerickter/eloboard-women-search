@@ -11,16 +11,12 @@ const matchPanel = document.getElementById("matchPanel");
 const cupAdminOpen = document.getElementById("cupAdminOpen");
 const cupAdminDialog = document.getElementById("cupAdminDialog");
 const cupAdminClose = document.getElementById("cupAdminClose");
-const cupAdminLogin = document.getElementById("cupAdminLogin");
-const cupAdminPassword = document.getElementById("cupAdminPassword");
-const cupAdminManager = document.getElementById("cupAdminManager");
 const cupAdminStatus = document.getElementById("cupAdminStatus");
 const groupEditor = document.getElementById("groupEditor");
 const cupAdminSave = document.getElementById("cupAdminSave");
 const cupAdminReset = document.getElementById("cupAdminReset");
 
-let authenticated = false;
-let csrf = "";
+const authenticated = true;
 let selectedMatch = null;
 let state = readState();
 
@@ -68,7 +64,17 @@ function formatGroupDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return "날짜 미정";
   const date = new Date(value + "T00:00:00");
   const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(date);
-  return value.replaceAll("-", ".") + " (" + weekday + ")";
+  return (date.getMonth() + 1) + "월 " + date.getDate() + "일 (" + weekday + ")";
+}
+
+function localDateKey(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return date.getFullYear() + "-" + month + "-" + day;
+}
+
+function isToday(value) {
+  return Boolean(value) && value === localDateKey();
 }
 
 function getMatch(group, index) {
@@ -99,12 +105,14 @@ function renderGroups() {
       const home = fixture.home || "왼쪽 대학 미정";
       const away = fixture.away || "오른쪽 대학 미정";
       const fixtureDate = formatGroupDate(fixture.date);
+      const today = isToday(fixture.date);
       const disabled = !fixture.home || !fixture.away;
       return [
-        '<div class="fixture">',
+        '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time>' + escapeHtml(fixtureDate) + "</time></span>",
+        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time>' + escapeHtml(fixtureDate) +
+          '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
         "</div>"
@@ -182,7 +190,7 @@ function renderMatchPanel() {
     "</header>",
     '<div class="set-table">' + rows + "</div>",
     '<p class="result-lock-note">' +
-      (authenticated ? "관리자 모드 · 선수명과 세트 승자를 입력할 수 있습니다." : "결과 입력은 관리자 로그인 후 사용할 수 있습니다.") +
+      "선수명과 세트 승자를 바로 입력할 수 있습니다." +
       "</p>"
   ].join("");
 }
@@ -195,16 +203,7 @@ function selectMatch(group, index) {
   if (window.innerWidth < 1120) matchPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function setAdminView(enabled) {
-  authenticated = enabled;
-  cupAdminLogin.hidden = enabled;
-  cupAdminManager.hidden = !enabled;
-  renderGroupEditor();
-  renderMatchPanel();
-}
-
 function renderGroupEditor() {
-  if (!authenticated) return;
   groupEditor.innerHTML = GROUPS.map((group) => {
     const fixtures = state.fixtures?.[group] || [];
     const rows = [0, 1, 2].map((index) => {
@@ -223,30 +222,6 @@ function renderGroupEditor() {
     }).join("");
     return '<div class="group-edit-card"><strong>' + group + '조</strong><span class="group-editor-label">날짜와 대전 대학을 경기별로 선택</span>' + rows + "</div>";
   }).join("");
-}
-
-async function checkAdminSession() {
-  cupAdminStatus.textContent = "관리자 상태를 확인하고 있습니다.";
-  try {
-    const response = await fetch("/api/admin/status", { headers: { "Accept": "application/json" } });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "관리자 상태를 확인하지 못했습니다.");
-    if (!data.configured) {
-      setAdminView(false);
-      cupAdminStatus.textContent = "관리자 비밀번호가 아직 설정되지 않았습니다.";
-      cupAdminPassword.disabled = true;
-      return;
-    }
-    cupAdminPassword.disabled = false;
-    csrf = data.csrf || "";
-    setAdminView(Boolean(data.authenticated));
-    cupAdminStatus.textContent = data.authenticated
-      ? "관리자 모드입니다. 대진과 경기 결과를 수정할 수 있습니다."
-      : "관리자 비밀번호로 로그인해 주세요.";
-  } catch (error) {
-    setAdminView(false);
-    cupAdminStatus.textContent = error.message;
-  }
 }
 
 groupGrid.addEventListener("click", (event) => {
@@ -276,32 +251,13 @@ matchPanel.addEventListener("click", (event) => {
 
 cupAdminOpen.addEventListener("click", () => {
   if (!cupAdminDialog.open) cupAdminDialog.showModal();
-  checkAdminSession();
+  renderGroupEditor();
+  cupAdminStatus.textContent = "등록할 경기 내용을 입력한 뒤 저장해 주세요.";
 });
 
 cupAdminClose.addEventListener("click", () => cupAdminDialog.close());
 cupAdminDialog.addEventListener("click", (event) => {
   if (event.target === cupAdminDialog) cupAdminDialog.close();
-});
-
-cupAdminLogin.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  cupAdminStatus.textContent = "로그인하고 있습니다.";
-  try {
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ password: cupAdminPassword.value })
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "로그인하지 못했습니다.");
-    csrf = data.csrf || "";
-    cupAdminPassword.value = "";
-    setAdminView(true);
-    cupAdminStatus.textContent = "로그인되었습니다. 조 편성을 등록해 주세요.";
-  } catch (error) {
-    cupAdminStatus.textContent = error.message;
-  }
 });
 
 groupEditor.addEventListener("change", (event) => {
@@ -311,20 +267,25 @@ groupEditor.addEventListener("change", (event) => {
 });
 
 cupAdminSave.addEventListener("click", () => {
-  const incomplete = GROUPS.flatMap((group) => (state.fixtures[group] || []).map((fixture, index) => ({
+  const entries = GROUPS.flatMap((group) => (state.fixtures[group] || []).map((fixture, index) => ({
     group,
     index,
     fixture
-  }))).find(({ fixture }) => !fixture.date || !fixture.home || !fixture.away);
+  })));
+  const incomplete = entries.find(({ fixture }) => {
+    const values = [fixture.date, fixture.home, fixture.away];
+    return values.some(Boolean) && !values.every(Boolean);
+  });
   if (incomplete) {
     cupAdminStatus.textContent = incomplete.group + "조 " + (incomplete.index + 1) + "경기의 날짜와 양쪽 대학을 모두 선택해 주세요.";
     return;
   }
-  const sameUniversity = GROUPS.flatMap((group) => (state.fixtures[group] || []).map((fixture, index) => ({
-    group,
-    index,
-    fixture
-  }))).find(({ fixture }) => fixture.home === fixture.away);
+  const completed = entries.filter(({ fixture }) => fixture.date && fixture.home && fixture.away);
+  if (!completed.length) {
+    cupAdminStatus.textContent = "등록할 대전을 한 경기 이상 입력해 주세요.";
+    return;
+  }
+  const sameUniversity = completed.find(({ fixture }) => fixture.home === fixture.away);
   if (sameUniversity) {
     cupAdminStatus.textContent = sameUniversity.group + "조 " + (sameUniversity.index + 1) + "경기는 서로 다른 대학을 선택해 주세요.";
     return;
@@ -333,7 +294,7 @@ cupAdminSave.addEventListener("click", () => {
   selectedMatch = null;
   renderGroups();
   renderMatchPanel();
-  cupAdminStatus.textContent = "4개 조의 12개 대전 날짜와 대학을 저장했습니다.";
+  cupAdminStatus.textContent = completed.length + "개 대전을 저장하고 화면에 반영했습니다.";
   cupAdminDialog.close();
 });
 

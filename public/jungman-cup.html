@@ -76,15 +76,7 @@
         <button id="cupAdminClose" type="button" aria-label="닫기">×</button>
       </div>
 
-      <form id="cupAdminLogin" class="cup-admin-login">
-        <label for="cupAdminPassword">관리자 비밀번호</label>
-        <div>
-          <input id="cupAdminPassword" type="password" autocomplete="current-password" required>
-          <button type="submit">로그인</button>
-        </div>
-      </form>
-
-      <section id="cupAdminManager" class="cup-admin-manager" hidden>
+      <section id="cupAdminManager" class="cup-admin-manager">
         <div id="groupEditor" class="group-editor"></div>
         <div class="cup-admin-actions">
           <button id="cupAdminReset" class="secondary" type="button">대전 전체 초기화</button>
@@ -92,7 +84,7 @@
         </div>
         <p>미리보기 단계에서는 이 브라우저에만 저장됩니다.</p>
       </section>
-      <p id="cupAdminStatus" class="cup-admin-status" role="status">관리자 비밀번호로 로그인해 주세요.</p>
+      <p id="cupAdminStatus" class="cup-admin-status" role="status">등록할 경기 내용을 입력한 뒤 저장해 주세요.</p>
     </dialog>
 
     <script src="./jungman-cup.js"></script>
