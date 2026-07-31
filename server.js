@@ -278,6 +278,25 @@ async function maybeSyncSpawnDiary(query, profile) {
     };
   }
 }
+function queueSpawnDiarySync(query, profile, wrId) {
+  if (autoDiaryPlayerKey(query) !== autoDiaryPlayerKey(AUTO_PLAYER_NAME) || !profile) return null;
+  setImmediate(() => {
+    (async () => {
+      let latestProfile = profile;
+      if (wrId) {
+        try {
+          latestProfile = await loadProfile(wrId, true);
+        } catch (error) {
+          console.warn("Spawn diary auto-sync is using the displayed profile:", error.message);
+        }
+      }
+      await maybeSyncSpawnDiary(query, latestProfile);
+    })().catch((error) => {
+      console.error("Spawn diary queued auto-sync failed:", error.message);
+    });
+  });
+  return { enabled: true, queued: true };
+}
 function normalizePlayerName(name) {
   return normalizeName(name).replace(/[tzp]$/i, "");
 }
@@ -1935,9 +1954,8 @@ const server = http.createServer(async (req, res) => {
       }
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
-        const autoDiaryTarget = autoDiaryPlayerKey(query) === autoDiaryPlayerKey(AUTO_PLAYER_NAME);
-        const profile = await loadProfile(requestedWrId, force || autoDiaryTarget);
-        const autoDiarySync = await maybeSyncSpawnDiary(query, profile);
+        const profile = await loadProfile(requestedWrId, force);
+        const autoDiarySync = queueSpawnDiarySync(query, profile, requestedWrId);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
         const result = summarize([], query);
@@ -1958,6 +1976,7 @@ const server = http.createServer(async (req, res) => {
       const result = summarize(data.matches, query);
       let players = [];
       let profile = null;
+      let autoDiaryWrId = "";
       if (query) {
         players = findPlayers(query, data.matches, indexedPlayers);
         if (!players.length && !force) {
@@ -1965,11 +1984,11 @@ const server = http.createServer(async (req, res) => {
         }
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
         if (selected?.wrId) {
-          const autoDiaryTarget = autoDiaryPlayerKey(query) === autoDiaryPlayerKey(AUTO_PLAYER_NAME);
-          profile = await loadProfile(selected.wrId, force || autoDiaryTarget);
+          autoDiaryWrId = selected.wrId;
+          profile = await loadProfile(selected.wrId, force);
         }
       }
-      const autoDiarySync = await maybeSyncSpawnDiary(query, profile);
+      const autoDiarySync = queueSpawnDiarySync(query, profile, autoDiaryWrId || profile?.wrId);
       return send(res, 200, JSON.stringify({
         ...data,
         ...result,
