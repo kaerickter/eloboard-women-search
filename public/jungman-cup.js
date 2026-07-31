@@ -3,6 +3,7 @@ const UNIVERSITIES = [
   "씨나인", "엠비대", "와플대", "캄몬스타즈", "케이대", "흑카데미"
 ];
 const GROUPS = ["A", "B", "C", "D"];
+const PREVIEW_DATES = { A: "", B: "", C: "", D: "" };
 const PREVIEW_GROUPS = {
   A: ["JSA", "씨나인", "뉴캣슬"],
   B: ["캄몬스타즈", "케이대", "신세계"],
@@ -33,15 +34,20 @@ function clonePreviewGroups() {
   return Object.fromEntries(GROUPS.map((group) => [group, [...PREVIEW_GROUPS[group]]]));
 }
 
+function clonePreviewDates() {
+  return { ...PREVIEW_DATES };
+}
+
 function readState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     return {
       groups: saved.groups && typeof saved.groups === "object" ? saved.groups : clonePreviewGroups(),
+      dates: saved.dates && typeof saved.dates === "object" ? { ...clonePreviewDates(), ...saved.dates } : clonePreviewDates(),
       matches: saved.matches && typeof saved.matches === "object" ? saved.matches : {}
     };
   } catch {
-    return { groups: clonePreviewGroups(), matches: {} };
+    return { groups: clonePreviewGroups(), dates: clonePreviewDates(), matches: {} };
   }
 }
 
@@ -67,6 +73,13 @@ function fixturePairs() {
   return [[0, 1], [0, 2], [1, 2]];
 }
 
+function formatGroupDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return "날짜 미정";
+  const date = new Date(value + "T00:00:00");
+  const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(date);
+  return value.replaceAll("-", ".") + " (" + weekday + ")";
+}
+
 function getMatch(group, homeSlot, awaySlot) {
   const teams = state.groups[group] || [];
   const home = teams[homeSlot] || "";
@@ -87,6 +100,7 @@ function getMatch(group, homeSlot, awaySlot) {
 function renderGroups() {
   groupGrid.innerHTML = GROUPS.map((group) => {
     const teams = state.groups[group] || ["", "", ""];
+    const groupDate = formatGroupDate(state.dates?.[group]);
     const fixtures = fixturePairs().map(([homeSlot, awaySlot], index) => {
       const home = teams[homeSlot] || "대학 미정";
       const away = teams[awaySlot] || "대학 미정";
@@ -105,7 +119,7 @@ function renderGroups() {
     return [
       '<article class="group-card">',
       '<header class="group-header"><div><span class="group-letter">' + group + "</span><strong>" + group +
-        '조</strong></div><small>3팀 · 3경기</small></header>',
+        '조</strong></div><small><time>' + escapeHtml(groupDate) + '</time><span>3팀 · 3경기</span></small></header>',
       '<div class="group-teams">',
       teams.map((team, index) => '<span class="team-seed">' + (index + 1) + ". " + escapeHtml(team || "미정") + "</span>").join(""),
       "</div>",
@@ -167,7 +181,7 @@ function renderMatchPanel() {
 
   matchPanel.innerHTML = [
     '<header class="match-sheet-head">',
-    "<span>" + match.group + "조 MATCH RESULT</span>",
+    "<span>" + match.group + "조 MATCH RESULT · " + escapeHtml(formatGroupDate(state.dates?.[match.group])) + "</span>",
     '<div class="match-title"><strong>' + escapeHtml(match.home) + "</strong>",
     '<div class="match-score"><b>' + score.home + "</b><i>:</i><b>" + score.away + "</b></div>",
     "<strong>" + escapeHtml(match.away) + "</strong></div>",
@@ -201,6 +215,7 @@ function renderGroupEditor() {
   const selected = new Set(GROUPS.flatMap((group) => state.groups[group] || []).filter(Boolean));
   groupEditor.innerHTML = GROUPS.map((group) => {
     const teams = state.groups[group] || ["", "", ""];
+    const groupDate = state.dates?.[group] || "";
     const selects = [0, 1, 2].map((slot) => {
       const value = teams[slot] || "";
       const options = ['<option value="">대학 선택</option>'].concat(UNIVERSITIES.map((university) => {
@@ -211,7 +226,10 @@ function renderGroupEditor() {
       }));
       return '<select data-editor-group="' + group + '" data-editor-slot="' + slot + '">' + options.join("") + "</select>";
     }).join("");
-    return '<div class="group-edit-card"><strong>' + group + "조</strong>" + selects + "</div>";
+    return '<div class="group-edit-card"><strong>' + group + '조</strong>' +
+      '<label class="group-date-field"><span>경기 날짜</span><input type="date" data-editor-date="' + group +
+      '" value="' + escapeHtml(groupDate) + '"></label>' +
+      '<span class="group-university-label">참가 대학</span>' + selects + "</div>";
   }).join("");
 }
 
@@ -295,6 +313,11 @@ cupAdminLogin.addEventListener("submit", async (event) => {
 });
 
 groupEditor.addEventListener("change", (event) => {
+  const dateInput = event.target.closest("[data-editor-date]");
+  if (dateInput) {
+    state.dates[dateInput.dataset.editorDate] = dateInput.value;
+    return;
+  }
   const select = event.target.closest("[data-editor-group]");
   if (!select) return;
   const group = select.dataset.editorGroup;
@@ -304,6 +327,11 @@ groupEditor.addEventListener("change", (event) => {
 });
 
 cupAdminSave.addEventListener("click", () => {
+  const missingDate = GROUPS.find((group) => !state.dates?.[group]);
+  if (missingDate) {
+    cupAdminStatus.textContent = missingDate + "조 경기 날짜를 선택해 주세요.";
+    return;
+  }
   const teams = GROUPS.flatMap((group) => state.groups[group] || []);
   const filled = teams.filter(Boolean);
   if (filled.length !== 12 || new Set(filled).size !== 12) {
@@ -314,12 +342,12 @@ cupAdminSave.addEventListener("click", () => {
   selectedMatch = null;
   renderGroups();
   renderMatchPanel();
-  cupAdminStatus.textContent = "4개 조 대진을 이 브라우저에 저장했습니다.";
+  cupAdminStatus.textContent = "4개 조의 날짜와 참가 대학을 저장했습니다.";
   cupAdminDialog.close();
 });
 
 cupAdminReset.addEventListener("click", () => {
-  state = { groups: clonePreviewGroups(), matches: {} };
+  state = { groups: clonePreviewGroups(), dates: clonePreviewDates(), matches: {} };
   saveState();
   selectedMatch = null;
   renderGroupEditor();

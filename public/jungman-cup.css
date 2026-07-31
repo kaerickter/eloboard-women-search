@@ -229,8 +229,18 @@ select {
 }
 
 .group-header small {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 3px;
   color: var(--cup-muted);
   font-size: 11px;
+}
+
+.group-header small time {
+  color: var(--cup-navy);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .group-teams {
@@ -540,7 +550,8 @@ select {
 }
 
 .cup-admin-login input,
-.group-editor select {
+.group-editor select,
+.group-editor input[type="date"] {
   min-height: 42px;
   padding: 0 12px;
   border: 1px solid var(--cup-line);
@@ -570,6 +581,33 @@ select {
 .group-edit-card select {
   width: 100%;
   margin-top: 7px;
+}
+
+.group-date-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--cup-line);
+}
+
+.group-date-field span,
+.group-university-label {
+  color: var(--cup-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.group-date-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.group-university-label {
+  display: block;
+  margin-bottom: 2px;
 }
 
 .cup-admin-actions {
