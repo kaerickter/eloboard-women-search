@@ -710,15 +710,34 @@ select {
 }
 
 .cup-stats-dialog {
-  width: min(760px, calc(100% - 28px));
+  width: min(988px, calc(100% - 28px));
   max-height: min(820px, calc(100vh - 36px));
   padding: 0;
   overflow: auto;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--cup-navy);
   background: var(--cup-cream);
   box-shadow: 0 30px 90px rgba(11, 18, 36, 0.35);
+}
+
+.cup-stats-dialog .cup-admin-header {
+  padding: 26px 29px;
+}
+
+.cup-stats-dialog .cup-admin-header strong {
+  font-size: 26px;
+}
+
+.cup-stats-dialog .cup-admin-header span {
+  margin-top: 7px;
+  font-size: 16px;
+}
+
+.cup-stats-dialog .cup-admin-header button {
+  width: 49px;
+  height: 49px;
+  font-size: 35px;
 }
 
 .cup-stats-dialog::backdrop {
@@ -727,20 +746,20 @@ select {
 }
 
 .cup-stats-body {
-  padding: 22px;
+  padding: 29px;
 }
 
 .cup-stats-summary {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   color: var(--cup-muted);
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 850;
 }
 
 .cup-stats-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--cup-line);
-  border-radius: 7px;
+  border-radius: 9px;
 }
 
 .cup-stats-table {
@@ -752,15 +771,15 @@ select {
 
 .cup-stats-table th,
 .cup-stats-table td {
-  padding: 13px 14px;
+  padding: 17px 18px;
   border-bottom: 1px solid #ecece6;
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .cup-stats-table th {
   color: #fff;
   background: var(--cup-navy);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -773,8 +792,8 @@ select {
 }
 
 .stats-rank {
-  width: 30px;
-  height: 30px;
+  width: 39px;
+  height: 39px;
   margin: 0 auto;
   display: grid;
   place-items: center;
@@ -789,23 +808,24 @@ select {
 
 .stats-player {
   color: var(--cup-navy);
-  font-size: 16px !important;
+  font-size: 21px !important;
   font-weight: 950;
   text-align: left;
 }
 
 .stats-wins {
   color: var(--cup-green);
-  font-size: 18px !important;
+  font-size: 23px !important;
   font-weight: 950;
 }
 
 .cup-stats-empty {
-  margin: 16px 0 0;
-  padding: 24px;
-  border-radius: 6px;
+  margin: 21px 0 0;
+  padding: 31px;
+  border-radius: 8px;
   color: var(--cup-muted);
   background: #f5f6f0;
+  font-size: 18px;
   text-align: center;
 }
 
