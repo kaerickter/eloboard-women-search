@@ -158,19 +158,25 @@ function renderMatchPanel() {
   const rows = match.games.map((game, index) => {
     const closed = index >= score.clinchedAt;
     const disabled = !authenticated || closed;
+    const homeWon = game.winner === "home";
+    const awayWon = game.winner === "away";
     return [
-      '<div class="set-row' + (closed ? " is-closed" : "") + '" data-game="' + index + '">',
+      '<div class="set-row' + (closed ? " is-closed" : "") + (game.winner ? " has-winner" : "") + '" data-game="' + index + '">',
       '<span class="set-number">' + (index + 1) + "SET</span>",
-      '<input type="text" data-field="homePlayer" value="' + escapeHtml(game.homePlayer) +
-        '" placeholder="' + escapeHtml(match.home) + ' 선수"' + (disabled ? " disabled" : "") + ">",
+      '<label class="player-entry' + (homeWon ? " is-winner" : "") + '"><input type="text" data-field="homePlayer" value="' +
+        escapeHtml(game.homePlayer) + '" placeholder="' + escapeHtml(match.home) + ' 선수"' +
+        (disabled ? " disabled" : "") + ">" + (homeWon ? '<span>승리</span>' : "") + "</label>",
       '<div class="winner-controls" aria-label="' + (index + 1) + '세트 승자">',
-      '<button type="button" data-winner="home" class="' + (game.winner === "home" ? "is-home" : "") +
-        '" title="' + escapeHtml(match.home) + ' 승"' + (disabled ? " disabled" : "") + ">승</button>",
-      '<button type="button" data-winner="away" class="' + (game.winner === "away" ? "is-away" : "") +
-        '" title="' + escapeHtml(match.away) + ' 승"' + (disabled ? " disabled" : "") + ">승</button>",
+      '<button type="button" data-winner="home" class="' + (homeWon ? "is-home" : "") +
+        '" aria-pressed="' + homeWon + '" title="' + escapeHtml(match.home) + ' 승"' +
+        (disabled ? " disabled" : "") + ">" + (homeWon ? "승자" : "승") + "</button>",
+      '<button type="button" data-winner="away" class="' + (awayWon ? "is-away" : "") +
+        '" aria-pressed="' + awayWon + '" title="' + escapeHtml(match.away) + ' 승"' +
+        (disabled ? " disabled" : "") + ">" + (awayWon ? "승자" : "승") + "</button>",
       "</div>",
-      '<input type="text" data-field="awayPlayer" value="' + escapeHtml(game.awayPlayer) +
-        '" placeholder="' + escapeHtml(match.away) + ' 선수"' + (disabled ? " disabled" : "") + ">",
+      '<label class="player-entry' + (awayWon ? " is-winner" : "") + '"><input type="text" data-field="awayPlayer" value="' +
+        escapeHtml(game.awayPlayer) + '" placeholder="' + escapeHtml(match.away) + ' 선수"' +
+        (disabled ? " disabled" : "") + ">" + (awayWon ? '<span>승리</span>' : "") + "</label>",
       "</div>"
     ].join("");
   }).join("");
@@ -181,8 +187,9 @@ function renderMatchPanel() {
 
   matchPanel.innerHTML = [
     '<header class="match-sheet-head">',
-    "<span>" + match.group + "조 MATCH RESULT · " +
-      escapeHtml(formatGroupDate(match.fixtureDate)) + "</span>",
+    '<div class="match-sheet-meta"><span>' + match.group + '조 MATCH RESULT</span><time>' +
+      escapeHtml(formatGroupDate(match.fixtureDate)) + '</time>' +
+      (isToday(match.fixtureDate) ? '<em>오늘 경기</em>' : "") + "</div>",
     '<div class="match-title"><strong>' + escapeHtml(match.home) + "</strong>",
     '<div class="match-score"><b>' + score.home + "</b><i>:</i><b>" + score.away + "</b></div>",
     "<strong>" + escapeHtml(match.away) + "</strong></div>",

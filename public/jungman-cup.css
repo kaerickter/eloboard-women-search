@@ -391,11 +391,37 @@ select {
   background: var(--cup-navy);
 }
 
-.match-sheet-head > span {
+.match-sheet-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  text-align: center;
+}
+
+.match-sheet-meta > span {
   color: var(--cup-lime);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.15em;
+}
+
+.match-sheet-meta time {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.match-sheet-meta em {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #17213a;
+  background: var(--cup-lime);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 950;
 }
 
 .match-title {
@@ -447,6 +473,11 @@ select {
   border-bottom: 1px solid #ecece6;
 }
 
+.set-row.has-winner {
+  border-radius: 5px;
+  background: #f8faea;
+}
+
 .set-row.is-closed {
   opacity: 0.38;
 }
@@ -476,6 +507,35 @@ select {
   background: #f8f8f3;
 }
 
+.player-entry {
+  min-width: 0;
+  position: relative;
+}
+
+.player-entry.is-winner input,
+.player-entry.is-winner input:disabled {
+  padding-right: 46px;
+  border: 2px solid var(--cup-green);
+  color: #0f604c;
+  background: #e8f7ef;
+  box-shadow: 0 0 0 3px rgba(24, 130, 101, 0.12);
+  font-weight: 950;
+}
+
+.player-entry > span {
+  padding: 3px 6px;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  color: #fff;
+  background: var(--cup-green);
+  font-size: 9px;
+  font-weight: 950;
+  pointer-events: none;
+}
+
 .winner-controls {
   display: flex;
   justify-content: center;
@@ -483,7 +543,7 @@ select {
 }
 
 .winner-controls button {
-  width: 31px;
+  width: 36px;
   height: 31px;
   padding: 0;
   border: 1px solid var(--cup-line);
