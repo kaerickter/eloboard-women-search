@@ -23,7 +23,7 @@ select {
 }
 
 .cup-shell {
-  width: min(1740px, calc(100% - 36px));
+  width: min(1870px, calc(100% - 36px));
   margin: 0 auto;
   padding: 42px 0 70px;
 }
@@ -150,7 +150,7 @@ select {
 
 .cup-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 430px;
+  grid-template-columns: minmax(0, 1fr) 560px;
   gap: 24px;
   align-items: start;
 }
@@ -465,9 +465,9 @@ select {
 }
 
 .set-row {
-  min-height: 49px;
+  min-height: 57px;
   display: grid;
-  grid-template-columns: 35px minmax(0, 1fr) 76px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr) 170px minmax(0, 1fr);
   gap: 6px;
   align-items: center;
   border-bottom: 1px solid #ecece6;
@@ -492,8 +492,8 @@ select {
 .set-row input {
   width: 100%;
   min-width: 0;
-  height: 36px;
-  padding: 0 9px;
+  height: 42px;
+  padding: 0 11px;
   border: 1px solid var(--cup-line);
   border-radius: 4px;
   color: var(--cup-navy);
@@ -510,6 +510,11 @@ select {
 .player-entry {
   min-width: 0;
   position: relative;
+}
+
+.player-entry input {
+  font-size: 16px;
+  font-weight: 850;
 }
 
 .player-entry.is-winner input,
@@ -537,9 +542,20 @@ select {
 }
 
 .winner-controls {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
   gap: 4px;
+}
+
+.winner-controls .set-map {
+  height: 34px;
+  padding: 0 7px;
+  border-color: #bfc3b7;
+  background: #fffefa;
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
 }
 
 .winner-controls button {
@@ -686,7 +702,7 @@ select {
   display: block;
   margin-bottom: 10px;
   color: var(--cup-muted);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 850;
 }
 
@@ -755,7 +771,7 @@ select {
   border-top: 1px solid var(--cup-line);
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1320px) {
   .cup-layout {
     grid-template-columns: 1fr;
   }
@@ -837,12 +853,16 @@ select {
   }
 
   .set-row {
-    grid-template-columns: 28px minmax(0, 1fr) 68px minmax(0, 1fr);
+    grid-template-columns: 28px minmax(0, 1fr) 132px minmax(0, 1fr);
     gap: 3px;
   }
 
   .set-row input {
     padding: 0 5px;
     font-size: 11px;
+  }
+
+  .player-entry input {
+    font-size: 14px;
   }
 }

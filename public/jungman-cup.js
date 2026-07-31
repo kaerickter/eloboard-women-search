@@ -89,7 +89,7 @@ function getMatch(group, index) {
       home,
       away,
       fixtureIndex: index,
-      games: Array.from({ length: 9 }, () => ({ homePlayer: "", awayPlayer: "", winner: "" }))
+      games: Array.from({ length: 9 }, () => ({ homePlayer: "", awayPlayer: "", mapName: "", winner: "" }))
     };
   }
   state.matches[key].fixtureIndex = index;
@@ -170,6 +170,8 @@ function renderMatchPanel() {
       '<button type="button" data-winner="home" class="' + (homeWon ? "is-home" : "") +
         '" aria-pressed="' + homeWon + '" title="' + escapeHtml(match.home) + ' 승"' +
         (disabled ? " disabled" : "") + ">" + (homeWon ? "승자" : "승") + "</button>",
+      '<input class="set-map" type="text" data-field="mapName" value="' + escapeHtml(game.mapName) +
+        '" placeholder="맵" aria-label="' + (index + 1) + '세트 맵"' + (disabled ? " disabled" : "") + ">",
       '<button type="button" data-winner="away" class="' + (awayWon ? "is-away" : "") +
         '" aria-pressed="' + awayWon + '" title="' + escapeHtml(match.away) + ' 승"' +
         (disabled ? " disabled" : "") + ">" + (awayWon ? "승자" : "승") + "</button>",
@@ -207,7 +209,7 @@ function selectMatch(group, index) {
   if (!result) return;
   selectedMatch = result.key;
   renderMatchPanel();
-  if (window.innerWidth < 1120) matchPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (window.innerWidth < 1320) matchPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderGroupEditor() {
