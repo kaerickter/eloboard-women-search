@@ -1,0 +1,226 @@
+"use strict";
+
+const crypto = require("node:crypto");
+
+const AUTO_PLAYER_NAME = "이아깽";
+const AUTO_SOURCE_ID = "eloboard-auto";
+const AUTO_SYNC_LOCK_ID = 7310928;
+
+function compactName(value) {
+  return String(value || "").replace(/\s+/g, "").trim().toLocaleLowerCase("ko");
+}
+
+function looseName(value) {
+  return compactName(value).replace(/[^0-9a-z가-힣]/gi, "");
+}
+
+function clean(value, limit = 500) {
+  return String(value ?? "").replace(/\r\n/g, "\n").trim().slice(0, limit);
+}
+
+function classifyGameFormat(match) {
+  const source = `${clean(match?.format, 100)} ${clean(match?.memo, 300)}`;
+  if (/(?:^|[^a-z])ck(?:[^a-z]|$)/i.test(source)) return "CK";
+  if (source.includes("대전")) return "대학대전";
+  return "스폰";
+}
+
+function resultFromElo(value) {
+  const elo = Number(value);
+  if (elo > 0) return "승";
+  if (elo < 0) return "패";
+  return "미정";
+}
+
+function sourceKeyForMatch(playerName, match) {
+  const identity = [
+    compactName(playerName),
+    clean(match?.url, 1000),
+    clean(match?.date, 10),
+    compactName(match?.opponent),
+    clean(match?.map, 100),
+    Number(match?.elo) || 0,
+    clean(match?.format, 100),
+    clean(match?.memo, 500),
+  ].join("\u001f");
+  return crypto.createHash("sha256").update(identity).digest("hex");
+}
+
+function findOpponentProfile(roster, opponentName) {
+  const players = Array.isArray(roster) ? roster : [];
+  const exact = compactName(opponentName);
+  const loose = looseName(opponentName);
+  return players.find((player) => compactName(player?.name) === exact)
+    || players.find((player) => looseName(player?.name) === loose)
+    || null;
+}
+
+function candidateFromMatch(playerName, match, roster) {
+  const opponent = clean(match?.opponent, 80);
+  const opponentProfile = findOpponentProfile(roster, opponent);
+  return {
+    sourceKey: sourceKeyForMatch(playerName, match),
+    sourceUrl: clean(match?.url, 1000) || null,
+    matchDate: clean(match?.date, 10) || null,
+    gameFormat: classifyGameFormat(match),
+    opponent,
+    tier: clean(opponentProfile?.tier, 40) || null,
+    opponentRace: clean(opponentProfile?.race, 30) || null,
+    mapName: clean(match?.map, 80) || null,
+    result: resultFromElo(match?.elo),
+  };
+}
+
+function duplicateSignature(entry) {
+  const date = entry?.match_date instanceof Date
+    ? entry.match_date.toISOString().slice(0, 10)
+    : clean(entry?.match_date ?? entry?.matchDate, 10).slice(0, 10);
+  return [
+    date,
+    looseName(entry?.opponent),
+    clean(entry?.map_name ?? entry?.mapName, 80).toLocaleLowerCase("ko"),
+    clean(entry?.result, 10),
+  ].join("|");
+}
+
+async function initializeSpawnDiaryAutoSyncSchema(pool) {
+  if (!pool) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS spawn_diary_auto_seen (
+    source_key TEXT PRIMARY KEY,
+    player_key TEXT NOT NULL,
+    match_date DATE,
+    first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    imported_entry_id BIGINT
+  )`);
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS spawn_diary_auto_seen_player_idx ON spawn_diary_auto_seen (player_key, first_seen_at DESC)"
+  );
+}
+
+async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = AUTO_PLAYER_NAME }) {
+  if (!pool) return { enabled: false, error: "스폰일지 저장소가 연결되지 않았습니다." };
+  const matches = Array.isArray(profile?.matches) ? profile.matches : [];
+  const playerKey = compactName(playerName);
+  const uniqueCandidates = [];
+  const sourceKeys = new Set();
+  for (const match of matches) {
+    const candidate = candidateFromMatch(playerName, match, roster);
+    if (!candidate.matchDate || !candidate.opponent || sourceKeys.has(candidate.sourceKey)) continue;
+    sourceKeys.add(candidate.sourceKey);
+    uniqueCandidates.push(candidate);
+  }
+
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1)", [AUTO_SYNC_LOCK_ID]);
+    const seenCountResult = await client.query(
+      "SELECT COUNT(*)::int AS count FROM spawn_diary_auto_seen WHERE player_key = $1",
+      [playerKey]
+    );
+    const seenCount = Number(seenCountResult.rows[0]?.count || 0);
+
+    const existingResult = await client.query(`
+      SELECT match_date, opponent, map_name, result
+      FROM spawn_diary_entries
+    `);
+    const existingSignatures = new Set(existingResult.rows.map(duplicateSignature));
+    const existingDates = existingResult.rows
+      .map((entry) => duplicateSignature(entry).split("|")[0])
+      .filter(Boolean)
+      .sort();
+    const latestExistingDate = existingDates.at(-1) || "";
+    const initializing = seenCount === 0;
+    const orderedCandidates = [...uniqueCandidates].sort((a, b) =>
+      String(a.matchDate).localeCompare(String(b.matchDate))
+    );
+    const sourceRowResult = await client.query(
+      "SELECT COALESCE(MAX(source_row), 0) AS last_row FROM spawn_diary_entries WHERE source_sheet_id = $1",
+      [AUTO_SOURCE_ID]
+    );
+    let nextSourceRow = Number(sourceRowResult.rows[0]?.last_row || 0) + 1;
+    let imported = 0;
+    let duplicates = 0;
+    let baselineSkipped = 0;
+
+    for (const candidate of orderedCandidates) {
+      const seenInsert = await client.query(`
+        INSERT INTO spawn_diary_auto_seen (source_key, player_key, match_date)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (source_key) DO NOTHING
+        RETURNING source_key
+      `, [candidate.sourceKey, playerKey, candidate.matchDate]);
+      if (!seenInsert.rowCount) continue;
+
+      if (existingSignatures.has(duplicateSignature(candidate))) {
+        duplicates += 1;
+        continue;
+      }
+      if (initializing && (!latestExistingDate || candidate.matchDate < latestExistingDate)) {
+        baselineSkipped += 1;
+        continue;
+      }
+
+      const diaryInsert = await client.query(`
+        INSERT INTO spawn_diary_entries (
+          match_date, game_format, opponent, tier, opponent_race, map_name,
+          result, opponent_build, my_build, feedback, reflection, keywords,
+          replay_number, source_sheet_id, source_row, source_url
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6,
+          $7, NULL, NULL, NULL, NULL, $8,
+          NULL, $9, $10, $11
+        )
+        RETURNING id
+      `, [
+        candidate.matchDate,
+        candidate.gameFormat,
+        candidate.opponent,
+        candidate.tier,
+        candidate.opponentRace,
+        candidate.mapName,
+        candidate.result,
+        "전적검색 자동등록",
+        AUTO_SOURCE_ID,
+        nextSourceRow,
+        candidate.sourceUrl,
+      ]);
+      nextSourceRow += 1;
+      imported += 1;
+      await client.query(
+        "UPDATE spawn_diary_auto_seen SET imported_entry_id = $1 WHERE source_key = $2",
+        [diaryInsert.rows[0].id, candidate.sourceKey]
+      );
+    }
+
+    await client.query("COMMIT");
+    return {
+      enabled: true,
+      initialized: initializing,
+      baselineCount: initializing ? uniqueCandidates.length : undefined,
+      checked: uniqueCandidates.length,
+      imported,
+      duplicates,
+      baselineSkipped,
+    };
+  } catch (error) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client?.release();
+  }
+}
+
+module.exports = {
+  AUTO_PLAYER_NAME,
+  candidateFromMatch,
+  classifyGameFormat,
+  compactName,
+  duplicateSignature,
+  initializeSpawnDiaryAutoSyncSchema,
+  resultFromElo,
+  sourceKeyForMatch,
+  syncSpawnDiaryFromProfile,
+};

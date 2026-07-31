@@ -7,6 +7,11 @@ const { setupCollaboration } = require("./collaboration-server");
 const { normalizeBjListPlayerText } = require("./eloboard-utils");
 const { TierAdmin } = require("./tier-admin");
 const { SpawnDiaryAdmin } = require("./spawn-diary-admin");
+const {
+  AUTO_PLAYER_NAME,
+  compactName: autoDiaryPlayerKey,
+  syncSpawnDiaryFromProfile
+} = require("./spawn-diary-auto-sync");
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
@@ -249,6 +254,29 @@ function soopChannelFromHtml(html) {
 }
 function normalizeName(name) {
   return String(name || "").replace(/\s+/g, "").trim().toLowerCase();
+}
+async function maybeSyncSpawnDiary(query, profile) {
+  if (autoDiaryPlayerKey(query) !== autoDiaryPlayerKey(AUTO_PLAYER_NAME) || !profile) return null;
+  try {
+    let roster = [];
+    try {
+      roster = tierAdmin.applyOverrides(await loadTierRoster(false));
+    } catch (error) {
+      console.warn("Spawn diary auto-sync could not load opponent tiers:", error.message);
+    }
+    return await syncSpawnDiaryFromProfile({
+      pool: tierAdmin.pool,
+      profile,
+      roster,
+      playerName: AUTO_PLAYER_NAME
+    });
+  } catch (error) {
+    console.error("Spawn diary auto-sync failed:", error.message);
+    return {
+      enabled: false,
+      error: "스폰일지 자동등록을 완료하지 못했습니다. 잠시 후 다시 검색해 주세요."
+    };
+  }
 }
 function normalizePlayerName(name) {
   return normalizeName(name).replace(/[tzp]$/i, "");
@@ -1907,11 +1935,20 @@ const server = http.createServer(async (req, res) => {
       }
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
-        const profile = await loadProfile(requestedWrId, force);
+        const autoDiaryTarget = autoDiaryPlayerKey(query) === autoDiaryPlayerKey(AUTO_PLAYER_NAME);
+        const profile = await loadProfile(requestedWrId, force || autoDiaryTarget);
+        const autoDiarySync = await maybeSyncSpawnDiary(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
         const result = summarize([], query);
-        return send(res, 200, JSON.stringify({ ...data, ...result, players, profile, resultState: profile ? "found" : "empty" }, null, 2), "application/json; charset=utf-8");
+        return send(res, 200, JSON.stringify({
+          ...data,
+          ...result,
+          players,
+          profile,
+          autoDiarySync,
+          resultState: profile ? "found" : "empty"
+        }, null, 2), "application/json; charset=utf-8");
       }
       const dataPromise = loadData(url.searchParams.get("pages"), force);
       const indexPromise = query
@@ -1927,13 +1964,18 @@ const server = http.createServer(async (req, res) => {
           players = findPlayers(query, data.matches, await loadPlayerIndex(true));
         }
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
-        if (selected?.wrId) profile = await loadProfile(selected.wrId, force);
+        if (selected?.wrId) {
+          const autoDiaryTarget = autoDiaryPlayerKey(query) === autoDiaryPlayerKey(AUTO_PLAYER_NAME);
+          profile = await loadProfile(selected.wrId, force || autoDiaryTarget);
+        }
       }
+      const autoDiarySync = await maybeSyncSpawnDiary(query, profile);
       return send(res, 200, JSON.stringify({
         ...data,
         ...result,
         players,
         profile,
+        autoDiarySync,
         resultState: query ? (profile ? "found" : "empty") : "found"
       }, null, 2), "application/json; charset=utf-8");
     } catch (error) {

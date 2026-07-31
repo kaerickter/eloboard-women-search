@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Pool } = require("pg");
+const { initializeSpawnDiaryAutoSyncSchema } = require("./spawn-diary-auto-sync");
 
 const SESSION_COOKIE = "tier_admin_session";
 const SESSION_MS = 12 * 60 * 60 * 1000;
@@ -145,6 +146,7 @@ class TierAdmin {
         );
         await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS race TEXT");
         await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS broadcast_id TEXT");
+        await initializeSpawnDiaryAutoSyncSchema(this.pool);
         const result = await this.pool.query(
           `SELECT player_key, player_name, universities, tier, promotion_light,
             is_custom, race, broadcast_id, updated_at
