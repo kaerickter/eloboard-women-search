@@ -3,14 +3,8 @@ const UNIVERSITIES = [
   "씨나인", "엠비대", "와플대", "캄몬스타즈", "케이대", "흑카데미"
 ];
 const GROUPS = ["A", "B", "C", "D"];
-const PREVIEW_FIXTURE_DATES = { A: ["", "", ""], B: ["", "", ""], C: ["", "", ""], D: ["", "", ""] };
-const PREVIEW_GROUPS = {
-  A: ["JSA", "씨나인", "뉴캣슬"],
-  B: ["캄몬스타즈", "케이대", "신세계"],
-  C: ["HM", "DM", "수술대"],
-  D: ["BGM", "엠비대", "와플대"]
-};
-const STORAGE_KEY = "jungman-cup-preview-v1";
+const STORAGE_KEY = "jungman-cup-preview-v2";
+const PREVIOUS_STORAGE_KEY = "jungman-cup-preview-v1";
 
 const groupGrid = document.getElementById("groupGrid");
 const matchPanel = document.getElementById("matchPanel");
@@ -30,36 +24,25 @@ let csrf = "";
 let selectedMatch = null;
 let state = readState();
 
-function clonePreviewGroups() {
-  return Object.fromEntries(GROUPS.map((group) => [group, [...PREVIEW_GROUPS[group]]]));
-}
-
-function clonePreviewFixtureDates() {
-  return Object.fromEntries(GROUPS.map((group) => [group, [...PREVIEW_FIXTURE_DATES[group]]]));
-}
-
-function readFixtureDates(saved) {
-  const dates = clonePreviewFixtureDates();
-  GROUPS.forEach((group) => {
-    if (Array.isArray(saved.fixtureDates?.[group])) {
-      dates[group] = [0, 1, 2].map((index) => saved.fixtureDates[group][index] || "");
-    } else if (saved.dates?.[group]) {
-      dates[group] = [saved.dates[group], saved.dates[group], saved.dates[group]];
-    }
-  });
-  return dates;
+function emptyFixtures() {
+  return Object.fromEntries(GROUPS.map((group) => [
+    group,
+    Array.from({ length: 3 }, () => ({ date: "", home: "", away: "" }))
+  ]));
 }
 
 function readState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    const previous = JSON.parse(localStorage.getItem(PREVIOUS_STORAGE_KEY) || "{}");
     return {
-      groups: saved.groups && typeof saved.groups === "object" ? saved.groups : clonePreviewGroups(),
-      fixtureDates: readFixtureDates(saved),
-      matches: saved.matches && typeof saved.matches === "object" ? saved.matches : {}
+      fixtures: saved.fixtures && typeof saved.fixtures === "object" ? saved.fixtures : emptyFixtures(),
+      matches: saved.matches && typeof saved.matches === "object"
+        ? saved.matches
+        : (previous.matches && typeof previous.matches === "object" ? previous.matches : {})
     };
   } catch {
-    return { groups: clonePreviewGroups(), fixtureDates: clonePreviewFixtureDates(), matches: {} };
+    return { fixtures: emptyFixtures(), matches: {} };
   }
 }
 
@@ -81,14 +64,6 @@ function matchKey(group, home, away) {
   return [group, home, away].join("::");
 }
 
-function fixturePairs() {
-  return [[0, 1], [0, 2], [1, 2]];
-}
-
-function fixtureIndex(homeSlot, awaySlot) {
-  return fixturePairs().findIndex(([home, away]) => home === homeSlot && away === awaySlot);
-}
-
 function formatGroupDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return "날짜 미정";
   const date = new Date(value + "T00:00:00");
@@ -96,13 +71,12 @@ function formatGroupDate(value) {
   return value.replaceAll("-", ".") + " (" + weekday + ")";
 }
 
-function getMatch(group, homeSlot, awaySlot) {
-  const teams = state.groups[group] || [];
-  const home = teams[homeSlot] || "";
-  const away = teams[awaySlot] || "";
+function getMatch(group, index) {
+  const fixture = state.fixtures?.[group]?.[index];
+  const home = fixture?.home || "";
+  const away = fixture?.away || "";
   if (!home || !away) return null;
   const key = matchKey(group, home, away);
-  const index = fixtureIndex(homeSlot, awaySlot);
   if (!state.matches[key]) {
     state.matches[key] = {
       group,
@@ -113,24 +87,26 @@ function getMatch(group, homeSlot, awaySlot) {
     };
   }
   state.matches[key].fixtureIndex = index;
+  state.matches[key].fixtureDate = fixture.date || "";
   return { key, match: state.matches[key] };
 }
 
 function renderGroups() {
   groupGrid.innerHTML = GROUPS.map((group) => {
-    const teams = state.groups[group] || ["", "", ""];
-    const fixtures = fixturePairs().map(([homeSlot, awaySlot], index) => {
-      const home = teams[homeSlot] || "대학 미정";
-      const away = teams[awaySlot] || "대학 미정";
-      const fixtureDate = formatGroupDate(state.fixtureDates?.[group]?.[index]);
-      const disabled = !teams[homeSlot] || !teams[awaySlot];
+    const groupFixtures = state.fixtures?.[group] || [];
+    const fixtures = [0, 1, 2].map((index) => {
+      const fixture = groupFixtures[index] || {};
+      const home = fixture.home || "왼쪽 대학 미정";
+      const away = fixture.away || "오른쪽 대학 미정";
+      const fixtureDate = formatGroupDate(fixture.date);
+      const disabled = !fixture.home || !fixture.away;
       return [
         '<div class="fixture">',
-        '<button class="fixture-team" type="button" data-group="' + group + '" data-home="' + homeSlot +
-          '" data-away="' + awaySlot + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
+        '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
+          '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
         '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time>' + escapeHtml(fixtureDate) + "</time></span>",
-        '<button class="fixture-team" type="button" data-group="' + group + '" data-home="' + homeSlot +
-          '" data-away="' + awaySlot + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
+        '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
+          '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
         "</div>"
       ].join("");
     }).join("");
@@ -138,10 +114,7 @@ function renderGroups() {
     return [
       '<article class="group-card">',
       '<header class="group-header"><div><span class="group-letter">' + group + "</span><strong>" + group +
-        '조</strong></div><small>3팀 · 3경기</small></header>',
-      '<div class="group-teams">',
-      teams.map((team, index) => '<span class="team-seed">' + (index + 1) + ". " + escapeHtml(team || "미정") + "</span>").join(""),
-      "</div>",
+        '조</strong></div><small>대전 3경기</small></header>',
       '<div class="fixture-list">' + fixtures + "</div>",
       "</article>"
     ].join("");
@@ -201,7 +174,7 @@ function renderMatchPanel() {
   matchPanel.innerHTML = [
     '<header class="match-sheet-head">',
     "<span>" + match.group + "조 MATCH RESULT · " +
-      escapeHtml(formatGroupDate(state.fixtureDates?.[match.group]?.[match.fixtureIndex])) + "</span>",
+      escapeHtml(formatGroupDate(match.fixtureDate)) + "</span>",
     '<div class="match-title"><strong>' + escapeHtml(match.home) + "</strong>",
     '<div class="match-score"><b>' + score.home + "</b><i>:</i><b>" + score.away + "</b></div>",
     "<strong>" + escapeHtml(match.away) + "</strong></div>",
@@ -214,8 +187,8 @@ function renderMatchPanel() {
   ].join("");
 }
 
-function selectMatch(group, homeSlot, awaySlot) {
-  const result = getMatch(group, homeSlot, awaySlot);
+function selectMatch(group, index) {
+  const result = getMatch(group, index);
   if (!result) return;
   selectedMatch = result.key;
   renderMatchPanel();
@@ -232,30 +205,23 @@ function setAdminView(enabled) {
 
 function renderGroupEditor() {
   if (!authenticated) return;
-  const selected = new Set(GROUPS.flatMap((group) => state.groups[group] || []).filter(Boolean));
   groupEditor.innerHTML = GROUPS.map((group) => {
-    const teams = state.groups[group] || ["", "", ""];
-    const selects = [0, 1, 2].map((slot) => {
-      const value = teams[slot] || "";
-      const options = ['<option value="">대학 선택</option>'].concat(UNIVERSITIES.map((university) => {
-        const usedElsewhere = selected.has(university) && university !== value;
-        return '<option value="' + escapeHtml(university) + '"' +
-          (university === value ? " selected" : "") +
-          (usedElsewhere ? " disabled" : "") + ">" + escapeHtml(university) + "</option>";
-      }));
-      return '<select data-editor-group="' + group + '" data-editor-slot="' + slot + '">' + options.join("") + "</select>";
+    const fixtures = state.fixtures?.[group] || [];
+    const rows = [0, 1, 2].map((index) => {
+      const fixture = fixtures[index] || { date: "", home: "", away: "" };
+      const options = (value, placeholder) => ['<option value="">' + placeholder + '</option>'].concat(UNIVERSITIES.map((university) => (
+        '<option value="' + escapeHtml(university) + '"' + (university === value ? " selected" : "") +
+        ">" + escapeHtml(university) + "</option>"
+      ))).join("");
+      return '<div class="fixture-edit-row"><span class="fixture-edit-number">' + (index + 1) + '경기</span>' +
+        '<input type="date" aria-label="' + group + '조 ' + (index + 1) + '경기 날짜" data-fixture-field="date" data-group="' +
+        group + '" data-index="' + index + '" value="' + escapeHtml(fixture.date) + '">' +
+        '<select aria-label="' + group + '조 ' + (index + 1) + '경기 왼쪽 대학" data-fixture-field="home" data-group="' +
+        group + '" data-index="' + index + '">' + options(fixture.home, "왼쪽 대학 선택") + '</select><b>VS</b>' +
+        '<select aria-label="' + group + '조 ' + (index + 1) + '경기 오른쪽 대학" data-fixture-field="away" data-group="' +
+        group + '" data-index="' + index + '">' + options(fixture.away, "오른쪽 대학 선택") + "</select></div>";
     }).join("");
-    const dateFields = fixturePairs().map(([homeSlot, awaySlot], index) => {
-      const home = teams[homeSlot] || "대학 " + (homeSlot + 1);
-      const away = teams[awaySlot] || "대학 " + (awaySlot + 1);
-      const value = state.fixtureDates?.[group]?.[index] || "";
-      return '<label class="fixture-date-field"><span>' + (index + 1) + '경기</span><b>' +
-        escapeHtml(home) + ' vs ' + escapeHtml(away) + '</b><input type="date" data-editor-fixture-date="' +
-        group + '" data-editor-fixture-index="' + index + '" value="' + escapeHtml(value) + '"></label>';
-    }).join("");
-    return '<div class="group-edit-card"><strong>' + group + '조</strong>' +
-      '<section class="group-university-fields"><span class="group-editor-label">참가 대학</span>' + selects + '</section>' +
-      '<section class="group-fixture-dates"><span class="group-editor-label">경기별 날짜</span>' + dateFields + "</section></div>";
+    return '<div class="group-edit-card"><strong>' + group + '조</strong><span class="group-editor-label">날짜와 대전 대학을 경기별로 선택</span>' + rows + "</div>";
   }).join("");
 }
 
@@ -284,9 +250,9 @@ async function checkAdminSession() {
 }
 
 groupGrid.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-group][data-home][data-away]");
+  const button = event.target.closest("[data-group][data-fixture]");
   if (!button) return;
-  selectMatch(button.dataset.group, Number(button.dataset.home), Number(button.dataset.away));
+  selectMatch(button.dataset.group, Number(button.dataset.fixture));
 });
 
 matchPanel.addEventListener("input", (event) => {
@@ -339,51 +305,46 @@ cupAdminLogin.addEventListener("submit", async (event) => {
 });
 
 groupEditor.addEventListener("change", (event) => {
-  const dateInput = event.target.closest("[data-editor-fixture-date]");
-  if (dateInput) {
-    const group = dateInput.dataset.editorFixtureDate;
-    state.fixtureDates[group][Number(dateInput.dataset.editorFixtureIndex)] = dateInput.value;
-    return;
-  }
-  const select = event.target.closest("[data-editor-group]");
-  if (!select) return;
-  const group = select.dataset.editorGroup;
-  const slot = Number(select.dataset.editorSlot);
-  state.groups[group][slot] = select.value;
-  renderGroupEditor();
+  const field = event.target.closest("[data-fixture-field][data-group][data-index]");
+  if (!field) return;
+  state.fixtures[field.dataset.group][Number(field.dataset.index)][field.dataset.fixtureField] = field.value;
 });
 
 cupAdminSave.addEventListener("click", () => {
-  const missingDate = GROUPS.map((group) => ({
+  const incomplete = GROUPS.flatMap((group) => (state.fixtures[group] || []).map((fixture, index) => ({
     group,
-    index: [0, 1, 2].findIndex((index) => !state.fixtureDates?.[group]?.[index])
-  })).find((item) => item.index !== -1);
-  if (missingDate) {
-    cupAdminStatus.textContent = missingDate.group + "조 " + (missingDate.index + 1) + "경기 날짜를 선택해 주세요.";
+    index,
+    fixture
+  }))).find(({ fixture }) => !fixture.date || !fixture.home || !fixture.away);
+  if (incomplete) {
+    cupAdminStatus.textContent = incomplete.group + "조 " + (incomplete.index + 1) + "경기의 날짜와 양쪽 대학을 모두 선택해 주세요.";
     return;
   }
-  const teams = GROUPS.flatMap((group) => state.groups[group] || []);
-  const filled = teams.filter(Boolean);
-  if (filled.length !== 12 || new Set(filled).size !== 12) {
-    cupAdminStatus.textContent = "중복 없이 12개 대학을 모두 선택해 주세요.";
+  const sameUniversity = GROUPS.flatMap((group) => (state.fixtures[group] || []).map((fixture, index) => ({
+    group,
+    index,
+    fixture
+  }))).find(({ fixture }) => fixture.home === fixture.away);
+  if (sameUniversity) {
+    cupAdminStatus.textContent = sameUniversity.group + "조 " + (sameUniversity.index + 1) + "경기는 서로 다른 대학을 선택해 주세요.";
     return;
   }
   saveState();
   selectedMatch = null;
   renderGroups();
   renderMatchPanel();
-  cupAdminStatus.textContent = "4개 조의 참가 대학과 12개 경기 날짜를 저장했습니다.";
+  cupAdminStatus.textContent = "4개 조의 12개 대전 날짜와 대학을 저장했습니다.";
   cupAdminDialog.close();
 });
 
 cupAdminReset.addEventListener("click", () => {
-  state = { groups: clonePreviewGroups(), fixtureDates: clonePreviewFixtureDates(), matches: {} };
+  state = { fixtures: emptyFixtures(), matches: state.matches || {} };
   saveState();
   selectedMatch = null;
   renderGroupEditor();
   renderGroups();
   renderMatchPanel();
-  cupAdminStatus.textContent = "화면 미리보기용 예시 대진으로 초기화했습니다.";
+  cupAdminStatus.textContent = "등록된 날짜와 대학을 모두 초기화했습니다.";
 });
 
 renderGroups();
