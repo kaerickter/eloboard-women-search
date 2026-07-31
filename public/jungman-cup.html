@@ -48,7 +48,10 @@
           <strong>조별 대전 일정</strong>
           <span>대전 등록에서 날짜와 양쪽 대학을 경기마다 직접 선택할 수 있습니다.</span>
         </div>
-        <button id="cupAdminOpen" type="button">대전 등록</button>
+        <div class="cup-notice-actions">
+          <button id="cupStatsOpen" class="stats-button" type="button">개인성적</button>
+          <button id="cupAdminOpen" type="button">대전 등록</button>
+        </div>
       </section>
 
       <div class="cup-layout">
@@ -85,6 +88,28 @@
         <p>미리보기 단계에서는 이 브라우저에만 저장됩니다.</p>
       </section>
       <p id="cupAdminStatus" class="cup-admin-status" role="status">등록할 경기 내용을 입력한 뒤 저장해 주세요.</p>
+    </dialog>
+
+    <dialog id="cupStatsDialog" class="cup-stats-dialog" aria-labelledby="cupStatsTitle">
+      <div class="cup-admin-header">
+        <div>
+          <strong id="cupStatsTitle">중만컵 개인성적</strong>
+          <span>기록이 완료된 경기만 집계합니다.</span>
+        </div>
+        <button id="cupStatsClose" type="button" aria-label="닫기">×</button>
+      </div>
+      <div class="cup-stats-body">
+        <p id="cupStatsSummary" class="cup-stats-summary"></p>
+        <div class="cup-stats-table-wrap">
+          <table class="cup-stats-table">
+            <thead>
+              <tr><th>순위</th><th>선수명</th><th>승리</th><th>경기 수</th><th>승률</th></tr>
+            </thead>
+            <tbody id="cupStatsRows"></tbody>
+          </table>
+        </div>
+        <p id="cupStatsEmpty" class="cup-stats-empty" hidden>승자와 양쪽 출전자 이름이 입력된 경기부터 개인성적에 표시됩니다.</p>
+      </div>
     </dialog>
 
     <script src="./jungman-cup.js"></script>

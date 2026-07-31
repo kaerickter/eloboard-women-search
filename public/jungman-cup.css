@@ -148,6 +148,17 @@ select {
   cursor: pointer;
 }
 
+.preview-notice .cup-notice-actions {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.preview-notice .stats-button {
+  border-color: var(--cup-green);
+  color: var(--cup-green);
+  background: #fff;
+}
+
 .cup-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 560px;
@@ -698,6 +709,106 @@ select {
   width: 100%;
 }
 
+.cup-stats-dialog {
+  width: min(760px, calc(100% - 28px));
+  max-height: min(820px, calc(100vh - 36px));
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: 8px;
+  color: var(--cup-navy);
+  background: var(--cup-cream);
+  box-shadow: 0 30px 90px rgba(11, 18, 36, 0.35);
+}
+
+.cup-stats-dialog::backdrop {
+  background: rgba(12, 18, 32, 0.58);
+  backdrop-filter: blur(4px);
+}
+
+.cup-stats-body {
+  padding: 22px;
+}
+
+.cup-stats-summary {
+  margin: 0 0 12px;
+  color: var(--cup-muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.cup-stats-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--cup-line);
+  border-radius: 7px;
+}
+
+.cup-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  text-align: center;
+}
+
+.cup-stats-table th,
+.cup-stats-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #ecece6;
+  font-size: 14px;
+}
+
+.cup-stats-table th {
+  color: #fff;
+  background: var(--cup-navy);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.cup-stats-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cup-stats-table tr.is-top-rank {
+  background: #fafcde;
+}
+
+.stats-rank {
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--cup-navy);
+  background: #eceee5;
+}
+
+.is-top-rank .stats-rank {
+  background: var(--cup-lime);
+}
+
+.stats-player {
+  color: var(--cup-navy);
+  font-size: 16px !important;
+  font-weight: 950;
+  text-align: left;
+}
+
+.stats-wins {
+  color: var(--cup-green);
+  font-size: 18px !important;
+  font-weight: 950;
+}
+
+.cup-stats-empty {
+  margin: 16px 0 0;
+  padding: 24px;
+  border-radius: 6px;
+  color: var(--cup-muted);
+  background: #f5f6f0;
+  text-align: center;
+}
+
 .group-editor-label {
   display: block;
   margin-bottom: 10px;
@@ -825,6 +936,12 @@ select {
 @media (max-width: 450px) {
   .fixture-edit-row {
     grid-template-columns: 46px minmax(0, 1fr) 28px minmax(0, 1fr);
+  }
+
+  .preview-notice .cup-notice-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .fixture-edit-number {

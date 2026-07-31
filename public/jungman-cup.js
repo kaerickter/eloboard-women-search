@@ -15,6 +15,12 @@ const cupAdminStatus = document.getElementById("cupAdminStatus");
 const groupEditor = document.getElementById("groupEditor");
 const cupAdminSave = document.getElementById("cupAdminSave");
 const cupAdminReset = document.getElementById("cupAdminReset");
+const cupStatsOpen = document.getElementById("cupStatsOpen");
+const cupStatsDialog = document.getElementById("cupStatsDialog");
+const cupStatsClose = document.getElementById("cupStatsClose");
+const cupStatsSummary = document.getElementById("cupStatsSummary");
+const cupStatsRows = document.getElementById("cupStatsRows");
+const cupStatsEmpty = document.getElementById("cupStatsEmpty");
 
 const authenticated = true;
 let selectedMatch = null;
@@ -65,6 +71,48 @@ function formatGroupDate(value) {
   const date = new Date(value + "T00:00:00");
   const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(date);
   return (date.getMonth() + 1) + "월 " + date.getDate() + "일 (" + weekday + ")";
+}
+
+function individualStandings() {
+  const players = new Map();
+  let completedGames = 0;
+  const addGame = (name, won) => {
+    const key = String(name || "").trim();
+    if (!players.has(key)) players.set(key, { name: key, wins: 0, games: 0 });
+    const player = players.get(key);
+    player.games += 1;
+    if (won) player.wins += 1;
+  };
+
+  Object.values(state.matches || {}).forEach((match) => {
+    (match.games || []).forEach((game) => {
+      const home = String(game.homePlayer || "").trim();
+      const away = String(game.awayPlayer || "").trim();
+      if (!home || !away || !["home", "away"].includes(game.winner)) return;
+      completedGames += 1;
+      addGame(home, game.winner === "home");
+      addGame(away, game.winner === "away");
+    });
+  });
+
+  return {
+    completedGames,
+    rows: [...players.values()].sort((a, b) =>
+      b.wins - a.wins || b.games - a.games || a.name.localeCompare(b.name, "ko")
+    )
+  };
+}
+
+function renderIndividualStats() {
+  const standings = individualStandings();
+  cupStatsSummary.textContent = standings.rows.length + "명 · 완료 경기 " + standings.completedGames + "경기";
+  cupStatsRows.innerHTML = standings.rows.map((player, index) => {
+    const winRate = player.games ? Math.round((player.wins / player.games) * 100) : 0;
+    return '<tr class="' + (index < 3 ? "is-top-rank" : "") + '"><td><b class="stats-rank">' +
+      (index + 1) + '</b></td><td class="stats-player">' + escapeHtml(player.name) + '</td><td class="stats-wins">' +
+      player.wins + '</td><td>' + player.games + '</td><td>' + winRate + "%</td></tr>";
+  }).join("");
+  cupStatsEmpty.hidden = standings.rows.length > 0;
 }
 
 function localDateKey(date = new Date()) {
@@ -267,6 +315,16 @@ cupAdminOpen.addEventListener("click", () => {
 cupAdminClose.addEventListener("click", () => cupAdminDialog.close());
 cupAdminDialog.addEventListener("click", (event) => {
   if (event.target === cupAdminDialog) cupAdminDialog.close();
+});
+
+cupStatsOpen.addEventListener("click", () => {
+  renderIndividualStats();
+  if (!cupStatsDialog.open) cupStatsDialog.showModal();
+});
+
+cupStatsClose.addEventListener("click", () => cupStatsDialog.close());
+cupStatsDialog.addEventListener("click", (event) => {
+  if (event.target === cupStatsDialog) cupStatsDialog.close();
 });
 
 groupEditor.addEventListener("change", (event) => {
