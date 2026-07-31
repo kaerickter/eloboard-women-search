@@ -112,6 +112,14 @@ function setSearchState(kind, message) {
   $("refreshButton").disabled = kind === "loading";
 }
 
+function autoDiaryStatusSuffix(sync) {
+  if (!sync) return "";
+  if (sync.error) return " · 스폰일지 자동등록을 다시 확인해 주세요.";
+  if (Number(sync.imported) > 0) return " · 새 경기 " + Number(sync.imported) + "건을 스폰일지에 자동등록했습니다.";
+  if (sync.initialized) return " · 현재 기록을 기준으로 스폰일지 자동등록을 시작했습니다.";
+  return "";
+}
+
 function validateSearchResponse(data) {
   if (!data || typeof data !== "object") throw new Error("검색 응답 형식이 올바르지 않습니다.");
   if (!Array.isArray(data.matches) || !Array.isArray(data.players)) {
@@ -509,9 +517,10 @@ async function load(name = "", refresh = false) {
   if (name && (!data.profile || data.resultState === "empty")) {
     setSearchState("empty", TXT.noResult);
   } else {
-    setSearchState("success", data.profileOnly
+    const successMessage = data.profileOnly
       ? when + " " + TXT.basis + " \u00b7 " + (data.profile?.name || name) + " \ud504\ub85c\ud544 \uc804\uc801\uc744 \uc77d\uc5c8\uc2b5\ub2c8\ub2e4."
-      : when + " " + TXT.basis + " \u00b7 " + TXT.pagesFrom + " " + data.pagesLoaded + TXT.pagesUnit + " " + data.matches.length + TXT.readUnit);
+      : when + " " + TXT.basis + " \u00b7 " + TXT.pagesFrom + " " + data.pagesLoaded + TXT.pagesUnit + " " + data.matches.length + TXT.readUnit;
+    setSearchState("success", successMessage + autoDiaryStatusSuffix(data.autoDiarySync));
   }
 }
 
