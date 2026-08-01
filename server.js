@@ -7,6 +7,7 @@ const { setupCollaboration } = require("./collaboration-server");
 const { normalizeBjListPlayerText } = require("./eloboard-utils");
 const { TierAdmin } = require("./tier-admin");
 const { SpawnDiaryAdmin } = require("./spawn-diary-admin");
+const { PlayerAnalysisStore, analyzePlayer } = require("./player-analysis");
 const {
   AUTO_PLAYER_NAME,
   compactName: autoDiaryPlayerKey,
@@ -106,6 +107,20 @@ const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 8;
 const tierAdmin = new TierAdmin();
 const spawnDiaryAdmin = new SpawnDiaryAdmin();
+const playerAnalysisStore = new PlayerAnalysisStore({ pool: tierAdmin.pool });
+let playerAnalysisReady = false;
+let playerAnalysisInitPromise = null;
+
+async function ensurePlayerAnalysisStore() {
+  if (playerAnalysisReady) return;
+  if (!playerAnalysisInitPromise) {
+    playerAnalysisStore.pool = tierAdmin.pool;
+    playerAnalysisInitPromise = playerAnalysisStore.init()
+      .then(() => { playerAnalysisReady = true; })
+      .finally(() => { playerAnalysisInitPromise = null; });
+  }
+  await playerAnalysisInitPromise;
+}
 
 function withMenTierFallback(players) {
   const roster = Array.isArray(players) ? players : [];
@@ -581,6 +596,10 @@ function parseProfile(html, wrId) {
   const mixed = parseRecordFromText(plainText, "\ud63c\uc131") || recordLines.find((record) => record.label === "\ud63c\uc131") || null;
   const recentLine = lines.find((line) => line.includes("\ucd5c\uadfc 30\uc77c\uac04 \uc804\uc801")) || "";
   const recentMatch = (recentLine + "\n" + plainText).match(/\ucd5c\uadfc\s*30\uc77c\uac04\s*\uc804\uc801[\s\S]{0,40}?\((\d+)\uc2b9\/(\d+)\ud328\)/);
+  const raceMatch = plainText.match(/\b(Terran|Zerg|Protoss)\b/i);
+  const race = raceMatch
+    ? ({ terran: "테란", zerg: "저그", protoss: "프로토스" })[raceMatch[1].toLowerCase()]
+    : "";
   const profileRows = parseProfileRows(html);
   const mostMatches = [];
   for (const match of html.matchAll(/href=["']([^"']*bo_table=bj_list[^"']*wr_id=\d+[^"']*)["'][^>]*>([^<]*?\((\d+)승\s*(\d+)패\))<\/a>/g)) {
@@ -598,6 +617,7 @@ function parseProfile(html, wrId) {
   return {
     wrId: String(wrId),
     name,
+    race,
     url: playerUrl(wrId),
     image: profileImageFromHtml(html),
     broadcastId: soop?.broadcastId || "",
@@ -1945,6 +1965,52 @@ const server = http.createServer(async (req, res) => {
       return send(res, 502, JSON.stringify({ error: error.message || "eloboard 전적을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/player-analysis" && req.method === "GET") {
+    try {
+      const wrId = String(url.searchParams.get("wr_id") || "").trim();
+      if (!/^\d+$/.test(wrId)) {
+        return send(res, 400, JSON.stringify({ error: "올바른 선수 wr_id가 필요합니다." }), "application/json; charset=utf-8");
+      }
+      await ensurePlayerAnalysisStore();
+      const profile = await loadProfile(wrId, url.searchParams.get("refresh") === "1");
+      if (!profile) {
+        return send(res, 404, JSON.stringify({ error: "선수 전적 데이터를 찾지 못했습니다." }), "application/json; charset=utf-8");
+      }
+      const saved = playerAnalysisStore.get(wrId);
+      const analysis = analyzePlayer(profile, saved?.communitySummary || "");
+      await playerAnalysisStore.saveAnalysis(wrId, profile.name, analysis);
+      return send(res, 200, JSON.stringify(analysis), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "선수 경기력 분석에 실패했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/player-analysis/community" && req.method === "PUT") {
+    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+      return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      tierAdmin.assertWritableStorage();
+      await ensurePlayerAnalysisStore();
+      const body = await readJsonBody(req);
+      const wrId = String(body.wrId || "").trim();
+      if (!/^\d+$/.test(wrId)) {
+        return send(res, 400, JSON.stringify({ error: "올바른 선수 wr_id가 필요합니다." }), "application/json; charset=utf-8");
+      }
+      const profile = await loadProfile(wrId, false);
+      if (!profile) {
+        return send(res, 404, JSON.stringify({ error: "선수 전적 데이터를 찾지 못했습니다." }), "application/json; charset=utf-8");
+      }
+      const communitySummary = String(body.communitySummary || "").replace(/\s+/g, " ").trim().slice(0, 1000);
+      await playerAnalysisStore.saveCommunity(wrId, profile.name, communitySummary);
+      const analysis = analyzePlayer(profile, communitySummary);
+      await playerAnalysisStore.saveAnalysis(wrId, profile.name, analysis);
+      return send(res, 200, JSON.stringify({ ok: true, analysis }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, error.statusCode || 500, JSON.stringify({
+        error: error.message || "커뮤니티 평가를 저장하지 못했습니다."
+      }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/data") {
     try {
       const force = url.searchParams.get("refresh") === "1";
@@ -2016,6 +2082,8 @@ let tierAdminRetryTimer = null;
 async function initializeTierAdminStorage() {
   try {
     await tierAdmin.init();
+    playerAnalysisReady = false;
+    await ensurePlayerAnalysisStore();
     clearTimeout(tierAdminRetryTimer);
     tierAdminRetryTimer = null;
   } catch (error) {
