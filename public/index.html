@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ELOBoard &#51204;&#51201;&#46321;&#47197; &#44160;&#49353;</title>
-    <link rel="stylesheet" href="./styles.css?v=20260731-period-font-plus2">
+    <link rel="stylesheet" href="./styles.css?v=20260801-player-analysis-right">
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   </head>
@@ -101,14 +101,46 @@
         </div>
       </section>
 
-      <section class="profile-grid">
-        <div class="panel">
-          <div class="panel-head"><h2>&#49440;&#49688; &#54532;&#47196;&#54596;</h2><span id="profileLink"></span></div>
-          <div id="playerChoices" class="choice-list"></div>
-          <div id="profile" class="profile-box" aria-live="polite"></div>
+      <div class="profile-analysis-layout">
+        <section class="profile-grid">
+          <div class="panel">
+            <div class="panel-head"><h2>&#49440;&#49688; &#54532;&#47196;&#54596;</h2><span id="profileLink"></span></div>
+            <div id="playerChoices" class="choice-list"></div>
+            <div id="profile" class="profile-box" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section id="analysisPanel" class="analysis-panel panel" aria-labelledby="analysisTitle" hidden>
+        <div class="analysis-head">
+          <div>
+            <p class="analysis-kicker">PLAYER PERFORMANCE</p>
+            <h2 id="analysisTitle">선수 경기력 분석</h2>
+            <p id="analysisUpdatedAt" class="analysis-updated">분석 버튼을 누르면 최신 전적으로 계산합니다.</p>
+          </div>
+          <button id="analysisButton" type="button">경기력 분석</button>
         </div>
-      </section>
+        <p id="analysisStatus" class="analysis-status" role="status" aria-live="polite">분석할 선수를 선택해 주세요.</p>
+        <div id="analysisResult" class="analysis-result" hidden></div>
+
+        <details class="analysis-admin">
+          <summary>관리자 커뮤니티 평가 입력</summary>
+          <div id="analysisLoginRow" class="analysis-login-row">
+            <input id="analysisAdminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
+            <button id="analysisLoginButton" class="ghost" type="button">관리자 로그인</button>
+          </div>
+          <div id="analysisEditor" class="analysis-editor" hidden>
+            <label for="communitySummaryInput">커뮤니티 평가</label>
+            <textarea id="communitySummaryInput" maxlength="1000" rows="4" placeholder="확인된 커뮤니티 의견만 입력해 주세요."></textarea>
+            <div class="analysis-editor-actions">
+              <small>저장하면 분석 결과의 커뮤니티 평가와 플레이 스타일에 반영됩니다.</small>
+              <button id="communitySaveButton" type="button">평가 저장</button>
+            </div>
+          </div>
+          <p id="analysisAdminStatus" class="analysis-admin-status" role="status" aria-live="polite"></p>
+        </details>
+        </section>
+      </div>
     </main>
-    <script src="./app.js?v=20260731-spawn-auto-sync"></script>
+    <script src="./app.js?v=20260801-player-analysis"></script>
   </body>
 </html>

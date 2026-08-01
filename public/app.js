@@ -9,7 +9,11 @@ const state = {
   selectedMonth: "",
   opponentQuery: "",
   requestId: 0,
-  activeController: null
+  activeController: null,
+  analysisProfile: null,
+  analysis: null,
+  analysisRequestId: 0,
+  analysisAdminCsrf: ""
 };
 
 function saveSearchSession() {
@@ -110,6 +114,168 @@ function setSearchState(kind, message) {
   $("profile").setAttribute("aria-busy", kind === "loading" ? "true" : "false");
   $("searchButton").disabled = kind === "loading";
   $("refreshButton").disabled = kind === "loading";
+}
+
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Accept": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("서버가 올바른 JSON 응답을 보내지 않았습니다.");
+  }
+  if (!response.ok) throw new Error(data.error || "요청을 처리하지 못했습니다.");
+  return data;
+}
+
+function analysisValue(value) {
+  if (Array.isArray(value)) return value.length ? value.join(" · ") : "데이터 부족";
+  if (value == null || value === "") return "데이터 부족";
+  return String(value);
+}
+
+function resetAnalysisPanel() {
+  state.analysisProfile = null;
+  state.analysis = null;
+  $("analysisPanel").hidden = true;
+  $("analysisResult").hidden = true;
+  $("analysisResult").innerHTML = "";
+}
+
+function prepareAnalysis(profile) {
+  if (!profile?.wrId) return resetAnalysisPanel();
+  const samePlayer = String(state.analysisProfile?.wrId || "") === String(profile.wrId);
+  state.analysisProfile = { name: profile.name, wrId: String(profile.wrId) };
+  $("analysisPanel").hidden = false;
+  $("analysisButton").disabled = false;
+  if (!samePlayer) {
+    state.analysis = null;
+    $("analysisResult").hidden = true;
+    $("analysisResult").innerHTML = "";
+    $("analysisUpdatedAt").textContent = "분석 버튼을 누르면 최신 전적으로 계산합니다.";
+    $("analysisStatus").dataset.state = "empty";
+    $("analysisStatus").textContent = profile.name + " 선수의 경기력 분석을 준비했습니다.";
+    $("communitySummaryInput").value = "";
+  }
+}
+
+function renderPlayerAnalysis(analysis) {
+  const rows = [
+    ["선수명", analysis.playerName],
+    ["종합 등급", analysis.overallGrade, "analysis-grade"],
+    ["플레이 스타일", analysis.playStyle],
+    ["강점", analysis.strengths],
+    ["약점", analysis.weaknesses],
+    ["상대 경쟁력", analysis.opponentCompetitiveness],
+    ["최근 흐름", analysis.recentTrend],
+    ["커뮤니티 평가", analysis.communitySummary],
+    ["성장 가능성", analysis.growthPotential == null ? "데이터 부족" : analysis.growthPotential + " / 5"],
+    ["한 줄 평가", analysis.oneLineSummary]
+  ];
+  $("analysisResult").innerHTML = '<dl class="analysis-list">' + rows.map((row) =>
+    '<div class="analysis-row ' + (row[2] || "") + '"><dt>' + escapeHtml(row[0]) + '</dt><dd>' +
+      escapeHtml(analysisValue(row[1])) + '</dd></div>'
+  ).join("") + "</dl>";
+  $("analysisResult").hidden = false;
+  $("analysisStatus").dataset.state = "success";
+  $("analysisStatus").textContent = "전적 데이터와 저장된 커뮤니티 평가로 계산했습니다.";
+  $("analysisUpdatedAt").textContent = "갱신 " + new Date(analysis.calculatedAt).toLocaleString("ko-KR");
+  $("communitySummaryInput").value = analysis.communitySummary === "데이터 부족" ? "" : analysis.communitySummary;
+}
+
+async function loadPlayerAnalysis(refresh = false) {
+  const profile = state.analysisProfile;
+  if (!profile?.wrId) return;
+  const requestId = state.analysisRequestId + 1;
+  state.analysisRequestId = requestId;
+  $("analysisButton").disabled = true;
+  $("analysisStatus").dataset.state = "loading";
+  $("analysisStatus").textContent = "ELOBoard 전적을 분석하는 중입니다.";
+  try {
+    const params = new URLSearchParams({ wr_id: profile.wrId });
+    if (refresh) params.set("refresh", "1");
+    const analysis = await requestJson("/api/player-analysis?" + params.toString());
+    if (requestId !== state.analysisRequestId) return;
+    state.analysis = analysis;
+    renderPlayerAnalysis(analysis);
+  } catch (error) {
+    if (requestId !== state.analysisRequestId) return;
+    $("analysisStatus").dataset.state = "error";
+    $("analysisStatus").textContent = error.message || "선수 경기력 분석에 실패했습니다.";
+    $("analysisResult").hidden = true;
+  } finally {
+    if (requestId === state.analysisRequestId) $("analysisButton").disabled = false;
+  }
+}
+
+async function refreshAnalysisAdminStatus() {
+  try {
+    const status = await requestJson("/api/admin/status");
+    state.analysisAdminCsrf = status.csrf || "";
+    $("analysisLoginRow").hidden = Boolean(status.authenticated);
+    $("analysisEditor").hidden = !status.authenticated;
+    $("analysisAdminStatus").dataset.state = status.authenticated ? "success" : "";
+    $("analysisAdminStatus").textContent = status.authenticated
+      ? status.storage?.message || "관리자 입력이 가능합니다."
+      : (status.configured ? "관리자 로그인이 필요합니다." : "관리자 비밀번호가 설정되지 않았습니다.");
+  } catch (error) {
+    $("analysisAdminStatus").dataset.state = "error";
+    $("analysisAdminStatus").textContent = error.message;
+  }
+}
+
+async function loginAnalysisAdmin() {
+  const password = $("analysisAdminPassword").value;
+  $("analysisLoginButton").disabled = true;
+  try {
+    const result = await requestJson("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password })
+    });
+    state.analysisAdminCsrf = result.csrf || "";
+    $("analysisAdminPassword").value = "";
+    await refreshAnalysisAdminStatus();
+  } catch (error) {
+    $("analysisAdminStatus").dataset.state = "error";
+    $("analysisAdminStatus").textContent = error.message;
+  } finally {
+    $("analysisLoginButton").disabled = false;
+  }
+}
+
+async function saveCommunitySummary() {
+  const profile = state.analysisProfile;
+  if (!profile?.wrId) return;
+  $("communitySaveButton").disabled = true;
+  try {
+    const result = await requestJson("/api/player-analysis/community", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": state.analysisAdminCsrf
+      },
+      body: JSON.stringify({
+        wrId: profile.wrId,
+        communitySummary: $("communitySummaryInput").value
+      })
+    });
+    state.analysis = result.analysis;
+    renderPlayerAnalysis(result.analysis);
+    $("analysisAdminStatus").dataset.state = "success";
+    $("analysisAdminStatus").textContent = "커뮤니티 평가를 저장했습니다.";
+  } catch (error) {
+    $("analysisAdminStatus").dataset.state = "error";
+    $("analysisAdminStatus").textContent = error.message;
+  } finally {
+    $("communitySaveButton").disabled = false;
+  }
 }
 
 function autoDiaryStatusSuffix(sync) {
@@ -302,6 +468,7 @@ function resetResultPanels(message, className = "") {
   $("profileLink").innerHTML = "";
   $("playerChoices").innerHTML = "";
   $("profile").innerHTML = '<div class="empty ' + escapeHtml(className) + '">' + escapeHtml(message) + '</div>';
+  resetAnalysisPanel();
 }
 
 function setSelectOptions(select, values, suffix) {
@@ -427,6 +594,7 @@ function renderProfile(data) {
   if (!state.query.trim() || !profile) {
     $("profileLink").innerHTML = "";
     $("profile").innerHTML = '<div class="empty">' + TXT.noProfile + '</div>';
+    resetAnalysisPanel();
     return;
   }
 
@@ -481,6 +649,7 @@ function renderProfile(data) {
     most +
     '<div class="profile-section profile-period-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
   bindImageFallbacks($("profile"));
+  prepareAnalysis(profile);
 }
 
 function render(data) {
@@ -548,6 +717,15 @@ async function search(refresh = false) {
 
 $("searchButton").addEventListener("click", () => search(false));
 $("refreshButton").addEventListener("click", () => search(true));
+$("analysisButton").addEventListener("click", () => loadPlayerAnalysis(true));
+$("analysisLoginButton").addEventListener("click", loginAnalysisAdmin);
+$("communitySaveButton").addEventListener("click", saveCommunitySummary);
+document.querySelector(".analysis-admin").addEventListener("toggle", (event) => {
+  if (event.target.open) refreshAnalysisAdminStatus();
+});
+$("analysisAdminPassword").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") loginAnalysisAdmin();
+});
 $("nameInput").addEventListener("keydown", (event) => { if (event.key === "Enter") search(false); });
 $("opponentInput").addEventListener("input", (event) => {
   state.opponentQuery = event.target.value.trim();
