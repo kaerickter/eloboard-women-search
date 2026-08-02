@@ -30,6 +30,8 @@ const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const MEN_TIER_FALLBACK_FILE = path.join(ROOT, "data", "men-tier-fallback.json");
+const SCOREBOARD_STATE_FILE = path.join(ROOT, "data", "scoreboard-state.json");
+const MAX_SCOREBOARD_STATE_SIZE = 200000;
 const PINNED_SOOP_ALIASES = {
   "핑핑": {
     broadcastId: "nreupne",
@@ -110,6 +112,83 @@ const spawnDiaryAdmin = new SpawnDiaryAdmin();
 const playerAnalysisStore = new PlayerAnalysisStore({ pool: tierAdmin.pool });
 let playerAnalysisReady = false;
 let playerAnalysisInitPromise = null;
+let scoreboardStateTableReady = false;
+let scoreboardStateTablePromise = null;
+
+async function ensureScoreboardStateTable() {
+  if (!tierAdmin.pool || scoreboardStateTableReady) return;
+  if (!scoreboardStateTablePromise) {
+    scoreboardStateTablePromise = tierAdmin.pool.query(`
+      CREATE TABLE IF NOT EXISTS scoreboard_state (
+        id TEXT PRIMARY KEY,
+        state JSONB NOT NULL,
+        version BIGINT NOT NULL DEFAULT 1,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `).then(() => {
+      scoreboardStateTableReady = true;
+    }).finally(() => {
+      scoreboardStateTablePromise = null;
+    });
+  }
+  await scoreboardStateTablePromise;
+}
+
+async function loadScoreboardState() {
+  if (tierAdmin.pool) {
+    await ensureScoreboardStateTable();
+    const result = await tierAdmin.pool.query(
+      "SELECT state, version, updated_at FROM scoreboard_state WHERE id = $1",
+      ["main"]
+    );
+    if (!result.rows[0]) return { state: null, version: 0, updatedAt: null };
+    return {
+      state: result.rows[0].state,
+      version: Number(result.rows[0].version),
+      updatedAt: result.rows[0].updated_at
+    };
+  }
+  try {
+    return JSON.parse(await fs.promises.readFile(SCOREBOARD_STATE_FILE, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
+    throw error;
+  }
+}
+
+async function saveScoreboardState(state) {
+  const stateJson = JSON.stringify(state);
+  if (stateJson.length > MAX_SCOREBOARD_STATE_SIZE) throw new Error("스코어보드 정보가 너무 큽니다.");
+
+  if (tierAdmin.pool) {
+    await ensureScoreboardStateTable();
+    const result = await tierAdmin.pool.query(`
+      INSERT INTO scoreboard_state (id, state, version, updated_at)
+      VALUES ($1, $2::jsonb, 1, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        state = EXCLUDED.state,
+        version = scoreboard_state.version + 1,
+        updated_at = NOW()
+      RETURNING version, updated_at
+    `, ["main", stateJson]);
+    return {
+      version: Number(result.rows[0]?.version || 1),
+      updatedAt: result.rows[0]?.updated_at || new Date().toISOString()
+    };
+  }
+
+  const current = await loadScoreboardState();
+  const saved = {
+    state,
+    version: Number(current.version || 0) + 1,
+    updatedAt: new Date().toISOString()
+  };
+  await fs.promises.mkdir(path.dirname(SCOREBOARD_STATE_FILE), { recursive: true });
+  const tempFile = SCOREBOARD_STATE_FILE + ".tmp";
+  await fs.promises.writeFile(tempFile, JSON.stringify(saved, null, 2));
+  await fs.promises.rename(tempFile, SCOREBOARD_STATE_FILE);
+  return { version: saved.version, updatedAt: saved.updatedAt };
+}
 
 async function ensurePlayerAnalysisStore() {
   if (playerAnalysisReady) return;
@@ -1370,6 +1449,36 @@ const server = http.createServer(async (req, res) => {
     }), "application/json; charset=utf-8");
   }
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname === "/api/scoreboard-state" && req.method === "GET") {
+    try {
+      return send(
+        res,
+        200,
+        JSON.stringify(await loadScoreboardState()),
+        "application/json; charset=utf-8",
+        { "Cache-Control": "no-store" }
+      );
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ error: error.message || "공용 스코어보드를 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/scoreboard-state" && req.method === "PUT") {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+        return send(res, 400, JSON.stringify({ error: "저장할 스코어보드 정보가 올바르지 않습니다." }), "application/json; charset=utf-8");
+      }
+      return send(
+        res,
+        200,
+        JSON.stringify(await saveScoreboardState(body.state)),
+        "application/json; charset=utf-8",
+        { "Cache-Control": "no-store" }
+      );
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ error: error.message || "공용 스코어보드를 저장하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/soop-vote-rankings" && req.method === "GET") {
     try {
       const payload = await loadSoopVoteRankings(url.searchParams.get("refresh") === "1");
