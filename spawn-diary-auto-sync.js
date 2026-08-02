@@ -200,6 +200,12 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock($1)", [AUTO_SYNC_LOCK_ID]);
     await client.query(`
+      DELETE FROM spawn_diary_auto_seen
+      WHERE player_key = $1
+        AND imported_entry_id IS NULL
+        AND match_date BETWEEN $2 AND $3
+    `, [playerKey, autoMatchWindow.from, autoMatchWindow.to]);
+    await client.query(`
       DELETE FROM spawn_diary_auto_seen AS seen
       WHERE seen.player_key = $1
         AND seen.imported_entry_id IS NOT NULL
@@ -237,12 +243,19 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
     }
 
     const existingResult = await client.query(`
-      SELECT id, match_date, opponent, tier, opponent_race, map_name, result, source_sheet_id
+      SELECT id, match_date, opponent, tier, opponent_race, map_name, result,
+             source_sheet_id, source_url
       FROM spawn_diary_entries
     `);
-    const existingSignatures = new Set(existingResult.rows.map(duplicateSignature));
-    const existingBySignature = new Map(
-      existingResult.rows.map((entry) => [duplicateSignature(entry), entry])
+    const manualExistingSignatures = new Set(
+      existingResult.rows
+        .filter((entry) => !clean(entry.source_url, 1000))
+        .map(duplicateSignature)
+    );
+    const autoExistingBySourceUrl = new Map(
+      existingResult.rows
+        .filter((entry) => clean(entry.source_url, 1000))
+        .map((entry) => [clean(entry.source_url, 1000), entry])
     );
     const existingDates = existingResult.rows
       .map((entry) => duplicateSignature(entry).split("|")[0])
@@ -264,7 +277,9 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
 
     for (const candidate of orderedCandidates) {
       const signature = duplicateSignature(candidate);
-      const existing = existingBySignature.get(signature);
+      const existing = candidate.sourceUrl
+        ? autoExistingBySourceUrl.get(candidate.sourceUrl)
+        : null;
       if (existing?.source_sheet_id === AUTO_SOURCE_ID) {
         await client.query(`
           UPDATE spawn_diary_entries
@@ -282,7 +297,7 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       `, [candidate.sourceKey, playerKey, candidate.matchDate]);
       if (!seenInsert.rowCount) continue;
 
-      if (existingSignatures.has(signature)) {
+      if (existing || manualExistingSignatures.has(signature)) {
         duplicates += 1;
         continue;
       }
