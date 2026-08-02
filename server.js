@@ -11,6 +11,7 @@ const { PlayerAnalysisStore, analyzePlayer } = require("./player-analysis");
 const {
   AUTO_PLAYER_NAME,
   compactName: autoDiaryPlayerKey,
+  initializeSpawnDiaryAutoSyncSchema,
   syncSpawnDiaryFromProfile
 } = require("./spawn-diary-auto-sync");
 
@@ -115,6 +116,24 @@ let playerAnalysisInitPromise = null;
 let scoreboardStateTableReady = false;
 let scoreboardStateTablePromise = null;
 
+function sanitizeScoreboardText(value) {
+  const normalized = String(value).normalize("NFC");
+  const repaired = normalized.replace(/\uFFFD+/g, "");
+  if (normalized.includes("\uFFFD") && repaired === "냥코기") return "냥냥코기";
+  return repaired;
+}
+
+function sanitizeScoreboardState(value) {
+  if (typeof value === "string") return sanitizeScoreboardText(value);
+  if (Array.isArray(value)) return value.map(sanitizeScoreboardState);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, sanitizeScoreboardState(item)])
+    );
+  }
+  return value;
+}
+
 async function ensureScoreboardStateTable() {
   if (!tierAdmin.pool || scoreboardStateTableReady) return;
   if (!scoreboardStateTablePromise) {
@@ -143,13 +162,17 @@ async function loadScoreboardState() {
     );
     if (!result.rows[0]) return { state: null, version: 0, updatedAt: null };
     return {
-      state: result.rows[0].state,
+      state: sanitizeScoreboardState(result.rows[0].state),
       version: Number(result.rows[0].version),
       updatedAt: result.rows[0].updated_at
     };
   }
   try {
-    return JSON.parse(await fs.promises.readFile(SCOREBOARD_STATE_FILE, "utf8"));
+    const saved = JSON.parse(await fs.promises.readFile(SCOREBOARD_STATE_FILE, "utf8"));
+    return {
+      ...saved,
+      state: sanitizeScoreboardState(saved.state)
+    };
   } catch (error) {
     if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
     throw error;
@@ -157,7 +180,8 @@ async function loadScoreboardState() {
 }
 
 async function saveScoreboardState(state) {
-  const stateJson = JSON.stringify(state);
+  const sanitizedState = sanitizeScoreboardState(state);
+  const stateJson = JSON.stringify(sanitizedState);
   if (stateJson.length > MAX_SCOREBOARD_STATE_SIZE) throw new Error("스코어보드 정보가 너무 큽니다.");
 
   if (tierAdmin.pool) {
@@ -179,7 +203,7 @@ async function saveScoreboardState(state) {
 
   const current = await loadScoreboardState();
   const saved = {
-    state,
+    state: sanitizedState,
     version: Number(current.version || 0) + 1,
     updatedAt: new Date().toISOString()
   };
@@ -372,24 +396,30 @@ async function maybeSyncSpawnDiary(query, profile) {
     };
   }
 }
-function queueSpawnDiarySync(query, profile, wrId) {
+let spawnDiarySchemaPromise = null;
+async function ensureSpawnDiaryStorage() {
+  if (!tierAdmin.pool) return false;
+  if (!spawnDiarySchemaPromise) {
+    spawnDiarySchemaPromise = initializeSpawnDiaryAutoSyncSchema(tierAdmin.pool)
+      .then(() => true)
+      .catch((error) => {
+        spawnDiarySchemaPromise = null;
+        throw error;
+      });
+  }
+  return spawnDiarySchemaPromise;
+}
+async function syncSpawnDiarySearch(query, profile, wrId) {
   if (autoDiaryPlayerKey(query) !== autoDiaryPlayerKey(AUTO_PLAYER_NAME) || !profile) return null;
-  setImmediate(() => {
-    (async () => {
-      let latestProfile = profile;
-      if (wrId) {
-        try {
-          latestProfile = await loadProfile(wrId, true);
-        } catch (error) {
-          console.warn("Spawn diary auto-sync is using the displayed profile:", error.message);
-        }
-      }
-      await maybeSyncSpawnDiary(query, latestProfile);
-    })().catch((error) => {
-      console.error("Spawn diary queued auto-sync failed:", error.message);
-    });
-  });
-  return { enabled: true, queued: true };
+  let latestProfile = profile;
+  if (wrId) {
+    try {
+      latestProfile = await loadProfile(wrId, true);
+    } catch (error) {
+      console.warn("Spawn diary auto-sync is using the displayed profile:", error.message);
+    }
+  }
+  return maybeSyncSpawnDiary(query, latestProfile);
 }
 function normalizePlayerName(name) {
   return normalizeName(name).replace(/[tzp]$/i, "");
@@ -1496,15 +1526,16 @@ const server = http.createServer(async (req, res) => {
       }), "application/json; charset=utf-8");
     }
     try {
+      await ensureSpawnDiaryStorage();
       const result = await tierAdmin.pool.query(`
         SELECT id, match_date, game_format, opponent, tier, opponent_race,
           map_name, result, opponent_build, my_build, feedback, reflection,
           keywords, replay_number
         FROM spawn_diary_entries
         ORDER BY
-          CASE WHEN source_sheet_id = 'site-manual' THEN 0 ELSE 1 END,
-          CASE WHEN source_sheet_id = 'site-manual' THEN source_row END DESC NULLS LAST,
-          match_date DESC NULLS LAST, source_row DESC, id DESC
+          match_date DESC NULLS LAST,
+          source_row DESC NULLS LAST,
+          id DESC
       `);
       return send(res, 200, JSON.stringify({
         entries: result.rows,
@@ -1512,6 +1543,7 @@ const server = http.createServer(async (req, res) => {
         updatedAt: new Date().toISOString()
       }), "application/json; charset=utf-8");
     } catch (error) {
+      console.error("Spawn diary load failed:", error.code || "UNKNOWN", error.message);
       return send(res, 503, JSON.stringify({
         error: "스폰일지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
       }), "application/json; charset=utf-8");
@@ -1684,10 +1716,19 @@ const server = http.createServer(async (req, res) => {
     const entryId = Number(spawnDiaryEntryMatch[1]);
     try {
       if (req.method === "DELETE") {
-        const deleteResult = await tierAdmin.pool.query(
-          "DELETE FROM spawn_diary_entries WHERE id = $1 RETURNING id",
-          [entryId]
-        );
+        const deleteResult = await tierAdmin.pool.query(`
+          WITH deleted AS (
+            DELETE FROM spawn_diary_entries
+            WHERE id = $1
+            RETURNING id
+          ), cleared_seen AS (
+            DELETE FROM spawn_diary_auto_seen AS seen
+            USING deleted
+            WHERE seen.imported_entry_id = deleted.id
+            RETURNING seen.source_key
+          )
+          SELECT id FROM deleted
+        `, [entryId]);
         if (!deleteResult.rowCount) {
           return send(res, 404, JSON.stringify({ error: "삭제할 기록을 찾지 못했습니다." }), "application/json; charset=utf-8");
         }
@@ -2130,7 +2171,7 @@ const server = http.createServer(async (req, res) => {
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
         const profile = await loadProfile(requestedWrId, force);
-        const autoDiarySync = queueSpawnDiarySync(query, profile, requestedWrId);
+        const autoDiarySync = await syncSpawnDiarySearch(query, profile, requestedWrId);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
         const result = summarize([], query);
@@ -2163,7 +2204,7 @@ const server = http.createServer(async (req, res) => {
           profile = await loadProfile(selected.wrId, force);
         }
       }
-      const autoDiarySync = queueSpawnDiarySync(query, profile, autoDiaryWrId || profile?.wrId);
+      const autoDiarySync = await syncSpawnDiarySearch(query, profile, autoDiaryWrId || profile?.wrId);
       return send(res, 200, JSON.stringify({
         ...data,
         ...result,

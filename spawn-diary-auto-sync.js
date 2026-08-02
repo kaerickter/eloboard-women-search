@@ -18,6 +18,15 @@ function clean(value, limit = 500) {
   return String(value ?? "").replace(/\r\n/g, "\n").trim().slice(0, limit);
 }
 
+function opponentIdentity(value) {
+  const label = clean(value, 80);
+  const raceMatch = label.match(/\s*\(([TPZ])\)\s*$/i);
+  return {
+    name: clean(label.replace(/\s*\([TPZ]\)\s*$/i, ""), 80),
+    race: raceMatch ? raceMatch[1].toUpperCase() : "",
+  };
+}
+
 function classifyGameFormat(match) {
   const source = `${clean(match?.format, 100)} ${clean(match?.memo, 300)}`;
   if (/(?:^|[^a-z])ck(?:[^a-z]|$)/i.test(source)) return "CK";
@@ -33,11 +42,12 @@ function resultFromElo(value) {
 }
 
 function sourceKeyForMatch(playerName, match) {
+  const opponent = opponentIdentity(match?.opponent).name;
   const identity = [
     compactName(playerName),
     clean(match?.url, 1000),
     clean(match?.date, 10),
-    compactName(match?.opponent),
+    compactName(opponent),
     clean(match?.map, 100),
     Number(match?.elo) || 0,
     clean(match?.format, 100),
@@ -56,7 +66,8 @@ function findOpponentProfile(roster, opponentName) {
 }
 
 function candidateFromMatch(playerName, match, roster) {
-  const opponent = clean(match?.opponent, 80);
+  const opponentInfo = opponentIdentity(match?.opponent);
+  const opponent = opponentInfo.name;
   const opponentProfile = findOpponentProfile(roster, opponent);
   return {
     sourceKey: sourceKeyForMatch(playerName, match),
@@ -65,7 +76,7 @@ function candidateFromMatch(playerName, match, roster) {
     gameFormat: classifyGameFormat(match),
     opponent,
     tier: clean(opponentProfile?.tier, 40) || null,
-    opponentRace: clean(opponentProfile?.race, 30) || null,
+    opponentRace: clean(opponentProfile?.race, 30) || opponentInfo.race || null,
     mapName: clean(match?.map, 80) || null,
     result: resultFromElo(match?.elo),
   };
@@ -75,9 +86,10 @@ function duplicateSignature(entry) {
   const date = entry?.match_date instanceof Date
     ? entry.match_date.toISOString().slice(0, 10)
     : clean(entry?.match_date ?? entry?.matchDate, 10).slice(0, 10);
+  const opponent = opponentIdentity(entry?.opponent).name;
   return [
     date,
-    looseName(entry?.opponent),
+    looseName(opponent),
     clean(entry?.map_name ?? entry?.mapName, 80).toLocaleLowerCase("ko"),
     clean(entry?.result, 10),
   ].join("|");
@@ -85,6 +97,53 @@ function duplicateSignature(entry) {
 
 async function initializeSpawnDiaryAutoSyncSchema(pool) {
   if (!pool) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS spawn_diary_entries (
+    id BIGSERIAL PRIMARY KEY,
+    match_date DATE,
+    game_format TEXT,
+    opponent TEXT NOT NULL DEFAULT '',
+    tier TEXT,
+    opponent_race TEXT,
+    map_name TEXT,
+    result TEXT,
+    opponent_build TEXT,
+    my_build TEXT,
+    feedback TEXT,
+    reflection TEXT,
+    keywords TEXT,
+    replay_number TEXT,
+    source_sheet_id TEXT,
+    source_row BIGINT,
+    source_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  const diaryColumns = [
+    ["match_date", "DATE"],
+    ["game_format", "TEXT"],
+    ["opponent", "TEXT"],
+    ["tier", "TEXT"],
+    ["opponent_race", "TEXT"],
+    ["map_name", "TEXT"],
+    ["result", "TEXT"],
+    ["opponent_build", "TEXT"],
+    ["my_build", "TEXT"],
+    ["feedback", "TEXT"],
+    ["reflection", "TEXT"],
+    ["keywords", "TEXT"],
+    ["replay_number", "TEXT"],
+    ["source_sheet_id", "TEXT"],
+    ["source_row", "BIGINT"],
+    ["source_url", "TEXT"],
+    ["created_at", "TIMESTAMPTZ NOT NULL DEFAULT NOW()"],
+    ["updated_at", "TIMESTAMPTZ NOT NULL DEFAULT NOW()"],
+  ];
+  for (const [column, definition] of diaryColumns) {
+    await pool.query(`ALTER TABLE spawn_diary_entries ADD COLUMN IF NOT EXISTS ${column} ${definition}`);
+  }
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS spawn_diary_entries_date_idx ON spawn_diary_entries (match_date DESC, source_row DESC)"
+  );
   await pool.query(`CREATE TABLE IF NOT EXISTS spawn_diary_auto_seen (
     source_key TEXT PRIMARY KEY,
     player_key TEXT NOT NULL,
@@ -115,6 +174,16 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
     client = await pool.connect();
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock($1)", [AUTO_SYNC_LOCK_ID]);
+    await client.query(`
+      DELETE FROM spawn_diary_auto_seen AS seen
+      WHERE seen.player_key = $1
+        AND seen.imported_entry_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM spawn_diary_entries AS entry
+          WHERE entry.id = seen.imported_entry_id
+        )
+    `, [playerKey]);
     const seenCountResult = await client.query(
       "SELECT COUNT(*)::int AS count FROM spawn_diary_auto_seen WHERE player_key = $1",
       [playerKey]
@@ -122,10 +191,13 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
     const seenCount = Number(seenCountResult.rows[0]?.count || 0);
 
     const existingResult = await client.query(`
-      SELECT match_date, opponent, map_name, result
+      SELECT id, match_date, opponent, tier, opponent_race, map_name, result, source_sheet_id
       FROM spawn_diary_entries
     `);
     const existingSignatures = new Set(existingResult.rows.map(duplicateSignature));
+    const existingBySignature = new Map(
+      existingResult.rows.map((entry) => [duplicateSignature(entry), entry])
+    );
     const existingDates = existingResult.rows
       .map((entry) => duplicateSignature(entry).split("|")[0])
       .filter(Boolean)
@@ -153,7 +225,18 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       `, [candidate.sourceKey, playerKey, candidate.matchDate]);
       if (!seenInsert.rowCount) continue;
 
-      if (existingSignatures.has(duplicateSignature(candidate))) {
+      const signature = duplicateSignature(candidate);
+      if (existingSignatures.has(signature)) {
+        const existing = existingBySignature.get(signature);
+        if (existing?.source_sheet_id === AUTO_SOURCE_ID) {
+          await client.query(`
+            UPDATE spawn_diary_entries
+            SET opponent = $2,
+                tier = COALESCE(tier, $3),
+                opponent_race = COALESCE(opponent_race, $4)
+            WHERE id = $1
+          `, [existing.id, candidate.opponent, candidate.tier, candidate.opponentRace]);
+        }
         duplicates += 1;
         continue;
       }
@@ -220,6 +303,7 @@ module.exports = {
   compactName,
   duplicateSignature,
   initializeSpawnDiaryAutoSyncSchema,
+  opponentIdentity,
   resultFromElo,
   sourceKeyForMatch,
   syncSpawnDiaryFromProfile,
