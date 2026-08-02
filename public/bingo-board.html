@@ -275,6 +275,35 @@
         inset 0 1px 0 rgba(255, 255, 255, .9);
     }
 
+    /* 송출 화면에서 선택된 칸만 보라색 없이 또렷하게 표시합니다. */
+    .broadcast .preview-cell.checked {
+      background: linear-gradient(180deg, #f2fff7 0%, #c9f5dc 100%);
+      color: #124d38;
+      border-color: #27b77a;
+      box-shadow:
+        0 0 0 3px rgba(39, 183, 122, .3),
+        0 12px 24px rgba(25, 133, 91, .25),
+        inset 0 -7px 0 rgba(25, 133, 91, .13),
+        inset 0 1px 0 rgba(255, 255, 255, .96);
+    }
+
+    .broadcast .preview-cell.checked::before {
+      content: "✓";
+      position: absolute;
+      top: 6%;
+      right: 7%;
+      display: grid;
+      place-items: center;
+      width: clamp(20px, 2.3vw, 31px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      color: #fff;
+      background: #168a5d;
+      box-shadow: 0 4px 10px rgba(17, 92, 64, .28);
+      font-size: clamp(13px, 1.5vw, 20px);
+      line-height: 1;
+    }
+
     .preview-cell.checked::after,
     .edit-cell.checked::after {
       display: none;
