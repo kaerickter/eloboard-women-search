@@ -118,29 +118,26 @@ async function initializeSpawnDiaryAutoSyncSchema(pool) {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  const diaryColumns = [
-    ["match_date", "DATE"],
-    ["game_format", "TEXT"],
-    ["opponent", "TEXT"],
-    ["tier", "TEXT"],
-    ["opponent_race", "TEXT"],
-    ["map_name", "TEXT"],
-    ["result", "TEXT"],
-    ["opponent_build", "TEXT"],
-    ["my_build", "TEXT"],
-    ["feedback", "TEXT"],
-    ["reflection", "TEXT"],
-    ["keywords", "TEXT"],
-    ["replay_number", "TEXT"],
-    ["source_sheet_id", "TEXT"],
-    ["source_row", "BIGINT"],
-    ["source_url", "TEXT"],
-    ["created_at", "TIMESTAMPTZ NOT NULL DEFAULT NOW()"],
-    ["updated_at", "TIMESTAMPTZ NOT NULL DEFAULT NOW()"],
-  ];
-  for (const [column, definition] of diaryColumns) {
-    await pool.query(`ALTER TABLE spawn_diary_entries ADD COLUMN IF NOT EXISTS ${column} ${definition}`);
-  }
+  await pool.query(`ALTER TABLE spawn_diary_entries
+    ADD COLUMN IF NOT EXISTS match_date DATE,
+    ADD COLUMN IF NOT EXISTS game_format TEXT,
+    ADD COLUMN IF NOT EXISTS opponent TEXT,
+    ADD COLUMN IF NOT EXISTS tier TEXT,
+    ADD COLUMN IF NOT EXISTS opponent_race TEXT,
+    ADD COLUMN IF NOT EXISTS map_name TEXT,
+    ADD COLUMN IF NOT EXISTS result TEXT,
+    ADD COLUMN IF NOT EXISTS opponent_build TEXT,
+    ADD COLUMN IF NOT EXISTS my_build TEXT,
+    ADD COLUMN IF NOT EXISTS feedback TEXT,
+    ADD COLUMN IF NOT EXISTS reflection TEXT,
+    ADD COLUMN IF NOT EXISTS keywords TEXT,
+    ADD COLUMN IF NOT EXISTS replay_number TEXT,
+    ADD COLUMN IF NOT EXISTS source_sheet_id TEXT,
+    ADD COLUMN IF NOT EXISTS source_row BIGINT,
+    ADD COLUMN IF NOT EXISTS source_url TEXT,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
   await pool.query(
     "CREATE INDEX IF NOT EXISTS spawn_diary_entries_date_idx ON spawn_diary_entries (match_date DESC, source_row DESC)"
   );
