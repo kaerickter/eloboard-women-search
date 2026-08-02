@@ -275,6 +275,35 @@
         inset 0 1px 0 rgba(255, 255, 255, .9);
     }
 
+    /* 송출 화면에서 선택된 칸만 보라색 없이 또렷하게 표시합니다. */
+    .broadcast .preview-cell.checked {
+      background: linear-gradient(180deg, #f2fff7 0%, #c9f5dc 100%);
+      color: #124d38;
+      border-color: #27b77a;
+      box-shadow:
+        0 0 0 3px rgba(39, 183, 122, .3),
+        0 12px 24px rgba(25, 133, 91, .25),
+        inset 0 -7px 0 rgba(25, 133, 91, .13),
+        inset 0 1px 0 rgba(255, 255, 255, .96);
+    }
+
+    .broadcast .preview-cell.checked::before {
+      content: "✓";
+      position: absolute;
+      top: 6%;
+      right: 7%;
+      display: grid;
+      place-items: center;
+      width: clamp(20px, 2.3vw, 31px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      color: #fff;
+      background: #168a5d;
+      box-shadow: 0 4px 10px rgba(17, 92, 64, .28);
+      font-size: clamp(13px, 1.5vw, 20px);
+      line-height: 1;
+    }
+
     .preview-cell.checked::after,
     .edit-cell.checked::after {
       display: none;
@@ -551,8 +580,8 @@
       padding: 14px;
       border: 1px solid #dce4ee;
       border-radius: 12px;
-      background: linear-gradient(135deg, #f7f8ff, #fff8fc);
-      box-shadow: 0 8px 20px rgba(91, 88, 145, .08);
+      background: linear-gradient(135deg, #f5fbf8, #fff8f4);
+      box-shadow: 0 8px 20px rgba(47, 143, 131, .08);
     }
 
     .timer-inputs,
@@ -588,8 +617,8 @@
 
     .timer-inputs input:focus,
     .target-row input:focus {
-      border-color: #9aa8e8;
-      box-shadow: 0 0 0 3px rgba(154, 168, 232, .2);
+      border-color: #8ed5ae;
+      box-shadow: 0 0 0 3px rgba(142, 213, 174, .2);
     }
 
     .timer-actions {
@@ -601,15 +630,15 @@
       border: 1px solid #d9dff2;
       border-radius: 8px;
       color: #303858;
-      background: #f0f2ff;
+      background: #eefbf3;
       cursor: pointer;
       font-weight: 900;
     }
 
     .timer-button.primary {
-      border-color: #8d9cdf;
+      border-color: #2f8f83;
       color: #fff;
-      background: linear-gradient(135deg, #8295df, #b48de1);
+      background: linear-gradient(135deg, #2f8f83, #65bfa9);
     }
 
     .target-time {
@@ -650,7 +679,7 @@
       display: grid;
       place-items: center;
       padding: 20px;
-      background: rgba(31, 27, 48, .46);
+      background: rgba(24, 32, 46, .46);
       opacity: 0;
       visibility: hidden;
       transition: opacity .2s ease, visibility .2s ease;
@@ -670,9 +699,9 @@
       border: 5px solid #fff;
       border-radius: 24px;
       color: #fff;
-      background: linear-gradient(135deg, #e85a73, #8b7bd9);
+      background: linear-gradient(135deg, #e85a73, #e7b75f);
       text-align: center;
-      box-shadow: 0 24px 70px rgba(37, 29, 62, .4);
+      box-shadow: 0 24px 70px rgba(24, 32, 46, .4);
       transform: scale(.88);
     }
 
@@ -833,22 +862,28 @@
     }
   </style>
   <link rel="stylesheet" href="./common-theme.css">
+  <link rel="stylesheet" href="./purple-five-tabs.css?v=20260802-content-colors">
   <link rel="stylesheet" href="./collaboration.css">
-</head>
+  </head>
 <body>
-  <nav class="site-nav" aria-label="페이지 이동">
+      <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-brand" href="./tiers.html" aria-label="ELO KITTEN 홈">
+        <span>EK</span><strong>ELO KITTEN</strong>
+      </a>
       <a class="site-tab" href="./tiers.html">티어표</a>
       <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
-      <a class="site-tab search" href="./index.html">전적검색</a>
-    <a class="site-tab search" href="./matchup.html">상대전적</a>
-    <a class="site-tab university" href="./university-matchup.html">대학대결</a>
-    <a class="site-tab active" href="./bingo-board.html">빙고판 열기</a>
-    <a class="site-tab search" href="./kill-bet.html">킬 내기</a>
-    <a class="site-tab search" href="./scoreboard.html">매치 점수판</a>
-    <a class="site-tab search" href="./lucky-roulette.html">행운 돌림판</a>
-    <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
-    <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
-  </nav>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab" href="./scoreboard.html">스코어보드</a>
+      <a class="site-tab bingo active" href="./bingo-board.html" aria-current="page">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab" href="./match-scoreboard.html">점수계산기</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      
+      <a class="site-tab cup-tab" href="./jungman-cup.html">중만컵</a>
+      <span class="site-user"><strong>이아깽</strong><em>관리자</em></span>
+    </nav>
   <main class="app">
     <section class="broadcast" aria-label="방송 송출용 빙고판">
       <div class="stage" id="stage">

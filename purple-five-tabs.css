@@ -230,6 +230,50 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
   color: #aaa5ff !important;
 }
 
+/* Keep page introductions compact so primary data remains visible. */
+.tier-hero,
+.shell > .hero,
+.matchup-hero {
+  min-height: 137px !important;
+  padding: 26px max(48px, calc((100vw - 1664px) / 2)) 30px !important;
+}
+
+.diary-hero-band,
+.diary-hero-band .diary-hero {
+  min-height: 137px !important;
+}
+
+.diary-hero-band .diary-hero {
+  padding-top: 26px !important;
+  padding-bottom: 30px !important;
+}
+
+.tier-hero h1,
+.shell > .hero h1,
+.matchup-hero h1,
+.diary-hero h1 {
+  font-size: clamp(22px, 2.4vw, 30px) !important;
+  letter-spacing: -0.9px !important;
+}
+
+.matchup-hero > p:last-child,
+.diary-hero .diary-intro {
+  margin-top: 10px !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+.diary-hero .diary-heading-row {
+  gap: 14px !important;
+}
+
+.diary-hero .diary-hero-logo {
+  width: 68px !important;
+  height: 68px !important;
+  flex-basis: 68px !important;
+  border-radius: 11px !important;
+}
+
 .search-panel,
 .panel,
 .period-panel,
@@ -253,7 +297,7 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
   padding: 22px !important;
 }
 
-button:not(.site-tab):not(.live-only-toggle),
+button:not(.site-tab):not(.live-only-toggle):not(.broadcast button):not(.editor button):not(.kill-area button),
 .source-link,
 .matchup-search-button,
 .record-open-button {
@@ -380,20 +424,26 @@ body.spawn-diary-page .diary-shell {
   margin: 0 !important;
 }
 
-body.spawn-diary-page col.feedback-column {
-  width: calc((100% - 980px) / 2 - 124px) !important;
-}
-
+body.spawn-diary-page col.feedback-column,
 body.spawn-diary-page col.reflection-column {
-  width: calc((100% - 980px) / 2) !important;
+  width: calc((100% - 777.308px) / 2) !important;
 }
 
 .tier-filter-toolbar {
-  margin: -8px 0 22px;
+  position: sticky;
+  top: 72px;
+  z-index: 18;
+  margin: 0 0 22px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  border: 1px solid #e3e1ef;
+  border-radius: 0 0 12px 12px;
+  background: rgba(247, 247, 251, 0.97);
+  box-shadow: 0 10px 24px rgba(37, 31, 85, 0.1);
+  backdrop-filter: blur(12px);
 }
 
 .tier-filter-toolbar .division-filters {
@@ -403,6 +453,12 @@ body.spawn-diary-page col.reflection-column {
 
 .tier-filter-toolbar .tier-live-controls {
   margin-left: auto;
+}
+
+@media (min-width: 901px) {
+  .tier-filter-toolbar {
+    top: 112px;
+  }
 }
 
 body .tier-shell .division-filters .division-filter-button {
