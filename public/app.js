@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_NAME = "\uc774\uc544\uae7d";
 const DEFAULT_WR_ID = "780";
-const SEARCH_SESSION_KEY = "record-search-session-v1";
+const SEARCH_SESSION_KEY = "record-search-session-v2";
 const state = {
   query: "",
   data: null,
@@ -385,16 +385,31 @@ function getProfileRows(data) {
   return data && data.profile && Array.isArray(data.profile.matches) ? data.profile.matches : [];
 }
 
-function sortedYears(rows) {
-  return [...new Set(rows.map((row) => String(row.date || "").slice(0, 4)).filter(Boolean))]
+function currentKoreaPeriod(date = new Date()) {
+  const korea = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return {
+    year: String(korea.getUTCFullYear()),
+    month: String(korea.getUTCMonth() + 1).padStart(2, "0")
+  };
+}
+
+function sortedYears(rows, date = new Date()) {
+  const current = currentKoreaPeriod(date);
+  return [...new Set([
+    current.year,
+    ...rows.map((row) => String(row.date || "").slice(0, 4)).filter(Boolean)
+  ])]
     .sort((a, b) => b.localeCompare(a));
 }
 
-function sortedMonths(rows, year) {
-  return [...new Set(rows
+function sortedMonths(rows, year, date = new Date()) {
+  const current = currentKoreaPeriod(date);
+  const months = rows
     .filter((row) => String(row.date || "").startsWith(year + "-"))
     .map((row) => String(row.date || "").slice(5, 7))
-    .filter(Boolean))]
+    .filter(Boolean);
+  if (year === current.year) months.push(current.month);
+  return [...new Set(months)]
     .sort((a, b) => b.localeCompare(a));
 }
 
@@ -530,27 +545,18 @@ function renderOpponent(data) {
 
 function renderPeriod(data) {
   const rows = getProfileRows(data);
+  const current = currentKoreaPeriod();
   const years = sortedYears(rows);
   const yearSelect = $("yearSelect");
   const monthSelect = $("monthSelect");
 
-  if (!years.length) {
-    state.selectedYear = "";
-    state.selectedMonth = "";
-    yearSelect.innerHTML = "";
-    monthSelect.innerHTML = "";
-    $("periodLabel").textContent = TXT.noPeriod;
-    $("yearRowLabel").textContent = "\ud574\ub2f9\ub144\ub3c4";
-    $("monthRowLabel").textContent = "\ub2f9\uc6d4";
-    setPeriodValues("year", { games: 0, wins: 0, losses: 0, rate: 0 });
-    setPeriodValues("month", { games: 0, wins: 0, losses: 0, rate: 0 });
-    setPeriodValues("day", { games: 0, wins: 0, losses: 0, rate: 0 });
-    return;
-  }
-
-  if (!years.includes(state.selectedYear)) state.selectedYear = years[0];
+  if (!years.includes(state.selectedYear)) state.selectedYear = current.year;
   const months = sortedMonths(rows, state.selectedYear);
-  if (!months.includes(state.selectedMonth)) state.selectedMonth = months[0] || "";
+  if (!months.includes(state.selectedMonth)) {
+    state.selectedMonth = state.selectedYear === current.year
+      ? current.month
+      : (months[0] || "");
+  }
 
   setSelectOptions(yearSelect, years, TXT.yearSuffix);
   setSelectOptions(monthSelect, months, TXT.monthSuffix);
@@ -567,7 +573,7 @@ function renderPeriod(data) {
   const month = periodStats(monthRows);
   const day = periodStats(dayRows);
 
-  $("periodLabel").textContent = (data.profile.name || state.query) + " \u00b7 " + TXT.periodBasis;
+  $("periodLabel").textContent = (data.profile?.name || state.query || "선수") + " \u00b7 " + TXT.periodBasis;
   $("dayRowLabel").innerHTML = "<span>당일</span><small>"
     + matchWindow.startDate + " 06:01 ~ " + matchWindow.endDate + " 06:00</small>";
   $("dayRowLabel").title = matchWindow.startDate + " 오전 06:01부터 "
