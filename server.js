@@ -107,7 +107,7 @@ let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 15;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
-const UPSTREAM_TIMEOUT_MS = 1000 * 8;
+const UPSTREAM_TIMEOUT_MS = 1000 * 20;
 const tierAdmin = new TierAdmin();
 const spawnDiaryAdmin = new SpawnDiaryAdmin();
 const playerAnalysisStore = new PlayerAnalysisStore({ pool: tierAdmin.pool });
@@ -748,7 +748,11 @@ async function loadProfile(wrId, force = false) {
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
   const promise = (async () => {
     try {
-      const response = await fetchWithRetry(playerUrl(wrId), { headers: { "User-Agent": "Mozilla/5.0 eloboard-women-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" } });
+      const response = await fetchWithRetry(
+        playerUrl(wrId),
+        { headers: { "User-Agent": "Mozilla/5.0 eloboard-women-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" } },
+        1
+      );
       if (!response.ok) throw new Error("profile " + wrId + " response error: " + response.status);
       const profile = parseProfile(await response.text(), wrId);
       if (!profile || String(profile.wrId) !== cacheKey || !String(profile.name || "").trim()) {
