@@ -496,6 +496,11 @@ function selectedMonthRows(rows) {
   return rows.filter((row) => String(row.date || "").startsWith(prefix));
 }
 
+function selectedCurrentMonth(date = new Date()) {
+  const current = currentKoreaPeriod(date);
+  return state.selectedYear === current.year && state.selectedMonth === current.month;
+}
+
 function displayMonth(month) {
   return String(Number(month) || month);
 }
@@ -568,7 +573,9 @@ function renderPeriod(data) {
   const yearRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-"));
   const monthRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-" + state.selectedMonth));
   const matchWindow = currentMatchWindow();
-  const dayRows = rows.filter((row) => isCurrentMatchDayRow(row, matchWindow));
+  const dayRows = selectedCurrentMonth()
+    ? monthRows.filter((row) => isCurrentMatchDayRow(row, matchWindow))
+    : [];
   const year = periodStats(yearRows);
   const month = periodStats(monthRows);
   const day = periodStats(dayRows);
@@ -637,7 +644,9 @@ function renderProfile(data) {
     return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="ELO" class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
   };
   const matchWindow = currentMatchWindow();
-  const dayRows = profileRows.filter((match) => isCurrentMatchDayRow(match, matchWindow));
+  const dayRows = selectedCurrentMonth()
+    ? periodRows.filter((match) => isCurrentMatchDayRow(match, matchWindow))
+    : [];
   const otherRows = periodRows.filter((match) => !isCurrentMatchDayRow(match, matchWindow));
   const dayGroup = dayRows.length
     ? '<section class="profile-day-group" aria-label="당일 전적"><div class="profile-day-group-title"><strong>당일 전적</strong><small>'
