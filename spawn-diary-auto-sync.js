@@ -65,18 +65,31 @@ function findOpponentProfile(roster, opponentName) {
     || null;
 }
 
+function tierSnapshot(player) {
+  const rawTier = clean(player?.tier, 40);
+  if (!rawTier) return null;
+  if (rawTier.toUpperCase() === "FA") return "FA";
+  const withoutPromotion = rawTier.replace(/\s*승급\s*불\s*$/u, "").trim();
+  const label = withoutPromotion.endsWith("티어")
+    ? withoutPromotion
+    : withoutPromotion + "티어";
+  const promotionLight = Boolean(player?.promotionLight) || /승급\s*불/u.test(rawTier);
+  return label + (promotionLight ? " 승급불" : "");
+}
+
 function candidateFromMatch(playerName, match, roster) {
   const opponentInfo = opponentIdentity(match?.opponent);
   const opponent = opponentInfo.name;
   const opponentProfile = findOpponentProfile(roster, opponent);
+  const matchRace = clean(match?.opponentRace, 30).toUpperCase();
   return {
     sourceKey: sourceKeyForMatch(playerName, match),
     sourceUrl: clean(match?.url, 1000) || null,
     matchDate: clean(match?.date, 10) || null,
     gameFormat: classifyGameFormat(match),
     opponent,
-    tier: clean(opponentProfile?.tier, 40) || null,
-    opponentRace: clean(opponentProfile?.race, 30) || opponentInfo.race || null,
+    tier: tierSnapshot(opponentProfile),
+    opponentRace: clean(opponentProfile?.race, 30) || matchRace || opponentInfo.race || null,
     mapName: clean(match?.map, 80) || null,
     result: resultFromElo(match?.elo),
   };
@@ -214,6 +227,17 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
     let baselineSkipped = 0;
 
     for (const candidate of orderedCandidates) {
+      const signature = duplicateSignature(candidate);
+      const existing = existingBySignature.get(signature);
+      if (existing?.source_sheet_id === AUTO_SOURCE_ID) {
+        await client.query(`
+          UPDATE spawn_diary_entries
+          SET opponent = $2,
+              tier = COALESCE($3, tier),
+              opponent_race = COALESCE($4, opponent_race)
+          WHERE id = $1
+        `, [existing.id, candidate.opponent, candidate.tier, candidate.opponentRace]);
+      }
       const seenInsert = await client.query(`
         INSERT INTO spawn_diary_auto_seen (source_key, player_key, match_date)
         VALUES ($1, $2, $3)
@@ -222,18 +246,7 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       `, [candidate.sourceKey, playerKey, candidate.matchDate]);
       if (!seenInsert.rowCount) continue;
 
-      const signature = duplicateSignature(candidate);
       if (existingSignatures.has(signature)) {
-        const existing = existingBySignature.get(signature);
-        if (existing?.source_sheet_id === AUTO_SOURCE_ID) {
-          await client.query(`
-            UPDATE spawn_diary_entries
-            SET opponent = $2,
-                tier = COALESCE(tier, $3),
-                opponent_race = COALESCE(opponent_race, $4)
-            WHERE id = $1
-          `, [existing.id, candidate.opponent, candidate.tier, candidate.opponentRace]);
-        }
         duplicates += 1;
         continue;
       }
@@ -304,4 +317,5 @@ module.exports = {
   resultFromElo,
   sourceKeyForMatch,
   syncSpawnDiaryFromProfile,
+  tierSnapshot,
 };

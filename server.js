@@ -373,6 +373,15 @@ function soopChannelFromHtml(html) {
 function normalizeName(name) {
   return String(name || "").replace(/\s+/g, "").trim().toLowerCase();
 }
+function diaryTierLabel(value) {
+  const rawTier = String(value || "").replace(/\s+/g, " ").trim().slice(0, 40);
+  if (!rawTier) return "";
+  if (rawTier.toUpperCase() === "FA") return "FA";
+  const hasPromotion = /승급\s*불/u.test(rawTier);
+  const base = rawTier.replace(/\s*승급\s*불\s*$/u, "").trim();
+  const label = base.endsWith("티어") ? base : base + "티어";
+  return label + (hasPromotion ? " 승급불" : "");
+}
 async function maybeSyncSpawnDiary(query, profile) {
   if (autoDiaryPlayerKey(query) !== autoDiaryPlayerKey(AUTO_PLAYER_NAME) || !profile) return null;
   try {
@@ -662,9 +671,14 @@ function parseProfileRows(html) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     const opponentLink = cells[1].match(/href=["']([^"']+)["'][\s\S]*?>([\s\S]*?)<\/a>/i);
     const opponent = cleanText(opponentLink ? opponentLink[2] : cells[1]);
+    const opponentCellText = cleanText(cells[1]);
+    const opponentRace = opponentCellText.match(/\(([TPZ])\)\s*$/i)?.[1]?.toUpperCase()
+      || opponentCellText.match(/\b([TPZ])\s*$/i)?.[1]?.toUpperCase()
+      || "";
     rows.push({
       date,
       opponent,
+      opponentRace,
       opponentId: opponentLink ? wrIdFromUrl(opponentLink[1]) : "",
       opponentUrl: opponentLink ? absoluteUrl(opponentLink[1].replace(/&amp;/g, "&")) : "",
       map: cleanText(cells[2]),
@@ -1541,7 +1555,7 @@ const server = http.createServer(async (req, res) => {
           id DESC
       `);
       return send(res, 200, JSON.stringify({
-        entries: result.rows,
+        entries: result.rows.map((entry) => ({ ...entry, tier: diaryTierLabel(entry.tier) })),
         total: result.rowCount,
         updatedAt: new Date().toISOString()
       }), "application/json; charset=utf-8");
@@ -1670,7 +1684,7 @@ const server = http.createServer(async (req, res) => {
         matchDate || null,
         gameFormat,
         opponent,
-        clean(body.tier, 40) || null,
+        diaryTierLabel(body.tier) || null,
         clean(body.opponentRace, 30) || null,
         clean(body.mapName, 80) || null,
         resultValue || "미정",
@@ -1775,7 +1789,7 @@ const server = http.createServer(async (req, res) => {
         matchDate || null,
         gameFormat,
         opponent,
-        clean(body.tier, 40) || null,
+        diaryTierLabel(body.tier) || null,
         clean(body.opponentRace, 30) || null,
         clean(body.mapName, 80) || null,
         resultValue || "미정",
