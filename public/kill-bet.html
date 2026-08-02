@@ -457,8 +457,33 @@
     }
   </style>
   <link rel="stylesheet" href="./common-theme.css">
-  <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
+  <link rel="stylesheet" href="./purple-five-tabs.css?v=20260802-content-colors">
   <link rel="stylesheet" href="./collaboration.css">
+  <style>
+    /* 메뉴 색상은 유지하고 킬 내기 내용 버튼만 원래 상태 색상을 사용합니다. */
+    .kill-area .reset-button,
+    .kill-area .step-button,
+    .kill-area .fail-button,
+    .kill-area .cancel-button {
+      border: 2px solid var(--button-edge) !important;
+      border-radius: 7px !important;
+      color: var(--ink) !important;
+      background: var(--button) !important;
+      box-shadow: inset 0 -2px 0 rgba(132, 83, 0, .14) !important;
+    }
+    .kill-area .fail-button { color: var(--fail) !important; }
+    .kill-area .cancel-button { color: var(--name) !important; }
+    .kill-area .fail-button.has-fails {
+      border-color: #b54825 !important;
+      background: #ffd1bc !important;
+    }
+    .kill-area .reset-button:hover,
+    .kill-area .step-button:hover,
+    .kill-area .fail-button:hover,
+    .kill-area .cancel-button:hover:not(:disabled) {
+      background: var(--button-hover) !important;
+    }
+  </style>
   </head>
 <body>
         <nav class="site-nav" aria-label="페이지 이동">

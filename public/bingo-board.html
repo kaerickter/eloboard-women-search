@@ -862,8 +862,98 @@
     }
   </style>
   <link rel="stylesheet" href="./common-theme.css">
-  <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
+  <link rel="stylesheet" href="./purple-five-tabs.css?v=20260802-content-colors">
   <link rel="stylesheet" href="./collaboration.css">
+  <style>
+    /* 메뉴 색상은 유지하고 빙고 내용 버튼만 원래 상태 색상을 사용합니다. */
+    .broadcast .preview-cell {
+      border-color: rgba(255, 255, 255, .86) !important;
+      border-radius: clamp(12px, 1.6vw, 18px) !important;
+      color: #33253a !important;
+      background: linear-gradient(180deg, #fff 0%, #fffaf4 100%) !important;
+      box-shadow: 0 10px 18px rgba(116, 83, 63, .13), inset 0 -7px 0 rgba(231, 183, 95, .12), inset 0 1px 0 rgba(255, 255, 255, .96) !important;
+    }
+    .broadcast .preview-cell.checked {
+      border-color: #27b77a !important;
+      color: #124d38 !important;
+      background: linear-gradient(180deg, #f2fff7 0%, #c9f5dc 100%) !important;
+      box-shadow: 0 0 0 3px rgba(39, 183, 122, .3), 0 12px 24px rgba(25, 133, 91, .25), inset 0 -7px 0 rgba(25, 133, 91, .13), inset 0 1px 0 rgba(255, 255, 255, .96) !important;
+    }
+    .broadcast .preview-cell.bingo-line {
+      border-color: #f0bd3d !important;
+      color: #5c3900 !important;
+      background: linear-gradient(180deg, #fff2b8 0%, #ffd66e 100%) !important;
+      box-shadow: 0 0 0 4px rgba(255, 246, 197, .98), 0 0 0 8px rgba(231, 183, 95, .42), 0 14px 30px rgba(231, 183, 95, .32), inset 0 -7px 0 rgba(231, 183, 95, .12), inset 0 1px 0 rgba(255, 255, 255, .94) !important;
+    }
+    .broadcast .preview-cell.territory-cell,
+    .editor .edit-cell.territory-cell {
+      border-color: var(--claim-color) !important;
+      color: var(--claim-ink, #fff) !important;
+      background: var(--claim-color) !important;
+    }
+    .editor .edit-cell {
+      border-color: var(--line) !important;
+      border-radius: 8px !important;
+      color: var(--ink) !important;
+      background: #fafbfc !important;
+      box-shadow: none !important;
+    }
+    .editor .edit-cell.checked {
+      border-color: #9bd8b6 !important;
+      color: #1e6248 !important;
+      background: #eaf8ef !important;
+    }
+    .editor .edit-cell.bingo-line {
+      border-color: #e7b75f !important;
+      color: #6b4300 !important;
+      background: #fff2bf !important;
+    }
+    .editor .segmented button {
+      border: 0 !important;
+      border-radius: 6px !important;
+      color: var(--muted) !important;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+    .editor .segmented button.active {
+      color: var(--ink) !important;
+      background: #fff !important;
+      box-shadow: 0 2px 8px rgba(20, 28, 40, .12) !important;
+    }
+    .editor .segmented button.mode-active {
+      color: #fff !important;
+      background: linear-gradient(135deg, var(--team-1), var(--team-2)) !important;
+    }
+    .editor .team-button[data-team="1"] { background: var(--team-1) !important; }
+    .editor .team-button[data-team="2"] { background: var(--team-2) !important; }
+    .editor .timer-button {
+      border-color: #d9dff2 !important;
+      color: #303858 !important;
+      background: #eefbf3 !important;
+      box-shadow: none !important;
+    }
+    .editor .timer-button.primary {
+      border-color: #2f8f83 !important;
+      color: #fff !important;
+      background: linear-gradient(135deg, #2f8f83, #65bfa9) !important;
+    }
+    .editor .button {
+      border-color: var(--line) !important;
+      color: var(--ink) !important;
+      background: #fff !important;
+      box-shadow: none !important;
+    }
+    .editor .button.primary {
+      border-color: var(--accent-2) !important;
+      color: #fff !important;
+      background: var(--accent-2) !important;
+    }
+    .editor .button.warn {
+      border-color: #f0c2c8 !important;
+      color: #8e1725 !important;
+      background: #fff5f6 !important;
+    }
+  </style>
   </head>
 <body>
       <nav class="site-nav" aria-label="페이지 이동">
