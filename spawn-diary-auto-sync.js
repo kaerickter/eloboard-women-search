@@ -6,6 +6,19 @@ const AUTO_PLAYER_NAME = "이아깽";
 const AUTO_SOURCE_ID = "eloboard-auto";
 const AUTO_SYNC_LOCK_ID = 7310928;
 
+function koreaDateKey(daysFromToday = 0, now = Date.now()) {
+  const koreaTime = new Date(now + (9 * 60 * 60 * 1000));
+  koreaTime.setUTCDate(koreaTime.getUTCDate() + daysFromToday);
+  return koreaTime.toISOString().slice(0, 10);
+}
+
+function recentAutoMatchWindow(now = Date.now()) {
+  return {
+    from: koreaDateKey(-1, now),
+    to: koreaDateKey(0, now),
+  };
+}
+
 function compactName(value) {
   return String(value || "").replace(/\s+/g, "").trim().toLocaleLowerCase("ko");
 }
@@ -172,9 +185,11 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
   const playerKey = compactName(playerName);
   const uniqueCandidates = [];
   const sourceKeys = new Set();
+  const autoMatchWindow = recentAutoMatchWindow();
   for (const match of matches) {
     const candidate = candidateFromMatch(playerName, match, roster);
     if (!candidate.matchDate || !candidate.opponent || sourceKeys.has(candidate.sourceKey)) continue;
+    if (candidate.matchDate < autoMatchWindow.from || candidate.matchDate > autoMatchWindow.to) continue;
     sourceKeys.add(candidate.sourceKey);
     uniqueCandidates.push(candidate);
   }
@@ -199,6 +214,27 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       [playerKey]
     );
     const seenCount = Number(seenCountResult.rows[0]?.count || 0);
+    const seenKeysResult = uniqueCandidates.length
+      ? await client.query(
+        "SELECT source_key FROM spawn_diary_auto_seen WHERE player_key = $1 AND source_key = ANY($2::text[])",
+        [playerKey, uniqueCandidates.map((candidate) => candidate.sourceKey)]
+      )
+      : { rows: [] };
+    const seenKeys = new Set(seenKeysResult.rows.map((row) => row.source_key));
+    const pendingCandidates = uniqueCandidates.filter((candidate) => !seenKeys.has(candidate.sourceKey));
+
+    if (!pendingCandidates.length) {
+      await client.query("COMMIT");
+      return {
+        enabled: true,
+        initialized: seenCount === 0,
+        baselineCount: seenCount === 0 ? uniqueCandidates.length : undefined,
+        checked: uniqueCandidates.length,
+        imported: 0,
+        duplicates: 0,
+        baselineSkipped: 0,
+      };
+    }
 
     const existingResult = await client.query(`
       SELECT id, match_date, opponent, tier, opponent_race, map_name, result, source_sheet_id
@@ -214,7 +250,7 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       .sort();
     const latestExistingDate = existingDates.at(-1) || "";
     const initializing = seenCount === 0;
-    const orderedCandidates = [...uniqueCandidates].sort((a, b) =>
+    const orderedCandidates = [...pendingCandidates].sort((a, b) =>
       String(a.matchDate).localeCompare(String(b.matchDate))
     );
     const sourceRowResult = await client.query(
@@ -313,6 +349,8 @@ module.exports = {
   compactName,
   duplicateSignature,
   initializeSpawnDiaryAutoSyncSchema,
+  koreaDateKey,
+  recentAutoMatchWindow,
   opponentIdentity,
   resultFromElo,
   sourceKeyForMatch,
