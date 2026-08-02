@@ -222,7 +222,7 @@ function render() {
         </button></td>
         <td>${formatPill(entry.game_format)}</td>
         <td>${escapeHtml(entry.opponent)}</td>
-        <td>${coloredText("tier", entry.tier, 47)}</td>
+        <td>${coloredText("tier", playerTierSnapshot({ tier: entry.tier }), 47)}</td>
         <td><span class="race-pill ${raceKind(entry.opponent_race)}" title="${escapeHtml(entry.opponent_race || "미정")}">${raceAbbreviation(entry.opponent_race)}</span></td>
         <td>${coloredPill("map", entry.map_name, 131)}</td>
         <td><span class="result-pill ${kind}">${escapeHtml(resultLabel(entry.result))}</span></td>
@@ -296,8 +296,10 @@ function playerTierSnapshot(player) {
   const tier = text(player?.tier);
   if (!tier) return "";
   if (tier === "FA") return "FA";
-  const label = tier.endsWith("티어") ? tier : tier + "티어";
-  return label + (player?.promotionLight ? "승급불" : "");
+  const hasPromotion = Boolean(player?.promotionLight) || /승급\s*불/u.test(tier);
+  const base = tier.replace(/\s*승급\s*불\s*$/u, "").trim();
+  const label = base.endsWith("티어") ? base : base + "티어";
+  return label + (hasPromotion ? " 승급불" : "");
 }
 
 function playerRaceLabel(value) {
