@@ -115,6 +115,24 @@ let playerAnalysisInitPromise = null;
 let scoreboardStateTableReady = false;
 let scoreboardStateTablePromise = null;
 
+function sanitizeScoreboardText(value) {
+  const normalized = String(value).normalize("NFC");
+  const repaired = normalized.replace(/\uFFFD+/g, "");
+  if (normalized.includes("\uFFFD") && repaired === "냥코기") return "냥냥코기";
+  return repaired;
+}
+
+function sanitizeScoreboardState(value) {
+  if (typeof value === "string") return sanitizeScoreboardText(value);
+  if (Array.isArray(value)) return value.map(sanitizeScoreboardState);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, sanitizeScoreboardState(item)])
+    );
+  }
+  return value;
+}
+
 async function ensureScoreboardStateTable() {
   if (!tierAdmin.pool || scoreboardStateTableReady) return;
   if (!scoreboardStateTablePromise) {
@@ -143,13 +161,17 @@ async function loadScoreboardState() {
     );
     if (!result.rows[0]) return { state: null, version: 0, updatedAt: null };
     return {
-      state: result.rows[0].state,
+      state: sanitizeScoreboardState(result.rows[0].state),
       version: Number(result.rows[0].version),
       updatedAt: result.rows[0].updated_at
     };
   }
   try {
-    return JSON.parse(await fs.promises.readFile(SCOREBOARD_STATE_FILE, "utf8"));
+    const saved = JSON.parse(await fs.promises.readFile(SCOREBOARD_STATE_FILE, "utf8"));
+    return {
+      ...saved,
+      state: sanitizeScoreboardState(saved.state)
+    };
   } catch (error) {
     if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
     throw error;
@@ -157,7 +179,8 @@ async function loadScoreboardState() {
 }
 
 async function saveScoreboardState(state) {
-  const stateJson = JSON.stringify(state);
+  const sanitizedState = sanitizeScoreboardState(state);
+  const stateJson = JSON.stringify(sanitizedState);
   if (stateJson.length > MAX_SCOREBOARD_STATE_SIZE) throw new Error("스코어보드 정보가 너무 큽니다.");
 
   if (tierAdmin.pool) {
@@ -179,7 +202,7 @@ async function saveScoreboardState(state) {
 
   const current = await loadScoreboardState();
   const saved = {
-    state,
+    state: sanitizedState,
     version: Number(current.version || 0) + 1,
     updatedAt: new Date().toISOString()
   };
