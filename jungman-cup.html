@@ -7,20 +7,26 @@
     <title>중만컵 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./jungman-cup.css">
+      <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   </head>
   <body>
-    <nav class="site-nav" aria-label="페이지 이동">
+        <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-brand" href="./tiers.html" aria-label="ELO KITTEN 홈">
+        <span>EK</span><strong>ELO KITTEN</strong>
+      </a>
       <a class="site-tab" href="./tiers.html">티어표</a>
       <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
       <a class="site-tab" href="./index.html">전적검색</a>
       <a class="site-tab matchup" href="./matchup.html">상대전적</a>
       <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab" href="./scoreboard.html">스코어보드</a>
       <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
       <a class="site-tab" href="./kill-bet.html">킬 내기</a>
-      <a class="site-tab" href="./scoreboard.html">매치 점수판</a>
+      <a class="site-tab" href="./match-scoreboard.html">점수계산기</a>
       <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
-      <a class="site-tab live-vote-tab" href="./live-vote.html">실시간투표확인</a>
-      <a class="site-tab active cup-tab" href="./jungman-cup.html" aria-current="page">중만컵</a>
+      
+      <a class="site-tab cup-tab active" href="./jungman-cup.html" aria-current="page">중만컵</a>
+      <span class="site-user"><strong>이아깽</strong><em>관리자</em></span>
     </nav>
 
     <main class="cup-shell">
@@ -39,10 +45,13 @@
 
       <section class="preview-notice">
         <div>
-          <strong>화면 미리보기</strong>
-          <span>현재 조 편성은 화면 확인을 위한 예시이며 실제 대진이 아닙니다.</span>
+          <strong>조별 대전 일정</strong>
+          <span>대전 등록에서 날짜와 양쪽 대학을 경기마다 직접 선택할 수 있습니다.</span>
         </div>
-        <button id="cupAdminOpen" type="button">대진 등록</button>
+        <div class="cup-notice-actions">
+          <button id="cupStatsOpen" class="stats-button" type="button">개인성적</button>
+          <button id="cupAdminOpen" type="button">대전 등록</button>
+        </div>
       </section>
 
       <div class="cup-layout">
@@ -64,29 +73,43 @@
     <dialog id="cupAdminDialog" class="cup-admin-dialog" aria-labelledby="cupAdminTitle">
       <div class="cup-admin-header">
         <div>
-          <strong id="cupAdminTitle">중만컵 대진 관리</strong>
-          <span>13개 대학 중 12개 대학을 조별로 등록합니다.</span>
+          <strong id="cupAdminTitle">중만컵 조별 대전 등록</strong>
+          <span>조별 참가 대학과 각 대전의 날짜를 따로 등록합니다.</span>
         </div>
         <button id="cupAdminClose" type="button" aria-label="닫기">×</button>
       </div>
 
-      <form id="cupAdminLogin" class="cup-admin-login">
-        <label for="cupAdminPassword">관리자 비밀번호</label>
-        <div>
-          <input id="cupAdminPassword" type="password" autocomplete="current-password" required>
-          <button type="submit">로그인</button>
-        </div>
-      </form>
-
-      <section id="cupAdminManager" class="cup-admin-manager" hidden>
+      <section id="cupAdminManager" class="cup-admin-manager">
         <div id="groupEditor" class="group-editor"></div>
         <div class="cup-admin-actions">
-          <button id="cupAdminReset" class="secondary" type="button">예시 대진으로 초기화</button>
-          <button id="cupAdminSave" type="button">대진 저장</button>
+          <button id="cupAdminReset" class="secondary" type="button">대전 전체 초기화</button>
+          <button id="cupAdminSave" type="button">조별 대전 저장</button>
         </div>
         <p>미리보기 단계에서는 이 브라우저에만 저장됩니다.</p>
       </section>
-      <p id="cupAdminStatus" class="cup-admin-status" role="status">관리자 비밀번호로 로그인해 주세요.</p>
+      <p id="cupAdminStatus" class="cup-admin-status" role="status">등록할 경기 내용을 입력한 뒤 저장해 주세요.</p>
+    </dialog>
+
+    <dialog id="cupStatsDialog" class="cup-stats-dialog" aria-labelledby="cupStatsTitle">
+      <div class="cup-admin-header">
+        <div>
+          <strong id="cupStatsTitle">중만컵 개인성적</strong>
+          <span>기록이 완료된 경기만 집계합니다.</span>
+        </div>
+        <button id="cupStatsClose" type="button" aria-label="닫기">×</button>
+      </div>
+      <div class="cup-stats-body">
+        <p id="cupStatsSummary" class="cup-stats-summary"></p>
+        <div class="cup-stats-table-wrap">
+          <table class="cup-stats-table">
+            <thead>
+              <tr><th>순위</th><th>선수명</th><th>승리</th><th>경기 수</th><th>승률</th></tr>
+            </thead>
+            <tbody id="cupStatsRows"></tbody>
+          </table>
+        </div>
+        <p id="cupStatsEmpty" class="cup-stats-empty" hidden>승자와 양쪽 출전자 이름이 입력된 경기부터 개인성적에 표시됩니다.</p>
+      </div>
     </dialog>
 
     <script src="./jungman-cup.js"></script>
