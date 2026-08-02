@@ -304,7 +304,7 @@ async function fetchSearchJson(url, signal, attempts = 2) {
     const timeoutController = new AbortController();
     const abortFromCaller = () => timeoutController.abort();
     signal.addEventListener("abort", abortFromCaller, { once: true });
-    const timeout = setTimeout(() => timeoutController.abort(), 15000);
+    const timeout = setTimeout(() => timeoutController.abort(), 30000);
     try {
       const response = await fetch(url, {
         signal: timeoutController.signal,
