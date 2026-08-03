@@ -347,10 +347,10 @@ select {
 .fixture-pairing-tooltip {
   position: fixed;
   z-index: 1200;
-  width: min(360px, calc(100vw - 24px));
-  max-height: min(430px, calc(100vh - 94px));
-  padding: 16px;
-  overflow: auto;
+  width: min(980px, calc(100vw - 24px));
+  max-height: none;
+  padding: 14px 18px;
+  overflow: visible;
   border: 2px solid #c9d438;
   border-radius: 10px;
   color: var(--cup-navy);
@@ -364,9 +364,10 @@ select {
 
 .fixture-pairing-tooltip > strong {
   display: block;
-  padding-bottom: 10px;
+  padding-bottom: 7px;
   border-bottom: 1px solid var(--cup-line);
-  font-size: 17px;
+  font-size: 22px;
+  line-height: 1.15;
 }
 
 .fixture-pairing-tooltip i {
@@ -376,30 +377,40 @@ select {
 }
 
 .fixture-pairing-tooltip p {
-  margin: 12px 0 0;
+  margin: 7px 0 0;
   color: var(--cup-muted);
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 800;
 }
 
 .fixture-pairing-tooltip section {
-  display: grid;
-  grid-template-columns: 58px 1fr;
-  gap: 5px 10px;
-  padding-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-height: 24px;
+  padding-top: 2px;
+  flex-wrap: wrap;
 }
 
 .fixture-pairing-tooltip section > b {
-  grid-row: 1 / span 20;
+  flex: 0 0 68px;
   color: #68710b;
-  font-size: 13px;
+  font-size: 17px;
+  line-height: 1.2;
 }
 
 .fixture-pairing-tooltip section > span {
-  display: block;
-  font-size: 14px;
+  display: inline-block;
+  font-size: 18px;
   font-weight: 850;
-  line-height: 1.35;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.fixture-pairing-tooltip section > span + span::before {
+  margin-right: 10px;
+  color: #a3a79f;
+  content: "·";
 }
 
 .today-badge {
