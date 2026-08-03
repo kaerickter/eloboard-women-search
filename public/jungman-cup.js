@@ -5,6 +5,7 @@ const UNIVERSITIES = [
 const GROUPS = ["A", "B", "C", "D"];
 const STORAGE_KEY = "jungman-cup-preview-v2";
 const PREVIOUS_STORAGE_KEY = "jungman-cup-preview-v1";
+const SHARED_STATE_API = "/api/jungman-cup-state";
 const MATCH_TIER_OVERRIDES = new Map([
   ["아리송이", "7"],
   ["막내현진", "7"],
@@ -37,6 +38,9 @@ let selectedMatch = null;
 let state = readState();
 let tierRoster = [];
 let tierRosterStatus = "loading";
+let sharedVersion = 0;
+let sharedSaveTimer = null;
+let sharedSaveInFlight = false;
 
 function belongsToUniversity(player, university) {
   return String(player?.university || "") === university ||
@@ -118,8 +122,86 @@ function readState() {
   }
 }
 
-function saveState() {
+function saveLocalState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function hasSavedContent(value = state) {
+  const hasFixture = Object.values(value.fixtures || {}).some((fixtures) =>
+    (fixtures || []).some((fixture) => fixture?.date || fixture?.home || fixture?.away)
+  );
+  const hasGame = Object.values(value.matches || {}).some((match) =>
+    (match?.games || []).some((game) => game?.homePlayer || game?.awayPlayer || game?.mapName || game?.winner)
+  );
+  return hasFixture || hasGame;
+}
+
+async function pushSharedState() {
+  if (sharedSaveInFlight) {
+    clearTimeout(sharedSaveTimer);
+    sharedSaveTimer = setTimeout(pushSharedState, 300);
+    return;
+  }
+  sharedSaveInFlight = true;
+  try {
+    const response = await fetch(SHARED_STATE_API, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "공용 저장 실패");
+    sharedVersion = Number(result.version || sharedVersion);
+  } catch (error) {
+    console.warn("중만컵 공용 저장 실패:", error.message);
+  } finally {
+    sharedSaveInFlight = false;
+  }
+}
+
+function saveState() {
+  saveLocalState();
+  clearTimeout(sharedSaveTimer);
+  sharedSaveTimer = setTimeout(() => {
+    sharedSaveTimer = null;
+    pushSharedState();
+  }, 250);
+}
+
+function applySharedState(sharedState, version) {
+  state = sharedState;
+  sharedVersion = Number(version || 0);
+  saveLocalState();
+  if (selectedMatch && !state.matches?.[selectedMatch]) selectedMatch = null;
+  renderGroups();
+  renderMatchPanel();
+  if (cupStatsDialog.open) renderIndividualStats();
+}
+
+async function pullSharedState(initial = false) {
+  if (!initial && (sharedSaveTimer || sharedSaveInFlight || cupAdminDialog.open || document.hidden)) return;
+  try {
+    const response = await fetch(SHARED_STATE_API, { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "공용 불러오기 실패");
+    if (!result.state) {
+      if (initial && hasSavedContent()) await pushSharedState();
+      return;
+    }
+    if (initial || Number(result.version || 0) > sharedVersion) {
+      applySharedState(result.state, result.version);
+    }
+  } catch (error) {
+    console.warn("중만컵 공용 불러오기 실패:", error.message);
+  }
+}
+
+function startSharedSync() {
+  pullSharedState(true);
+  setInterval(() => pullSharedState(false), 3000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pullSharedState(false);
+  });
 }
 
 function escapeHtml(value) {
@@ -510,3 +592,4 @@ cupAdminReset.addEventListener("click", () => {
 renderGroups();
 renderMatchPanel();
 loadTierRoster();
+startSharedSync();
