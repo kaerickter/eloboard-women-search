@@ -80,9 +80,7 @@ const PINNED_SOOP_ALIASES = {
     stationNames: ["임조이1111", "Imzoe"]
   }
 };
-const PINNED_TIER_DISPLAY_NAMES = {
-  "핑핑": "핑핑♥"
-};
+const PINNED_TIER_DISPLAY_NAMES = {};
 const PORT = Number(process.env.PORT || 5177);
 const DATABASE_RETRY_MS = 15000;
 const DEFAULT_PAGES = 10;
@@ -418,16 +416,18 @@ async function ensureSpawnDiaryStorage() {
   }
   return spawnDiarySchemaPromise;
 }
-function queueSpawnDiarySync(query, profile) {
+async function syncSpawnDiaryNow(query, profile) {
   if (autoDiaryPlayerKey(query) !== autoDiaryPlayerKey(AUTO_PLAYER_NAME) || !profile) return null;
-  setImmediate(() => {
-    ensureSpawnDiaryStorage()
-      .then(() => maybeSyncSpawnDiary(query, profile))
-      .catch((error) => {
-        console.error("Spawn diary queued auto-sync failed:", error.message);
-      });
-  });
-  return { enabled: true, queued: true };
+  try {
+    await ensureSpawnDiaryStorage();
+    return await maybeSyncSpawnDiary(query, profile);
+  } catch (error) {
+    console.error("Spawn diary immediate auto-sync failed:", error.message);
+    return {
+      enabled: false,
+      error: "스폰일지 자동등록을 완료하지 못했습니다. 잠시 후 다시 검색해 주세요."
+    };
+  }
 }
 function normalizePlayerName(name) {
   return normalizeName(name).replace(/[tzp]$/i, "");
@@ -2188,7 +2188,7 @@ const server = http.createServer(async (req, res) => {
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
         const profile = await loadProfile(requestedWrId, force);
-        const autoDiarySync = queueSpawnDiarySync(query, profile);
+        const autoDiarySync = await syncSpawnDiaryNow(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
         const result = summarize([], query);
@@ -2219,7 +2219,7 @@ const server = http.createServer(async (req, res) => {
           profile = await loadProfile(selected.wrId, force);
         }
       }
-      const autoDiarySync = queueSpawnDiarySync(query, profile);
+      const autoDiarySync = await syncSpawnDiaryNow(query, profile);
       return send(res, 200, JSON.stringify({
         ...data,
         ...result,
