@@ -5,6 +5,16 @@ const UNIVERSITIES = [
 const GROUPS = ["A", "B", "C", "D"];
 const STORAGE_KEY = "jungman-cup-preview-v2";
 const PREVIOUS_STORAGE_KEY = "jungman-cup-preview-v1";
+const MATCH_TIER_OVERRIDES = new Map([
+  ["아리송이", "7"],
+  ["막내현진", "7"],
+  ["냥수디", "7"],
+  ["밍또얌", "8"],
+  ["헤요이", "8"],
+  ["진땅콩", "8"],
+  ["또아", "9"],
+  ["봄덕이", "9"]
+]);
 
 const groupGrid = document.getElementById("groupGrid");
 const matchPanel = document.getElementById("matchPanel");
@@ -33,20 +43,24 @@ function belongsToUniversity(player, university) {
     (Array.isArray(player?.universities) && player.universities.includes(university));
 }
 
+function matchTierFor(player) {
+  return MATCH_TIER_OVERRIDES.get(String(player?.name || "").trim()) || String(player?.tier || "");
+}
+
 function fixturePairings(home, away) {
   if (tierRosterStatus === "loading") return { status: "loading", tiers: [] };
   if (tierRosterStatus === "error") return { status: "error", tiers: [] };
 
   const rosterFor = (university) => tierRoster.filter((player) => {
-    const tier = String(player?.tier || "");
+    const tier = matchTierFor(player);
     const eligibleTier = (player?.division === "women" && /^\d+$/.test(tier)) ||
       (player?.division === "men" && ["갓", "킹"].includes(tier));
     return eligibleTier && belongsToUniversity(player, university);
-  });
+  }).map((player) => ({ ...player, matchTier: matchTierFor(player) }));
   const homePlayers = rosterFor(home);
   const awayPlayers = rosterFor(away);
-  const tierNumbers = [...new Set(homePlayers.map((player) => String(player.tier)))]
-    .filter((tier) => awayPlayers.some((player) => String(player.tier) === tier))
+  const tierNumbers = [...new Set(homePlayers.map((player) => player.matchTier))]
+    .filter((tier) => awayPlayers.some((player) => player.matchTier === tier))
     .sort((a, b) => {
       const tierOrder = { "갓": -2, "킹": -1 };
       const aOrder = tierOrder[a] ?? Number(a);
@@ -57,8 +71,8 @@ function fixturePairings(home, away) {
   return {
     status: "ready",
     tiers: tierNumbers.map((tier) => {
-      const left = homePlayers.filter((player) => String(player.tier) === tier);
-      const right = awayPlayers.filter((player) => String(player.tier) === tier);
+      const left = homePlayers.filter((player) => player.matchTier === tier);
+      const right = awayPlayers.filter((player) => player.matchTier === tier);
       return {
         tier,
         pairs: left.flatMap((homePlayer) => right.map((awayPlayer) => ({
