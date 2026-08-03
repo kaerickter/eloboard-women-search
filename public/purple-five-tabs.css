@@ -400,7 +400,7 @@ body.spawn-diary-page button.date-edit-button:focus-visible {
 
 body.spawn-diary-page button.date-edit-button:hover,
 body.spawn-diary-page button.date-edit-button:focus-visible {
-  background: #f5f4fa !important;
+  background: transparent !important;
 }
 
 body .matchup-shell .matchup-search .quick button {

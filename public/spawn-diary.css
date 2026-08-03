@@ -430,7 +430,7 @@ tbody tr:hover td { background: #fbfbeF; }
 th:last-child, td:last-child { border-right: 0; }
 tbody tr:last-child td { border-bottom: 0; }
 
-.date-column { width: 84.361px; }
+.date-column { width: 105px; }
 .format-column { width: 69.176px; }
 .opponent-column { width: 87.736px; }
 .tier-column { width: 92.798px; }
@@ -440,7 +440,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .opponent-build-column,
 .my-build-column { width: 117.853px; }
 .feedback-column,
-.reflection-column { width: calc((100% - 777.308px) / 2); }
+.reflection-column { width: calc((100% - 797.947px) / 2); }
 
 th:nth-child(-n+9),
 td:nth-child(-n+9) {
@@ -537,16 +537,22 @@ td:nth-child(11) {
 }
 
 .date-edit-button {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
-  padding: 3px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
   color: var(--theme-ink);
+  box-shadow: none !important;
   cursor: pointer;
   font: inherit;
   font-size: 17px;
   font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.35px;
   white-space: nowrap;
 }
 
@@ -556,7 +562,8 @@ td:nth-child(11) {
 
 .date-edit-button:hover,
 .date-edit-button:focus-visible {
-  background: #f3f7cf;
+  background: transparent !important;
+  box-shadow: none !important;
   outline: 1px solid var(--theme-accent-deep);
 }
 
