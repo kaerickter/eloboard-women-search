@@ -183,6 +183,12 @@ function formatDate(value) {
   return date.replaceAll("-", "/");
 }
 
+function newestMatchFirst(a, b) {
+  const aDate = text(a?.match_date).slice(0, 10) || "0000-00-00";
+  const bDate = text(b?.match_date).slice(0, 10) || "0000-00-00";
+  return bDate.localeCompare(aDate);
+}
+
 function updateSummary() {
   const wins = entries.filter((entry) => resultKind(entry.result) === "win").length;
   const losses = entries.filter((entry) => resultKind(entry.result) === "loss").length;
@@ -256,7 +262,7 @@ function applyFilters(resetPage = true) {
     return matchesResult &&
       (!map || text(entry.map_name) === map) &&
       (!query || searchableText(entry).includes(query));
-  });
+  }).sort(newestMatchFirst);
   if (resetPage) currentPage = 1;
   render();
   saveDiaryViewState();
