@@ -32,6 +32,7 @@ const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const MEN_TIER_FALLBACK_FILE = path.join(ROOT, "data", "men-tier-fallback.json");
 const SCOREBOARD_STATE_FILE = path.join(ROOT, "data", "scoreboard-state.json");
+const JUNGMAN_CUP_STATE_FILE = path.join(ROOT, "data", "jungman-cup-state.json");
 const MAX_SCOREBOARD_STATE_SIZE = 200000;
 const PINNED_SOOP_ALIASES = {
   "핑핑": {
@@ -209,6 +210,103 @@ async function saveScoreboardState(state) {
   const tempFile = SCOREBOARD_STATE_FILE + ".tmp";
   await fs.promises.writeFile(tempFile, JSON.stringify(saved, null, 2));
   await fs.promises.rename(tempFile, SCOREBOARD_STATE_FILE);
+  return { version: saved.version, updatedAt: saved.updatedAt };
+}
+
+function sanitizeJungmanCupState(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const shortText = (input, limit = 100) => String(input || "").trim().slice(0, limit);
+  const fixtures = {};
+  for (const group of ["A", "B", "C", "D"]) {
+    const rows = Array.isArray(source.fixtures?.[group]) ? source.fixtures[group] : [];
+    fixtures[group] = Array.from({ length: 3 }, (_, index) => {
+      const row = rows[index] && typeof rows[index] === "object" ? rows[index] : {};
+      const date = shortText(row.date, 10);
+      return {
+        date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "",
+        home: shortText(row.home),
+        away: shortText(row.away)
+      };
+    });
+  }
+
+  const matches = {};
+  const matchEntries = source.matches && typeof source.matches === "object" && !Array.isArray(source.matches)
+    ? Object.entries(source.matches).slice(0, 100)
+    : [];
+  for (const [rawKey, rawMatch] of matchEntries) {
+    if (!rawMatch || typeof rawMatch !== "object" || Array.isArray(rawMatch)) continue;
+    const key = shortText(rawKey, 300);
+    if (!key) continue;
+    const games = (Array.isArray(rawMatch.games) ? rawMatch.games : []).slice(0, 20).map((rawGame) => {
+      const game = rawGame && typeof rawGame === "object" ? rawGame : {};
+      const winner = ["home", "away"].includes(game.winner) ? game.winner : "";
+      return {
+        homePlayer: shortText(game.homePlayer),
+        awayPlayer: shortText(game.awayPlayer),
+        mapName: shortText(game.mapName),
+        winner
+      };
+    });
+    while (games.length < 9) games.push({ homePlayer: "", awayPlayer: "", mapName: "", winner: "" });
+    matches[key] = {
+      group: ["A", "B", "C", "D"].includes(rawMatch.group) ? rawMatch.group : "",
+      home: shortText(rawMatch.home),
+      away: shortText(rawMatch.away),
+      fixtureIndex: Math.max(0, Math.min(2, Number(rawMatch.fixtureIndex) || 0)),
+      fixtureDate: /^\d{4}-\d{2}-\d{2}$/.test(shortText(rawMatch.fixtureDate, 10)) ? shortText(rawMatch.fixtureDate, 10) : "",
+      games
+    };
+  }
+  return { fixtures, matches };
+}
+
+async function loadJungmanCupState() {
+  if (tierAdmin.pool) {
+    await ensureScoreboardStateTable();
+    const result = await tierAdmin.pool.query(
+      "SELECT state, version, updated_at FROM scoreboard_state WHERE id = $1",
+      ["jungman-cup"]
+    );
+    if (!result.rows[0]) return { state: null, version: 0, updatedAt: null };
+    return {
+      state: sanitizeJungmanCupState(result.rows[0].state),
+      version: Number(result.rows[0].version),
+      updatedAt: result.rows[0].updated_at
+    };
+  }
+  try {
+    const saved = JSON.parse(await fs.promises.readFile(JUNGMAN_CUP_STATE_FILE, "utf8"));
+    return { ...saved, state: sanitizeJungmanCupState(saved.state) };
+  } catch (error) {
+    if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
+    throw error;
+  }
+}
+
+async function saveJungmanCupState(state) {
+  const sanitizedState = sanitizeJungmanCupState(state);
+  const stateJson = JSON.stringify(sanitizedState);
+  if (stateJson.length > MAX_SCOREBOARD_STATE_SIZE) throw new Error("중만컵 정보가 너무 큽니다.");
+  if (tierAdmin.pool) {
+    await ensureScoreboardStateTable();
+    const result = await tierAdmin.pool.query(`
+      INSERT INTO scoreboard_state (id, state, version, updated_at)
+      VALUES ($1, $2::jsonb, 1, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        state = EXCLUDED.state,
+        version = scoreboard_state.version + 1,
+        updated_at = NOW()
+      RETURNING version, updated_at
+    `, ["jungman-cup", stateJson]);
+    return { version: Number(result.rows[0]?.version || 1), updatedAt: result.rows[0]?.updated_at || new Date().toISOString() };
+  }
+  const current = await loadJungmanCupState();
+  const saved = { state: sanitizedState, version: Number(current.version || 0) + 1, updatedAt: new Date().toISOString() };
+  await fs.promises.mkdir(path.dirname(JUNGMAN_CUP_STATE_FILE), { recursive: true });
+  const tempFile = JUNGMAN_CUP_STATE_FILE + ".tmp";
+  await fs.promises.writeFile(tempFile, JSON.stringify(saved, null, 2));
+  await fs.promises.rename(tempFile, JUNGMAN_CUP_STATE_FILE);
   return { version: saved.version, updatedAt: saved.updatedAt };
 }
 
@@ -1524,6 +1622,24 @@ const server = http.createServer(async (req, res) => {
       );
     } catch (error) {
       return send(res, 500, JSON.stringify({ error: error.message || "공용 스코어보드를 저장하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/jungman-cup-state" && req.method === "GET") {
+    try {
+      return send(res, 200, JSON.stringify(await loadJungmanCupState()), "application/json; charset=utf-8", { "Cache-Control": "no-store" });
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ error: error.message || "공용 중만컵 정보를 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/jungman-cup-state" && req.method === "PUT") {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+        return send(res, 400, JSON.stringify({ error: "저장할 중만컵 정보가 올바르지 않습니다." }), "application/json; charset=utf-8");
+      }
+      return send(res, 200, JSON.stringify(await saveJungmanCupState(body.state)), "application/json; charset=utf-8", { "Cache-Control": "no-store" });
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ error: error.message || "공용 중만컵 정보를 저장하지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/soop-vote-rankings" && req.method === "GET") {
