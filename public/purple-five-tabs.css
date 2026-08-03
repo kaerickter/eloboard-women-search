@@ -297,7 +297,7 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
   padding: 22px !important;
 }
 
-button:not(.site-tab):not(.live-only-toggle),
+button:not(.site-tab):not(.live-only-toggle):not(.broadcast button):not(.editor button):not(.kill-area button),
 .source-link,
 .matchup-search-button,
 .record-open-button {

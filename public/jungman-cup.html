@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#17213a">
-    <title>중만컵 · ELO Kitten</title>
+    <title>K-중만컵 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./jungman-cup.css">
+    <link rel="stylesheet" href="./jungman-cup.css?v=20260803-schedule-pairings">
       <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   </head>
   <body>
@@ -25,15 +25,15 @@
       <a class="site-tab" href="./match-scoreboard.html">점수계산기</a>
       <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
       
-      <a class="site-tab cup-tab active" href="./jungman-cup.html" aria-current="page">중만컵</a>
+      <a class="site-tab cup-tab active" href="./jungman-cup.html" aria-current="page">K-중만컵</a>
       <span class="site-user"><strong>이아깽</strong><em>관리자</em></span>
     </nav>
 
     <main class="cup-shell">
       <header class="cup-hero">
         <div>
-          <p class="cup-eyebrow">JUNGMAN CUP · GROUP STAGE</p>
-          <h1>중만컵</h1>
+          <p class="cup-eyebrow">K-JUNGMAN CUP · GROUP STAGE</p>
+          <h1>K-중만컵</h1>
           <p>12개 대학이 3팀씩 4개 조로 나뉘어 예선을 치릅니다.</p>
         </div>
         <div class="cup-rule-card" aria-label="대회 방식">
@@ -61,7 +61,7 @@
               <span>QUALIFIERS</span>
               <h2>조별 대진표</h2>
             </div>
-            <p>대학 이름을 누르면 해당 경기 결과표가 열립니다.</p>
+            <p>날짜에 마우스를 올리면 티어별 선수 대진이, 대학 이름을 누르면 경기 결과표가 열립니다.</p>
           </div>
           <div id="groupGrid" class="group-grid" aria-live="polite"></div>
         </section>
@@ -73,7 +73,7 @@
     <dialog id="cupAdminDialog" class="cup-admin-dialog" aria-labelledby="cupAdminTitle">
       <div class="cup-admin-header">
         <div>
-          <strong id="cupAdminTitle">중만컵 조별 대전 등록</strong>
+          <strong id="cupAdminTitle">K-중만컵 조별 대전 등록</strong>
           <span>조별 참가 대학과 각 대전의 날짜를 따로 등록합니다.</span>
         </div>
         <button id="cupAdminClose" type="button" aria-label="닫기">×</button>
@@ -93,7 +93,7 @@
     <dialog id="cupStatsDialog" class="cup-stats-dialog" aria-labelledby="cupStatsTitle">
       <div class="cup-admin-header">
         <div>
-          <strong id="cupStatsTitle">중만컵 개인성적</strong>
+          <strong id="cupStatsTitle">K-중만컵 개인성적</strong>
           <span>기록이 완료된 경기만 집계합니다.</span>
         </div>
         <button id="cupStatsClose" type="button" aria-label="닫기">×</button>
@@ -112,6 +112,6 @@
       </div>
     </dialog>
 
-    <script src="./jungman-cup.js"></script>
+    <script src="./jungman-cup.js?v=20260803-men-god-king"></script>
   </body>
 </html>

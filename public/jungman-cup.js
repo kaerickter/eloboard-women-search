@@ -25,6 +25,62 @@ const cupStatsEmpty = document.getElementById("cupStatsEmpty");
 const authenticated = true;
 let selectedMatch = null;
 let state = readState();
+let tierRoster = [];
+let tierRosterStatus = "loading";
+
+function belongsToUniversity(player, university) {
+  return String(player?.university || "") === university ||
+    (Array.isArray(player?.universities) && player.universities.includes(university));
+}
+
+function fixturePairings(home, away) {
+  if (tierRosterStatus === "loading") return { status: "loading", tiers: [] };
+  if (tierRosterStatus === "error") return { status: "error", tiers: [] };
+
+  const rosterFor = (university) => tierRoster.filter((player) => {
+    const tier = String(player?.tier || "");
+    const eligibleTier = (player?.division === "women" && /^\d+$/.test(tier)) ||
+      (player?.division === "men" && ["갓", "킹"].includes(tier));
+    return eligibleTier && belongsToUniversity(player, university);
+  });
+  const homePlayers = rosterFor(home);
+  const awayPlayers = rosterFor(away);
+  const tierNumbers = [...new Set(homePlayers.map((player) => String(player.tier)))]
+    .filter((tier) => awayPlayers.some((player) => String(player.tier) === tier))
+    .sort((a, b) => {
+      const tierOrder = { "갓": -2, "킹": -1 };
+      const aOrder = tierOrder[a] ?? Number(a);
+      const bOrder = tierOrder[b] ?? Number(b);
+      return aOrder - bOrder;
+    });
+
+  return {
+    status: "ready",
+    tiers: tierNumbers.map((tier) => {
+      const left = homePlayers.filter((player) => String(player.tier) === tier);
+      const right = awayPlayers.filter((player) => String(player.tier) === tier);
+      return {
+        tier,
+        pairs: left.flatMap((homePlayer) => right.map((awayPlayer) => ({
+          home: homePlayer.name,
+          away: awayPlayer.name
+        })))
+      };
+    })
+  };
+}
+
+async function loadTierRoster() {
+  try {
+    const response = await fetch("/api/tiers");
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.players)) throw new Error("선수 명단 오류");
+    tierRoster = data.players;
+    tierRosterStatus = "ready";
+  } catch {
+    tierRosterStatus = "error";
+  }
+}
 
 function emptyFixtures() {
   return Object.fromEntries(GROUPS.map((group) => [
@@ -148,8 +204,15 @@ function getMatch(group, index) {
 function renderGroups() {
   groupGrid.innerHTML = GROUPS.map((group) => {
     const groupFixtures = state.fixtures?.[group] || [];
-    const fixtures = [0, 1, 2].map((index) => {
-      const fixture = groupFixtures[index] || {};
+    const orderedFixtures = [0, 1, 2].map((index) => ({
+      index,
+      fixture: groupFixtures[index] || {}
+    })).sort((a, b) => {
+      const aDate = /^\d{4}-\d{2}-\d{2}$/.test(a.fixture.date || "") ? a.fixture.date : "9999-12-31";
+      const bDate = /^\d{4}-\d{2}-\d{2}$/.test(b.fixture.date || "") ? b.fixture.date : "9999-12-31";
+      return aDate.localeCompare(bDate) || a.index - b.index;
+    });
+    const fixtures = orderedFixtures.map(({ index, fixture }, orderIndex) => {
       const home = fixture.home || "왼쪽 대학 미정";
       const away = fixture.away || "오른쪽 대학 미정";
       const fixtureDate = formatGroupDate(fixture.date);
@@ -159,7 +222,8 @@ function renderGroups() {
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time>' + escapeHtml(fixtureDate) +
+        '<span class="fixture-vs"><b>' + (orderIndex + 1) + '경기 · VS</b><time tabindex="0" data-pairing-home="' +
+          escapeHtml(fixture.home) + '" data-pairing-away="' + escapeHtml(fixture.away) + '">' + escapeHtml(fixtureDate) +
           '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
@@ -281,6 +345,60 @@ function renderGroupEditor() {
   }).join("");
 }
 
+const pairingTooltip = document.createElement("div");
+pairingTooltip.className = "fixture-pairing-tooltip";
+pairingTooltip.hidden = true;
+pairingTooltip.setAttribute("role", "tooltip");
+document.body.appendChild(pairingTooltip);
+
+function showPairingTooltip(target) {
+  const home = target.dataset.pairingHome || "";
+  const away = target.dataset.pairingAway || "";
+  if (!home || !away) return;
+  const result = fixturePairings(home, away);
+  let content = '<strong>' + escapeHtml(home) + ' <i>VS</i> ' + escapeHtml(away) + '</strong>';
+  if (result.status === "loading") {
+    content += '<p>티어별 선수 대진을 불러오는 중입니다.</p>';
+  } else if (result.status === "error") {
+    content += '<p>선수 명단을 불러오지 못했습니다.</p>';
+  } else if (!result.tiers.length) {
+    content += '<p>같은 티어의 선수 대진이 없습니다.</p>';
+  } else {
+    content += result.tiers.map((tier) => '<section><b>' + escapeHtml(tier.tier) + '티어</b>' +
+      tier.pairs.map((pair) => '<span>' + escapeHtml(pair.home) + ' <i>vs</i> ' + escapeHtml(pair.away) + '</span>').join("") +
+      '</section>').join("");
+  }
+  pairingTooltip.innerHTML = content;
+  pairingTooltip.hidden = false;
+  const targetRect = target.getBoundingClientRect();
+  const tooltipRect = pairingTooltip.getBoundingClientRect();
+  const left = Math.max(12, Math.min(window.innerWidth - tooltipRect.width - 12,
+    targetRect.left + (targetRect.width - tooltipRect.width) / 2));
+  const below = targetRect.bottom + 10;
+  const top = below + tooltipRect.height <= window.innerHeight - 12
+    ? below
+    : Math.max(82, targetRect.top - tooltipRect.height - 10);
+  pairingTooltip.style.left = left + "px";
+  pairingTooltip.style.top = top + "px";
+}
+
+function hidePairingTooltip() {
+  pairingTooltip.hidden = true;
+}
+
+groupGrid.addEventListener("mouseover", (event) => {
+  const date = event.target.closest("[data-pairing-home][data-pairing-away]");
+  if (date) showPairingTooltip(date);
+});
+groupGrid.addEventListener("mouseout", (event) => {
+  if (event.target.closest("[data-pairing-home][data-pairing-away]")) hidePairingTooltip();
+});
+groupGrid.addEventListener("focusin", (event) => {
+  const date = event.target.closest("[data-pairing-home][data-pairing-away]");
+  if (date) showPairingTooltip(date);
+});
+groupGrid.addEventListener("focusout", hidePairingTooltip);
+
 groupGrid.addEventListener("click", (event) => {
   const button = event.target.closest("[data-group][data-fixture]");
   if (!button) return;
@@ -377,3 +495,4 @@ cupAdminReset.addEventListener("click", () => {
 
 renderGroups();
 renderMatchPanel();
+loadTierRoster();
