@@ -7,7 +7,6 @@ const state = {
   data: null,
   selectedYear: "",
   selectedMonth: "",
-  opponentQuery: "",
   requestId: 0,
   activeController: null,
   analysisProfile: null,
@@ -23,8 +22,7 @@ function saveSearchSession() {
       name: $("nameInput").value,
       data: state.data,
       selectedYear: state.selectedYear,
-      selectedMonth: state.selectedMonth,
-      opponentQuery: state.opponentQuery
+      selectedMonth: state.selectedMonth
     }));
   } catch {
     // 저장 공간이 부족한 경우 검색 기능은 그대로 사용합니다.
@@ -37,12 +35,10 @@ function restoreSearchSession() {
     if (!saved || typeof saved !== "object") return false;
     validateSearchResponse(saved.data);
     $("nameInput").value = String(saved.name || DEFAULT_NAME);
-    $("opponentInput").value = String(saved.opponentQuery || "");
     state.query = $("nameInput").value.trim();
     state.data = saved.data;
     state.selectedYear = String(saved.selectedYear || "");
     state.selectedMonth = String(saved.selectedMonth || "");
-    state.opponentQuery = $("opponentInput").value.trim();
     render(saved.data);
     setSearchState("success", "이전에 보던 검색 결과를 복원했습니다.");
     return true;
@@ -479,7 +475,7 @@ function resetResultPanels(message, className = "") {
   setPeriodValues("year", { games: 0, wins: 0, losses: 0, rate: 0 });
   setPeriodValues("month", { games: 0, wins: 0, losses: 0, rate: 0 });
   setPeriodValues("day", { games: 0, wins: 0, losses: 0, rate: 0 });
-  setOpponentStats({ games: 0, wins: 0, losses: 0, rate: 0 }, TXT.opponentReady);
+  renderRaceRates(null);
   $("profileLink").innerHTML = "";
   $("playerChoices").innerHTML = "";
   $("profile").innerHTML = '<div class="empty ' + escapeHtml(className) + '">' + escapeHtml(message) + '</div>';
@@ -524,28 +520,31 @@ function recentRows(rows, days) {
   });
 }
 
-function setOpponentStats(stats, label) {
-  $("opponentLabel").textContent = label;
-  $("opponentGames").textContent = stats.games;
-  $("opponentWins").textContent = stats.wins;
-  $("opponentLosses").textContent = stats.losses;
-  $("opponentRate").textContent = stats.rate + "%";
-}
-
-function renderOpponent(data) {
+function renderRaceRates(data) {
   const rows = getProfileRows(data);
-  const query = cleanName(state.opponentQuery || $("opponentInput").value);
-  if (!rows.length || !query) {
-    setOpponentStats({ games: 0, wins: 0, losses: 0, rate: 0 }, query ? TXT.noData : TXT.opponentReady);
-    return;
-  }
+  const yearPrefix = state.selectedYear ? state.selectedYear + "-" : "";
+  const monthPrefix = state.selectedYear && state.selectedMonth
+    ? state.selectedYear + "-" + state.selectedMonth
+    : "";
+  $("raceYearHeading").textContent = state.selectedYear ? state.selectedYear + "년 승률" : "해당 연도 승률";
+  $("raceMonthHeading").textContent = state.selectedMonth ? Number(state.selectedMonth) + "월 승률" : "당월 승률";
 
-  const matches = recentRows(rows, 90).filter((row) => cleanName(row.opponent).includes(query));
-  const stats = periodStats(matches);
-  const label = stats.games
-    ? state.opponentQuery + " \u00b7 " + TXT.recent90Basis
-    : TXT.opponentNoData;
-  setOpponentStats(stats, label);
+  for (const race of ["T", "Z", "P"]) {
+    const raceRows = rows.filter((row) => String(row.opponentRace || "").toUpperCase() === race);
+    const yearRows = yearPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(yearPrefix)) : [];
+    const monthRows = monthPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(monthPrefix)) : [];
+    const values = {
+      Overall: periodStats(raceRows),
+      Year: periodStats(yearRows),
+      Month: periodStats(monthRows)
+    };
+    for (const [period, stats] of Object.entries(values)) {
+      const element = $("race" + period + race);
+      element.textContent = stats.rate + "%";
+      element.title = stats.games + "전 " + stats.wins + "승 " + stats.losses + "패";
+      element.dataset.empty = stats.games ? "false" : "true";
+    }
+  }
 }
 
 function renderPeriod(data) {
@@ -669,7 +668,7 @@ function renderProfile(data) {
 
 function render(data) {
   renderPeriod(data);
-  renderOpponent(data);
+  renderRaceRates(data);
   renderProfile(data);
 }
 
@@ -742,11 +741,6 @@ $("analysisAdminPassword").addEventListener("keydown", (event) => {
   if (event.key === "Enter") loginAnalysisAdmin();
 });
 $("nameInput").addEventListener("keydown", (event) => { if (event.key === "Enter") search(false); });
-$("opponentInput").addEventListener("input", (event) => {
-  state.opponentQuery = event.target.value.trim();
-  renderOpponent(state.data);
-  saveSearchSession();
-});
 $("yearSelect").addEventListener("change", (event) => {
   state.selectedYear = event.target.value;
   state.selectedMonth = "";
