@@ -1142,3 +1142,34 @@ body.spawn-diary-page .diary-panel .date-edit-button {
     flex-direction: column;
   }
 }
+
+/* 스폰일지의 새 기록 버튼만 사용하는 네온 표시입니다. */
+body.spawn-diary-page .diary-shell #recordOpenButton.record-open-button {
+  border: 2px solid #fff !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #5f57db, #8a80f6) !important;
+  box-shadow:
+    0 0 0 2px rgba(151, 143, 255, .42),
+    0 0 17px rgba(154, 145, 255, .88),
+    0 0 34px rgba(116, 107, 236, .5),
+    0 10px 22px rgba(57, 49, 156, .34) !important;
+  animation: diary-record-neon 2.6s ease-in-out infinite;
+}
+
+body.spawn-diary-page .diary-shell #recordOpenButton.record-open-button:hover,
+body.spawn-diary-page .diary-shell #recordOpenButton.record-open-button:focus-visible {
+  box-shadow:
+    0 0 0 3px rgba(174, 167, 255, .55),
+    0 0 23px rgba(174, 167, 255, 1),
+    0 0 42px rgba(116, 107, 236, .65),
+    0 12px 25px rgba(57, 49, 156, .4) !important;
+}
+
+@keyframes diary-record-neon {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.13); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.spawn-diary-page .diary-shell #recordOpenButton.record-open-button { animation: none; }
+}

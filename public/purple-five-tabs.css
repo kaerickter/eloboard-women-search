@@ -155,8 +155,7 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
 .tier-shell,
 .shell,
 .matchup-shell,
-.diary-shell,
-.cup-shell {
+.diary-shell {
   width: min(1760px, calc(100% - 48px)) !important;
   margin-right: auto !important;
   margin-left: auto !important;
@@ -164,16 +163,14 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
 }
 
 .tier-shell,
-.shell,
-.cup-shell {
+.shell {
   padding-top: 0 !important;
 }
 
 .tier-hero,
 .shell > .hero,
 .matchup-hero,
-.diary-hero-band,
-.cup-hero {
+.diary-hero-band {
   position: relative;
   overflow: hidden;
   color: #fff !important;
@@ -187,8 +184,7 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
 
 .tier-hero,
 .shell > .hero,
-.matchup-hero,
-.cup-hero {
+.matchup-hero {
   width: 100vw;
   min-height: 228px;
   margin-left: calc(50% - 50vw);
@@ -208,8 +204,7 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
 .tier-hero h1,
 .shell > .hero h1,
 .matchup-hero h1,
-.diary-hero h1,
-.cup-hero h1 {
+.diary-hero h1 {
   color: #fff !important;
   font-size: clamp(36px, 4vw, 50px) !important;
   letter-spacing: -1.5px !important;
@@ -218,16 +213,14 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
 .tier-hero p,
 .shell > .hero p,
 .matchup-hero p,
-.diary-hero p,
-.cup-hero p {
+.diary-hero p {
   color: #bbb8d0 !important;
 }
 
 .tier-hero .eyebrow,
 .shell > .hero .eyebrow,
 .matchup-eyebrow,
-.diary-hero .eyebrow,
-.cup-eyebrow {
+.diary-hero .eyebrow {
   color: #aaa5ff !important;
   font-weight: 900 !important;
   letter-spacing: 1.7px !important;
@@ -240,8 +233,7 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
 /* Keep page introductions compact so primary data remains visible. */
 .tier-hero,
 .shell > .hero,
-.matchup-hero,
-.cup-hero {
+.matchup-hero {
   min-height: 137px !important;
   padding: 26px max(48px, calc((100vw - 1664px) / 2)) 30px !important;
 }
@@ -259,15 +251,13 @@ body.spawn-diary-page .site-tab.live-vote-tab::before {
 .tier-hero h1,
 .shell > .hero h1,
 .matchup-hero h1,
-.diary-hero h1,
-.cup-hero h1 {
+.diary-hero h1 {
   font-size: clamp(22px, 2.4vw, 30px) !important;
   letter-spacing: -0.9px !important;
 }
 
 .matchup-hero > p:last-child,
-.diary-hero .diary-intro,
-.cup-hero p:last-child {
+.diary-hero .diary-intro {
   margin-top: 10px !important;
   font-size: 13px !important;
   line-height: 1.45 !important;
@@ -411,17 +401,6 @@ body.spawn-diary-page button.date-edit-button:focus-visible {
 body.spawn-diary-page button.date-edit-button:hover,
 body.spawn-diary-page button.date-edit-button:focus-visible {
   background: transparent !important;
-}
-
-@media (min-width: 901px) {
-  body:not(.spawn-diary-page) .cup-hero {
-    height: 137px !important;
-    min-height: 137px !important;
-    max-height: 137px !important;
-    padding-top: 26px !important;
-    padding-bottom: 30px !important;
-    align-items: center !important;
-  }
 }
 
 body .matchup-shell .matchup-search .quick button {

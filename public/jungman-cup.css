@@ -28,6 +28,68 @@ select {
   padding: 42px 0 70px;
 }
 
+/* K-중만컵 전용 배치: 공통 메뉴 스타일에는 영향을 주지 않는다. */
+@media (min-width: 901px) {
+  body.jungman-cup-page .cup-shell {
+    width: min(1760px, calc(100% - 48px)) !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    padding-top: 0 !important;
+    background: #f7f7fb !important;
+  }
+
+  body.jungman-cup-page .cup-hero {
+    box-sizing: border-box !important;
+    width: 142.8571dvw !important;
+    height: 137px !important;
+    min-height: 137px !important;
+    max-height: 137px !important;
+    margin-left: calc(50% - 71.4286dvw) !important;
+    padding: 20px calc(28.5714vw - 64.2857px) !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    color: #fff !important;
+    background:
+      radial-gradient(circle at 87% -40%, transparent 0 105px, rgba(157, 150, 255, 0.09) 106px 145px, transparent 146px),
+      radial-gradient(circle at 87% -40%, transparent 0 165px, rgba(157, 150, 255, 0.07) 166px 210px, transparent 211px),
+      linear-gradient(115deg, #1a1929 2%, #20203a 48%, #242080 100%) !important;
+    box-shadow: none !important;
+  }
+
+  body.jungman-cup-page .cup-hero h1 {
+    color: #fff !important;
+    font-size: clamp(22px, 2.4vw, 30px) !important;
+    line-height: 1.05 !important;
+    letter-spacing: -0.9px !important;
+  }
+
+  body.jungman-cup-page .cup-eyebrow {
+    margin-bottom: 6px !important;
+    color: #aaa5ff !important;
+    font-size: 11px !important;
+    letter-spacing: 1.7px !important;
+  }
+
+  body.jungman-cup-page .cup-hero p:last-child {
+    margin-top: 7px !important;
+    color: #bbb8d0 !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+
+  body.jungman-cup-page .cup-rule-card {
+    min-width: 230px !important;
+    padding: 7px 14px !important;
+    gap: 2px !important;
+  }
+
+  body.jungman-cup-page .cup-rule-card strong { font-size: 16px !important; }
+  body.jungman-cup-page .cup-rule-card span { font-size: 10px !important; }
+  body.jungman-cup-page .cup-rule-card em { font-size: 11px !important; }
+}
+
 .cup-hero {
   min-height: 245px;
   padding: 42px 46px;

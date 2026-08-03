@@ -953,9 +953,26 @@
       color: #8e1725 !important;
       background: #fff5f6 !important;
     }
+
+    /* 빙고 화면 전용 선택 표시: 체크 문구와 중복 밑줄을 제거합니다. */
+    body.bingo-page .broadcast .preview-cell.checked::before,
+    body.bingo-page .editor .team-button.active::after {
+      display: none !important;
+      content: none !important;
+    }
+
+    body.bingo-page .site-nav .site-tab.bingo.active {
+      border-color: transparent !important;
+    }
+
+    body.bingo-page .site-nav .site-tab.bingo.active::after {
+      height: 3px !important;
+      background: #7771e7 !important;
+      box-shadow: none !important;
+    }
   </style>
   </head>
-<body>
+<body class="bingo-page">
       <nav class="site-nav" aria-label="페이지 이동">
       <a class="site-brand" href="./tiers.html" aria-label="ELO KITTEN 홈">
         <span>EK</span><strong>ELO KITTEN</strong>
