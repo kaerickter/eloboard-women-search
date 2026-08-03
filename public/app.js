@@ -540,7 +540,7 @@ function renderRaceRates(data) {
     };
     for (const [period, stats] of Object.entries(values)) {
       const element = $("race" + period + race);
-      element.innerHTML = '<span>' + stats.rate + '%</span><small>' + stats.wins + '승 ' + stats.losses + '패</small>';
+      element.textContent = stats.games + '전 ' + stats.wins + '승 ' + stats.losses + '패 · ' + stats.rate + '%';
       element.title = stats.games + "전 " + stats.wins + "승 " + stats.losses + "패";
       element.dataset.empty = stats.games ? "false" : "true";
     }
