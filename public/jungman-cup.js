@@ -128,10 +128,10 @@ function saveLocalState() {
 
 function hasSavedContent(value = state) {
   const hasFixture = Object.values(value.fixtures || {}).some((fixtures) =>
-    (fixtures || []).some((fixture) => fixture?.date || fixture?.home || fixture?.away)
+    Object.values(fixtures || {}).some((fixture) => fixture?.date || fixture?.home || fixture?.away)
   );
   const hasGame = Object.values(value.matches || {}).some((match) =>
-    (match?.games || []).some((game) => game?.homePlayer || game?.awayPlayer || game?.mapName || game?.winner)
+    Object.values(match?.games || {}).some((game) => game?.homePlayer || game?.awayPlayer || game?.mapName || game?.winner)
   );
   return hasFixture || hasGame;
 }
@@ -140,7 +140,7 @@ async function pushSharedState() {
   if (sharedSaveInFlight) {
     clearTimeout(sharedSaveTimer);
     sharedSaveTimer = setTimeout(pushSharedState, 300);
-    return;
+    return false;
   }
   sharedSaveInFlight = true;
   try {
@@ -152,8 +152,10 @@ async function pushSharedState() {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "공용 저장 실패");
     sharedVersion = Number(result.version || sharedVersion);
+    return true;
   } catch (error) {
     console.warn("중만컵 공용 저장 실패:", error.message);
+    return false;
   } finally {
     sharedSaveInFlight = false;
   }
@@ -185,7 +187,7 @@ async function pullSharedState(initial = false) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "공용 불러오기 실패");
     if (!result.state) {
-      if (initial && hasSavedContent()) await pushSharedState();
+      if (hasSavedContent()) await pushSharedState();
       return;
     }
     if (initial || Number(result.version || 0) > sharedVersion) {
@@ -547,7 +549,7 @@ groupEditor.addEventListener("change", (event) => {
   state.fixtures[field.dataset.group][Number(field.dataset.index)][field.dataset.fixtureField] = field.value;
 });
 
-cupAdminSave.addEventListener("click", () => {
+cupAdminSave.addEventListener("click", async () => {
   const entries = GROUPS.flatMap((group) => (state.fixtures[group] || []).map((fixture, index) => ({
     group,
     index,
@@ -571,11 +573,21 @@ cupAdminSave.addEventListener("click", () => {
     cupAdminStatus.textContent = sameUniversity.group + "조 " + (sameUniversity.index + 1) + "경기는 서로 다른 대학을 선택해 주세요.";
     return;
   }
-  saveState();
+  saveLocalState();
+  clearTimeout(sharedSaveTimer);
+  sharedSaveTimer = null;
+  cupAdminSave.disabled = true;
+  cupAdminStatus.textContent = "공용 서버에 저장하고 있습니다...";
+  const sharedSaved = await pushSharedState();
+  cupAdminSave.disabled = false;
+  if (!sharedSaved) {
+    cupAdminStatus.textContent = "공용 서버에 저장하지 못했습니다. 잠시 후 저장을 다시 눌러 주세요.";
+    return;
+  }
   selectedMatch = null;
   renderGroups();
   renderMatchPanel();
-  cupAdminStatus.textContent = completed.length + "개 대전을 저장하고 화면에 반영했습니다.";
+  cupAdminStatus.textContent = completed.length + "개 대전을 공용 서버에 저장했습니다.";
   cupAdminDialog.close();
 });
 
