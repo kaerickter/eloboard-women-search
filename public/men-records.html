@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>남성전적 검색 · ELOBoard</title>
-  <link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./matchup.css?v=20260803-selection-state"><link rel="stylesheet" href="./men-records.css"><link rel="stylesheet" href="./common-theme.css"><link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
+  <link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./matchup.css?v=20260803-selection-state-v2"><link rel="stylesheet" href="./men-records.css"><link rel="stylesheet" href="./common-theme.css"><link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
 </head>
 <body class="matchup-page">
       <nav class="site-nav" aria-label="페이지 이동">
@@ -27,7 +27,7 @@
   <main class="matchup-shell men-shell">
     <section class="matchup-hero"><p class="matchup-eyebrow">MEN'S HEAD TO HEAD</p><h1>두 선수의 맞대결을,<br><em>한눈에 확인하세요.</em></h1><p>플레이어 1과 플레이어 2의 이름을 입력하면 플레이어 1 기준 승·패와 승률을 조회합니다.</p></section>
     <section class="matchup-search men-search-card">
-      <div class="mode-tabs" role="tablist" aria-label="전적 메뉴"><a class="men-mode-link" href="./matchup.html">1 : 1 비교</a><a class="men-mode-link" href="./matchup.html">1 : 다수 비교</a><a class="men-mode-link" href="./matchup.html">다수 : 다수 비교</a><a class="men-mode-tab active" href="./men-records.html" aria-current="page">남성전적 <b>NEW</b></a></div>
+      <div id="matchupModeTabs" class="mode-tabs" role="tablist" aria-label="전적 메뉴"><a class="men-mode-link" href="./matchup.html">1 : 1 비교</a><a class="men-mode-link" href="./matchup.html">1 : 다수 비교</a><a class="men-mode-link" href="./matchup.html">다수 : 다수 비교</a><a class="men-mode-tab active" href="./men-records.html" aria-current="page">남성전적 <b>NEW</b></a></div>
       <form id="menSearchForm" class="men-filter-grid">
         <label><span>플레이어 1</span><input id="player1" type="search" list="menPlayerList" placeholder="선수 이름 입력" autocomplete="off"></label><label><span>플레이어 2</span><input id="player2" type="search" list="menPlayerList" placeholder="선수 이름 입력" autocomplete="off"></label>
         <datalist id="menPlayerList"></datalist>

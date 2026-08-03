@@ -42,46 +42,63 @@
 @media(max-width:620px){.matchup-duel-card{padding:24px 14px 0!important}.duel-stage{grid-template-columns:1fr 78px 1fr;gap:8px}.duel-player{grid-row:1}.duel-player:first-child{grid-column:1}.duel-player:last-child{grid-column:3}.duel-photo{width:104px;height:122px;margin:auto}.duel-center{grid-column:2;grid-row:1;gap:7px}.duel-logo{width:56px;height:56px}.duel-score{grid-row:2}.duel-score-one{grid-column:1}.duel-score-two{grid-column:3}.duel-score strong{font-size:42px}.duel-score span{font-size:11px}.duel-score small{font-size:13px}.duel-recent span{font-size:11px}.duel-recent strong{font-size:14px}.duel-recent em{font-size:12px}.duel-record-meta{grid-template-columns:repeat(2,minmax(0,1fr));margin-right:-14px;margin-left:-14px}.duel-detail-button{grid-column:1/-1;width:100%}.matchup-duel-card .match-detail{margin-right:-14px;margin-left:-14px}}
 
 /* 상대전적 전용 선택 상태: 공통 보라색 버튼 규칙에서 분리합니다. */
-body.matchup-page .matchup-shell .matchup-search .mode-tabs > button[data-mode],
-body.matchup-page .matchup-shell .matchup-search .mode-tabs > a.men-mode-link,
-body.matchup-page .matchup-shell .matchup-search .mode-tabs > a.men-mode-tab {
+#matchupModeTabs > button[data-mode],
+#matchupModeTabs > a.men-mode-link,
+#matchupModeTabs > a.men-mode-tab {
   position: relative !important;
   border: 0 !important;
   border-radius: 0 !important;
-  color: #7d868d !important;
+  color: #8a9299 !important;
   background: #fff !important;
   box-shadow: none !important;
   text-decoration: none !important;
-  transition: color .2s ease, background .2s ease, transform .2s ease !important;
+  transform: none !important;
+  transition: color .2s ease, background .2s ease !important;
 }
 
-body.matchup-page .matchup-shell .matchup-search .mode-tabs > button[data-mode].selected,
-body.matchup-page .matchup-shell .matchup-search .mode-tabs > a.men-mode-tab.active {
+#matchupModeTabs > button[data-mode]::after,
+#matchupModeTabs > a.men-mode-link::after,
+#matchupModeTabs > a.men-mode-tab::after {
+  position: absolute !important;
+  right: 21px !important;
+  bottom: -1px !important;
+  left: 21px !important;
+  display: block !important;
+  height: 3px !important;
+  background: #b7dc19 !important;
+  content: "" !important;
+  opacity: 0 !important;
+  transform: scaleX(0) !important;
+  transition: opacity .18s ease, transform .18s ease !important;
+}
+
+#matchupModeTabs > button[data-mode].selected,
+#matchupModeTabs > a.men-mode-tab.active {
   color: #17202c !important;
-  background: #f2f7dc !important;
-  box-shadow: inset 0 -4px 0 #a7c600 !important;
-  transform: translateY(-1px);
+  background: #fff !important;
+  box-shadow: none !important;
 }
 
-body.matchup-page .matchup-shell .matchup-search .mode-tabs > button[data-mode].selected::after,
-body.matchup-page .matchup-shell .matchup-search .mode-tabs > a.men-mode-tab.active::after {
-  display: none !important;
-  content: none !important;
+#matchupModeTabs > button[data-mode].selected::after,
+#matchupModeTabs > a.men-mode-tab.active::after {
+  opacity: 1 !important;
+  transform: scaleX(1) !important;
 }
 
-body.matchup-page .matchup-shell .matchup-search .quick button,
-body.matchup-page .matchup-shell .matchup-search .quick button:hover,
-body.matchup-page .matchup-shell .matchup-search .quick button:focus-visible {
+#quickPlayers > button,
+#quickPlayers > button:hover,
+#quickPlayers > button:focus-visible {
   border: 1px solid #dfe4d6 !important;
+  border-radius: 5px !important;
   color: #27302a !important;
   background: #fff !important;
   box-shadow: none !important;
   outline-color: #a7c600 !important;
 }
 
-body.matchup-page .matchup-shell .matchup-search .quick button.on {
+#quickPlayers > button.on {
   border-color: #a9c84c !important;
   color: #344008 !important;
   background: #eef5c8 !important;
-  box-shadow: inset 0 0 0 1px rgba(169, 200, 76, .28) !important;
+  box-shadow: none !important;
 }

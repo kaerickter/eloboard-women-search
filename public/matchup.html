@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>상대전적 비교 · ELOBoard</title>
     <link rel="stylesheet" href="./styles.css">
-    <link rel="stylesheet" href="./matchup.css?v=20260803-selection-state">
+    <link rel="stylesheet" href="./matchup.css?v=20260803-selection-state-v2">
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   </head>
@@ -37,7 +37,7 @@
       </section>
 
       <section class="matchup-search">
-        <div class="mode-tabs" role="tablist" aria-label="비교 방식">
+        <div id="matchupModeTabs" class="mode-tabs" role="tablist" aria-label="비교 방식">
           <button type="button" data-mode="one">1 : 1 비교</button>
           <button type="button" data-mode="many" class="selected">1 : 다수 비교</button>
           <button type="button" data-mode="group">다수 : 다수 비교 <b>NEW</b></button>
