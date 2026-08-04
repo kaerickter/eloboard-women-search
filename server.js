@@ -765,6 +765,44 @@ function parseRecordFromText(text, label) {
   const losses = Number(match[3].replace(/,/g, ""));
   return { label, games, wins, losses, rate: match[4] ? Number(match[4]) : Math.round((wins / Math.max(games, 1)) * 1000) / 10 };
 }
+function parseRaceTotals(plainText) {
+  const raceKeys = { Terran: "T", Zerg: "Z", Protoss: "P" };
+  const groups = { women: {}, mixed: {}, combined: {} };
+  const womenStart = plainText.search(/여성\s*:/);
+  const mixedStart = plainText.search(/혼성\s*:/);
+  const sections = {
+    women: womenStart >= 0 ? plainText.slice(womenStart, mixedStart > womenStart ? mixedStart : womenStart + 1500) : "",
+    mixed: mixedStart >= 0 ? plainText.slice(mixedStart, mixedStart + 1500) : ""
+  };
+
+  for (const [group, section] of Object.entries(sections)) {
+    for (const [label, race] of Object.entries(raceKeys)) {
+      const record = parseRecordFromText(section, label);
+      if (!record) continue;
+      groups[group][race] = {
+        games: record.games,
+        wins: record.wins,
+        losses: record.losses,
+        rate: record.rate
+      };
+    }
+  }
+
+  for (const race of Object.values(raceKeys)) {
+    const women = groups.women[race] || { games: 0, wins: 0, losses: 0 };
+    const mixed = groups.mixed[race] || { games: 0, wins: 0, losses: 0 };
+    const games = women.games + mixed.games;
+    const wins = women.wins + mixed.wins;
+    const losses = women.losses + mixed.losses;
+    groups.combined[race] = {
+      games,
+      wins,
+      losses,
+      rate: games ? Math.round((wins / games) * 1000) / 10 : 0
+    };
+  }
+  return groups;
+}
 function parseProfileRows(html) {
   const rows = [];
   const rowMatches = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
@@ -854,6 +892,7 @@ function parseProfile(html, wrId) {
     women,
     mixed,
     records: recordLines,
+    raceTotals: parseRaceTotals(plainText),
     recent30: recentMatch ? { wins: Number(recentMatch[1]), losses: Number(recentMatch[2]), games: Number(recentMatch[1]) + Number(recentMatch[2]) } : inferRecent30(profileRows),
     mostMatches: mostMatches.slice(0, 7),
     matches: profileRows
