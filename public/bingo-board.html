@@ -193,10 +193,23 @@
     }
 
     .timer-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(10px, 1.5vw, 18px);
       min-width: min(86%, 420px);
       font-variant-numeric: tabular-nums;
       letter-spacing: .04em;
       white-space: nowrap;
+    }
+
+    .timer-chicken {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: .68em;
+      letter-spacing: 0;
+      filter: drop-shadow(0 3px 3px rgba(108, 62, 18, .2));
     }
 
     .bingo-heading {
@@ -1091,7 +1104,10 @@
           <strong id="bingoTitleText">빙고</strong>
           <span class="bingo-chicken" aria-label="치킨 수"><span aria-hidden="true">🍗</span><strong id="bingoChickenCount">0</strong></span>
         </div>
-        <div class="stage-title timer-display" id="timerDisplay" role="timer" aria-live="polite" hidden>00:00:00</div>
+        <div class="stage-title timer-display" id="timerDisplay" role="timer" aria-live="polite" hidden>
+          <span id="timerValue">00:00:00</span>
+          <span class="timer-chicken" aria-label="치킨 수"><span aria-hidden="true">🍗</span><strong id="timerChickenCount">0</strong></span>
+        </div>
         <div class="preview-board" id="previewBoard"></div>
         <div class="bingo-message" id="bingoMessage"></div>
       </div>
@@ -1249,6 +1265,8 @@
     const chickenMinusButton = document.getElementById("chickenMinusButton");
     const chickenPlusButton = document.getElementById("chickenPlusButton");
     const timerDisplay = document.getElementById("timerDisplay");
+    const timerValue = document.getElementById("timerValue");
+    const timerChickenCount = document.getElementById("timerChickenCount");
     const timerStartButton = document.getElementById("timerStartButton");
     const timerResetButton = document.getElementById("timerResetButton");
     const targetHour = document.getElementById("targetHour");
@@ -1386,6 +1404,7 @@
 
       bingoTitleText.textContent = state.title;
       bingoChickenCount.textContent = state.chickenCount;
+      timerChickenCount.textContent = state.chickenCount;
       chickenEditorCount.textContent = `🍗 ${state.chickenCount}`;
       if (document.activeElement !== bingoTitleInput) bingoTitleInput.value = state.title;
       document.documentElement.style.setProperty("--team-1", state.teamColors[0]);
@@ -1509,6 +1528,7 @@
     function updateChickenCount(change) {
       state.chickenCount = Math.max(0, state.chickenCount + change);
       bingoChickenCount.textContent = state.chickenCount;
+      timerChickenCount.textContent = state.chickenCount;
       chickenEditorCount.textContent = `🍗 ${state.chickenCount}`;
       realtimeRoom?.sendSet("chickenCount", state.chickenCount);
       save();
@@ -1645,7 +1665,7 @@
     }
 
     function renderTimer() {
-      timerDisplay.textContent = formatTime(timerRemaining);
+      timerValue.textContent = formatTime(timerRemaining);
       timerDisplay.hidden = !timerVisible;
       bingoHeading.hidden = timerVisible;
     }
@@ -1688,7 +1708,7 @@
       const now = Date.now();
       timerRemaining = Math.max(0, timerRemaining - (now - timerLastTick) / 1000);
       timerLastTick = now;
-      timerDisplay.textContent = formatTime(timerRemaining);
+      timerValue.textContent = formatTime(timerRemaining);
       if (timerRemaining <= 0) finishTimer();
     }
 
