@@ -186,7 +186,15 @@ function formatDate(value) {
 function newestMatchFirst(a, b) {
   const aDate = text(a?.match_date).slice(0, 10) || "0000-00-00";
   const bDate = text(b?.match_date).slice(0, 10) || "0000-00-00";
-  return bDate.localeCompare(aDate);
+  const dateOrder = bDate.localeCompare(aDate);
+  if (dateOrder) return dateOrder;
+  const aPosition = a?.source_position === null || a?.source_position === undefined
+    ? Number.MAX_SAFE_INTEGER
+    : Number(a.source_position);
+  const bPosition = b?.source_position === null || b?.source_position === undefined
+    ? Number.MAX_SAFE_INTEGER
+    : Number(b.source_position);
+  return aPosition - bPosition || Number(b?.id || 0) - Number(a?.id || 0);
 }
 
 function updateSummary() {
@@ -441,7 +449,7 @@ async function showRecordForm(csrf) {
       gameFormat: text(editingEntry.game_format) || "스폰",
       opponent: text(editingEntry.opponent),
       tier: text(editingEntry.tier),
-      opponentRace: text(editingEntry.opponent_race),
+      opponentRace: playerRaceLabel(editingEntry.opponent_race),
       mapName: text(editingEntry.map_name),
       result: text(editingEntry.result) || "미정",
       opponentBuild: text(editingEntry.opponent_build),
