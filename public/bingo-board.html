@@ -199,6 +199,22 @@
       white-space: nowrap;
     }
 
+    .bingo-heading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(10px, 1.5vw, 18px);
+    }
+
+    .bingo-heading .bingo-chicken {
+      filter: drop-shadow(0 3px 3px rgba(108, 62, 18, .22));
+      transform: translateY(-1px);
+    }
+
+    .stage-title[hidden] {
+      display: none !important;
+    }
+
     .preview-board,
     .edit-board {
       display: grid;
@@ -867,23 +883,25 @@
   <style>
     /* 메뉴 색상은 유지하고 빙고 내용 버튼만 원래 상태 색상을 사용합니다. */
     .broadcast .preview-cell {
-      border-color: rgba(255, 255, 255, .86) !important;
+      border: 3px solid #b97836 !important;
       border-radius: clamp(12px, 1.6vw, 18px) !important;
       color: #33253a !important;
       background: linear-gradient(180deg, #fff 0%, #fffaf4 100%) !important;
-      box-shadow: 0 10px 18px rgba(116, 83, 63, .13), inset 0 -7px 0 rgba(231, 183, 95, .12), inset 0 1px 0 rgba(255, 255, 255, .96) !important;
+      box-shadow: 0 10px 18px rgba(116, 83, 63, .18), inset 0 -7px 0 rgba(185, 120, 54, .17), inset 0 1px 0 rgba(255, 255, 255, .96) !important;
     }
     .broadcast .preview-cell.checked {
-      border-color: #27b77a !important;
-      color: #124d38 !important;
-      background: linear-gradient(180deg, #f2fff7 0%, #c9f5dc 100%) !important;
-      box-shadow: 0 0 0 3px rgba(39, 183, 122, .3), 0 12px 24px rgba(25, 133, 91, .25), inset 0 -7px 0 rgba(25, 133, 91, .13), inset 0 1px 0 rgba(255, 255, 255, .96) !important;
+      border-color: #07593c !important;
+      color: #fff !important;
+      background: linear-gradient(180deg, #35bd7f 0%, #14875b 100%) !important;
+      text-shadow: 0 2px 2px rgba(3, 54, 35, .42) !important;
+      box-shadow: 0 0 0 3px rgba(7, 89, 60, .34), 0 14px 28px rgba(6, 86, 57, .35), inset 0 -7px 0 rgba(2, 70, 45, .23), inset 0 1px 0 rgba(255, 255, 255, .35) !important;
     }
     .broadcast .preview-cell.bingo-line {
-      border-color: #f0bd3d !important;
-      color: #5c3900 !important;
-      background: linear-gradient(180deg, #fff2b8 0%, #ffd66e 100%) !important;
-      box-shadow: 0 0 0 4px rgba(255, 246, 197, .98), 0 0 0 8px rgba(231, 183, 95, .42), 0 14px 30px rgba(231, 183, 95, .32), inset 0 -7px 0 rgba(231, 183, 95, .12), inset 0 1px 0 rgba(255, 255, 255, .94) !important;
+      border-color: #824300 !important;
+      color: #fff !important;
+      background: linear-gradient(180deg, #f5b900 0%, #d27600 100%) !important;
+      text-shadow: 0 2px 2px rgba(92, 47, 0, .52) !important;
+      box-shadow: 0 0 0 4px rgba(255, 224, 112, .94), 0 0 0 8px rgba(181, 103, 0, .48), 0 16px 32px rgba(145, 76, 0, .38), inset 0 -7px 0 rgba(111, 55, 0, .2), inset 0 1px 0 rgba(255, 255, 255, .42) !important;
     }
     .broadcast .preview-cell.territory-cell,
     .editor .edit-cell.territory-cell {
@@ -892,21 +910,21 @@
       background: var(--claim-color) !important;
     }
     .editor .edit-cell {
-      border-color: var(--line) !important;
+      border: 2px solid #a76c32 !important;
       border-radius: 8px !important;
       color: var(--ink) !important;
       background: #fafbfc !important;
       box-shadow: none !important;
     }
     .editor .edit-cell.checked {
-      border-color: #9bd8b6 !important;
-      color: #1e6248 !important;
-      background: #eaf8ef !important;
+      border-color: #07593c !important;
+      color: #fff !important;
+      background: #18875d !important;
     }
     .editor .edit-cell.bingo-line {
-      border-color: #e7b75f !important;
-      color: #6b4300 !important;
-      background: #fff2bf !important;
+      border-color: #824300 !important;
+      color: #fff !important;
+      background: #d98200 !important;
     }
     .editor .segmented button {
       border: 0 !important;
@@ -994,7 +1012,11 @@
   <main class="app">
     <section class="broadcast" aria-label="방송 송출용 빙고판">
       <div class="stage" id="stage">
-        <div class="stage-title timer-display" id="timerDisplay" role="timer" aria-live="polite">00:00:00</div>
+        <div class="stage-title bingo-heading" id="bingoHeading">
+          <strong id="bingoTitleText">빙고</strong>
+          <span class="bingo-chicken" aria-hidden="true">🍗</span>
+        </div>
+        <div class="stage-title timer-display" id="timerDisplay" role="timer" aria-live="polite" hidden>00:00:00</div>
         <div class="preview-board" id="previewBoard"></div>
         <div class="bingo-message" id="bingoMessage"></div>
       </div>
@@ -1131,6 +1153,8 @@
     const timerHours = document.getElementById("timerHours");
     const timerMinutes = document.getElementById("timerMinutes");
     const timerSeconds = document.getElementById("timerSeconds");
+    const bingoHeading = document.getElementById("bingoHeading");
+    const bingoTitleText = document.getElementById("bingoTitleText");
     const timerDisplay = document.getElementById("timerDisplay");
     const timerStartButton = document.getElementById("timerStartButton");
     const timerResetButton = document.getElementById("timerResetButton");
@@ -1147,6 +1171,7 @@
     let timerInterval = null;
     let timerLastTick = 0;
     let timerSyncing = false;
+    let timerVisible = false;
 
     const saved = localStorage.getItem("broadcast-bingo-state");
     if (saved) {
@@ -1158,6 +1183,7 @@
     }
 
     state.mode = state.mode === "territory" ? "territory" : "classic";
+    state.title = String(state.title || "빙고").slice(0, 20);
     state.owners = Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(state.owners?.[index])) ? Number(state.owners[index]) : 0);
     state.teamColors = Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(state.teamColors?.[index] || "")
       ? state.teamColors[index]
@@ -1261,6 +1287,7 @@
       const team2Highlighted = new Set(team2Lines.flat());
       const grid = `repeat(${state.size}, minmax(0, 1fr))`;
 
+      bingoTitleText.textContent = state.title;
       document.documentElement.style.setProperty("--team-1", state.teamColors[0]);
       document.documentElement.style.setProperty("--team-2", state.teamColors[1]);
       previewBoard.style.gridTemplateColumns = grid;
@@ -1501,7 +1528,9 @@
     }
 
     function renderTimer() {
-      timerDisplay.textContent = formatTime(timerRemaining || configuredSeconds());
+      timerDisplay.textContent = formatTime(timerRemaining);
+      timerDisplay.hidden = !timerVisible;
+      bingoHeading.hidden = timerVisible;
     }
 
     function stopTimer() {
@@ -1517,6 +1546,7 @@
         timer: {
           remaining: timerRemaining,
           running: Boolean(timerInterval),
+          visible: timerVisible,
           endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
         }
       });
@@ -1530,7 +1560,7 @@
     function finishTimer() {
       stopTimer();
       timerRemaining = 0;
-      timerDisplay.textContent = "00:00:00";
+      renderTimer();
       timerStatus.textContent = "시간이 종료됐습니다.";
       showTimeUpEffect();
       broadcastTimer();
@@ -1548,7 +1578,8 @@
       timerLastTick = Date.now();
       timerStartButton.textContent = "일시정지";
       timerInterval = window.setInterval(tickTimer, 200);
-      timerDisplay.textContent = formatTime(timerRemaining);
+      timerVisible = true;
+      renderTimer();
     }
 
     function toggleTimer() {
@@ -1563,6 +1594,7 @@
         timerStatus.textContent = "시간을 먼저 설정하세요.";
         return;
       }
+      timerVisible = true;
       startTimerInterval();
       timerStatus.textContent = "스톱워치가 진행 중입니다.";
       broadcastTimer();
@@ -1571,6 +1603,7 @@
     function resetTimer() {
       stopTimer();
       timerRemaining = 0;
+      timerVisible = false;
       timerHours.value = 0;
       timerMinutes.value = 0;
       timerSeconds.value = 0;
@@ -1607,6 +1640,7 @@
       targetMinute.value = minute;
       stopTimer();
       timerRemaining = secondsUntilKstTarget(hour, minute);
+      timerVisible = true;
       timerHours.value = 0;
       timerMinutes.value = 0;
       timerSeconds.value = 0;
@@ -1622,6 +1656,7 @@
       timerRemaining = timer.running && timer.endAt
         ? Math.max(0, (Number(timer.endAt) - Date.now()) / 1000)
         : Math.max(0, Number(timer.remaining) || 0);
+      timerVisible = typeof timer.visible === "boolean" ? timer.visible : timerRemaining > 0;
       if (timer.running && timerRemaining > 0) startTimerInterval();
       renderTimer();
       timerSyncing = false;
@@ -1631,6 +1666,7 @@
       input.addEventListener("input", () => {
         if (!timerInterval) {
           timerRemaining = configuredSeconds();
+          timerVisible = timerRemaining > 0;
           renderTimer();
           broadcastTimer();
         }
@@ -1700,6 +1736,7 @@
       }
     });
 
+    renderTimer();
     render();
   </script>
 </body>
