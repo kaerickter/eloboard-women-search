@@ -478,6 +478,13 @@ function diaryTierLabel(value) {
   const label = base.endsWith("티어") ? base : base + "티어";
   return label + (hasPromotion ? " 승급불" : "");
 }
+function diaryRaceLabel(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "T" || normalized.includes("테란")) return "테란";
+  if (normalized === "P" || normalized.includes("프로토스")) return "프로토스";
+  if (normalized === "Z" || normalized.includes("저그")) return "저그";
+  return "";
+}
 async function maybeSyncSpawnDiary(query, profile) {
   if (autoDiaryPlayerKey(query) !== autoDiaryPlayerKey(AUTO_PLAYER_NAME) || !profile) return null;
   try {
@@ -1663,15 +1670,20 @@ const server = http.createServer(async (req, res) => {
       const result = await tierAdmin.pool.query(`
         SELECT id, match_date, game_format, opponent, tier, opponent_race,
           map_name, result, opponent_build, my_build, feedback, reflection,
-          keywords, replay_number
+          keywords, replay_number, source_position
         FROM spawn_diary_entries
         ORDER BY
           match_date DESC NULLS LAST,
-          source_row DESC NULLS LAST,
+          CASE WHEN source_sheet_id = 'eloboard-auto' THEN source_position END ASC NULLS LAST,
+          CASE WHEN source_sheet_id IS DISTINCT FROM 'eloboard-auto' THEN source_row END DESC NULLS LAST,
           id DESC
       `);
       return send(res, 200, JSON.stringify({
-        entries: result.rows.map((entry) => ({ ...entry, tier: diaryTierLabel(entry.tier) })),
+        entries: result.rows.map((entry) => ({
+          ...entry,
+          tier: diaryTierLabel(entry.tier),
+          opponent_race: diaryRaceLabel(entry.opponent_race)
+        })),
         total: result.rowCount,
         updatedAt: new Date().toISOString()
       }), "application/json; charset=utf-8");
@@ -1801,7 +1813,7 @@ const server = http.createServer(async (req, res) => {
         gameFormat,
         opponent,
         diaryTierLabel(body.tier) || null,
-        clean(body.opponentRace, 30) || null,
+        diaryRaceLabel(body.opponentRace) || null,
         clean(body.mapName, 80) || null,
         resultValue || "미정",
         clean(body.opponentBuild, 300) || null,
@@ -1906,7 +1918,7 @@ const server = http.createServer(async (req, res) => {
         gameFormat,
         opponent,
         diaryTierLabel(body.tier) || null,
-        clean(body.opponentRace, 30) || null,
+        diaryRaceLabel(body.opponentRace) || null,
         clean(body.mapName, 80) || null,
         resultValue || "미정",
         clean(body.opponentBuild, 300) || null,
