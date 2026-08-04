@@ -6,9 +6,19 @@
     <title>ELOBoard &#51204;&#51201;&#46321;&#47197; &#44160;&#49353;</title>
     <link rel="stylesheet" href="./styles.css?v=20260803-race-rates">
     <style>
-      .race-rate-row-head { min-height: 42px; font-size: 14px; }
-      .race-rate-row > b { font-size: 14px; white-space: nowrap; }
-      @media (max-width: 560px) { .race-rate-row-head { font-size: 12px; } }
+      .race-rate-row { min-height: 48px; }
+      .race-rate-row-head { min-height: 46px; font-size: 15px; line-height: 1.25; }
+      .race-rate-row-head > * { display: flex; min-height: 45px; align-items: center; justify-content: center; }
+      .race-rate-row-head > strong { justify-content: flex-start; }
+      .race-rate-row > b { font-size: 17px; line-height: 1.25; white-space: nowrap; }
+      .race-rate-row .race-name { font-size: 16px; line-height: 1.25; }
+      @media (max-width: 560px) {
+        .race-rate-row { min-height: 44px; }
+        .race-rate-row-head { min-height: 42px; font-size: 13px; }
+        .race-rate-row-head > * { min-height: 41px; }
+        .race-rate-row > b { font-size: 15px; }
+        .race-rate-row .race-name { font-size: 14px; }
+      }
     </style>
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
