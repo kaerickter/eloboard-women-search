@@ -533,8 +533,12 @@ function renderRaceRates(data) {
     const raceRows = rows.filter((row) => String(row.opponentRace || "").toUpperCase() === race);
     const yearRows = yearPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(yearPrefix)) : [];
     const monthRows = monthPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(monthPrefix)) : [];
+    const parsedOverall = data && data.profile && data.profile.raceTotals
+      ? data.profile.raceTotals.combined && data.profile.raceTotals.combined[race]
+      : null;
+    const officialOverall = parsedOverall && Number(parsedOverall.games) > 0 ? parsedOverall : null;
     const values = {
-      Overall: periodStats(raceRows),
+      Overall: officialOverall || periodStats(raceRows),
       Year: periodStats(yearRows),
       Month: periodStats(monthRows)
     };
