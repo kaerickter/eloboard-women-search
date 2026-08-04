@@ -41,6 +41,62 @@
 @media(max-width:900px){.matchup-duel-card{padding:28px 20px 0!important}.duel-stage{grid-template-columns:110px 1fr 104px 1fr 110px;gap:12px}.duel-photo{width:104px;height:126px}.duel-score strong{font-size:46px}.duel-logo{width:78px;height:78px}.duel-recent{display:grid;gap:2px;text-align:center}.duel-recent span{font-size:12px}.duel-recent strong{font-size:16px}.duel-recent em{font-size:13px}.duel-record-meta,.matchup-duel-card .match-detail{margin-right:-20px;margin-left:-20px}}
 @media(max-width:620px){.matchup-duel-card{padding:24px 14px 0!important}.duel-stage{grid-template-columns:1fr 78px 1fr;gap:8px}.duel-player{grid-row:1}.duel-player:first-child{grid-column:1}.duel-player:last-child{grid-column:3}.duel-photo{width:104px;height:122px;margin:auto}.duel-center{grid-column:2;grid-row:1;gap:7px}.duel-logo{width:56px;height:56px}.duel-score{grid-row:2}.duel-score-one{grid-column:1}.duel-score-two{grid-column:3}.duel-score strong{font-size:42px}.duel-score span{font-size:11px}.duel-score small{font-size:13px}.duel-recent span{font-size:11px}.duel-recent strong{font-size:14px}.duel-recent em{font-size:12px}.duel-record-meta{grid-template-columns:repeat(2,minmax(0,1fr));margin-right:-14px;margin-left:-14px}.duel-detail-button{grid-column:1/-1;width:100%}.matchup-duel-card .match-detail{margin-right:-14px;margin-left:-14px}}
 
+/* 상대전적 본문 확대: 공용 메뉴에는 적용하지 않습니다. */
+.matchup-page .matchup-hero>p:last-child{font-size:18px!important}
+.matchup-page .mode-tabs button,.matchup-page .mode-tabs .men-mode-tab{font-size:17px}
+.matchup-page .picker-title>span,.matchup-page .main-picker>span,.matchup-page .opponent-picker>span{font-size:15px}
+.matchup-page .picker-title>button,.matchup-page .selection-actions button{font-size:13px}
+.matchup-page .player-picker input,.matchup-page .main-picker input,.matchup-page .opponent-picker input{font-size:17px}
+.matchup-page .matchup-search-button{font-size:17px}
+.matchup-page .player-chip b{font-size:14px}
+.matchup-page .selection-actions p{font-size:14px}
+.matchup-page .quick>span{font-size:14px}
+.matchup-page .quick button{font-size:14px}
+.matchup-page .quick button small{font-size:11px}
+.matchup-page .quick-status{font-size:14px!important}
+.matchup-page .results-head h2{font-size:40px}
+.matchup-page .results-head>div>p:last-child{font-size:16px}
+.matchup-page .range-switch button{font-size:15px}
+.matchup-page .summary-grid article>span{font-size:14px}
+.matchup-page .summary-grid article div strong{font-size:32px}
+.matchup-page .summary-grid article div>b{font-size:26px}
+.matchup-page .summary-grid small{font-size:14px}
+.matchup-page .table-tools strong{font-size:21px}
+.matchup-page .table-tools>div>small,.matchup-page .table-tools label{font-size:14px}
+.matchup-page .table-tools select{font-size:15px}
+.matchup-page .matchup-player b{font-size:17px}
+.matchup-page .matchup-player small,.matchup-page .last-played{font-size:13px}
+.matchup-page .last-played b{font-size:14px}
+.matchup-page .donut strong{font-size:32px}
+.matchup-page .donut small,.matchup-page .score-pair small{font-size:13px}
+.matchup-page .score-pair strong{font-size:34px}
+.matchup-page .score-pair em{font-size:15px}
+.matchup-page .bar-labels{font-size:13px}
+.matchup-page .recent-panel span{font-size:13px}
+.matchup-page .recent-panel strong,.matchup-page .recent-panel>b{font-size:15px}
+.matchup-page .record-graph-card .match-detail{font-size:14px}
+.matchup-page .matchup-source{font-size:13px}
+.matchup-page .duel-player figcaption{font-size:16px}
+.matchup-page .duel-score span{font-size:16px}
+.matchup-page .duel-score small{font-size:18px}
+.matchup-page .duel-recent span{font-size:15px}
+.matchup-page .duel-recent strong{font-size:20px}
+.matchup-page .duel-recent em{font-size:17px}
+.matchup-page .duel-record-meta small{font-size:12px}
+.matchup-page .duel-record-meta strong{font-size:14px}
+.matchup-page .duel-detail-button{font-size:13px}
+
+@media(max-width:620px){
+  .matchup-page .matchup-hero>p:last-child{font-size:16px!important}
+  .matchup-page .mode-tabs button,.matchup-page .mode-tabs .men-mode-tab{font-size:15px}
+  .matchup-page .results-head h2{font-size:34px}
+  .matchup-page .duel-score span{font-size:13px}
+  .matchup-page .duel-score small{font-size:15px}
+  .matchup-page .duel-recent span{font-size:13px}
+  .matchup-page .duel-recent strong{font-size:16px}
+  .matchup-page .duel-recent em{font-size:14px}
+}
+
 /* 상대전적 전용 선택 상태: 공통 보라색 버튼 규칙에서 분리합니다. */
 #matchupModeTabs > button[data-mode],
 #matchupModeTabs > a.men-mode-link,

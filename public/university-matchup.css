@@ -13,3 +13,47 @@
 .university-player-photo{position:relative;display:grid;width:112px;height:112px;place-items:center;overflow:hidden;margin-top:13px;border:4px solid #fff;border-radius:50%;background:linear-gradient(145deg,#dbe4f4,#8fa4c4);color:#fff;box-shadow:0 9px 24px rgba(30,43,69,.2)}.university-player-photo.photo-a{background:linear-gradient(145deg,#ffd9bd,#ef761d)}.university-player-photo.photo-b{background:linear-gradient(145deg,#ddd1ff,#5b37b8)}.university-player-photo>span{font-size:36px;font-weight:900}.university-player-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#eef1f6}.university-player-photo img[hidden]{display:none}
 @media(max-width:760px){.university-duel-stage{grid-template-columns:minmax(0,1fr) 96px minmax(0,1fr);gap:12px;padding:24px 16px 20px}.university-player-photo{width:88px;height:88px}.university-vs-logo{width:74px;height:74px}.university-player-name{font-size:clamp(21px,5vw,30px)}.university-duel-wins{font-size:44px}.university-duel-recent{display:grid;gap:2px;text-align:center}.university-duel-recent span{font-size:11px}.university-duel-recent strong{font-size:14px}.university-duel-recent em{font-size:12px}}
 @media(max-width:520px){.university-duel-list{gap:12px;padding:10px}.university-duel-stage{grid-template-columns:minmax(0,1fr) 72px minmax(0,1fr);gap:7px;padding:20px 9px 17px}.university-duel-side>small{font-size:10px}.university-player-photo{width:66px;height:66px;margin-top:9px;border-width:3px}.university-player-photo>span{font-size:25px}.university-player-name{font-size:20px}.university-duel-wins{margin-top:13px;font-size:38px}.university-duel-side>span{font-size:11px}.university-vs-logo{width:56px;height:56px;box-shadow:inset 0 0 0 4px #91a4bd,0 6px 14px rgba(23,32,44,.18)}.university-vs-logo b{font-size:18px}.university-duel-recent strong{font-size:12px}.university-duel-meta{display:grid;gap:5px;text-align:center}}
+
+/* 대학대결 본문 확대: 공용 메뉴에는 적용하지 않습니다. */
+.university-shell .matchup-hero>p:last-child{font-size:18px!important}
+.university-shell .university-select-grid label{font-size:15px}
+.university-shell .university-select-grid select{font-size:17px}
+.university-shell .matchup-search-button{font-size:17px}
+.university-shell .roster-preview strong{font-size:14px}
+.university-shell .roster-preview p{font-size:13px}
+.university-shell .roster-chip{font-size:13px}
+.university-shell .university-summary span{font-size:13px}
+.university-shell .university-summary strong{font-size:30px}
+.university-shell .university-summary small{font-size:13px}
+.university-shell .tier-head h3{font-size:21px}
+.university-shell .tier-head small{font-size:14px}
+.university-shell .tier-totals span{font-size:12px}
+.university-shell .tier-totals b{font-size:16px}
+.university-shell .pair-table-head{font-size:12px}
+.university-shell .university-pair{font-size:14px}
+.university-shell .pair-identity b{font-size:15px}
+.university-shell .pair-identity em{font-size:11px}
+.university-shell .pair-score{font-size:15px}
+.university-shell .pair-score small{font-size:11px}
+.university-shell .last-date{font-size:13px}
+.university-shell .university-empty{font-size:15px}
+.university-shell .university-duel-side>small{font-size:14px}
+.university-shell .university-player-name{font-size:clamp(28px,3.2vw,42px)}
+.university-shell .university-duel-side>span{font-size:16px}
+.university-shell .university-duel-recent span{font-size:15px}
+.university-shell .university-duel-recent strong{font-size:21px}
+.university-shell .university-duel-recent em{font-size:17px}
+.university-shell .university-duel-meta{font-size:13px}
+.university-shell .university-duel-meta strong{font-size:14px}
+
+@media(max-width:520px){
+  .university-shell .matchup-hero>p:last-child{font-size:16px!important}
+  .university-shell .university-select-grid label{font-size:14px}
+  .university-shell .university-select-grid select{font-size:15px}
+  .university-shell .university-player-name{font-size:22px}
+  .university-shell .university-duel-side>small{font-size:12px}
+  .university-shell .university-duel-side>span{font-size:13px}
+  .university-shell .university-duel-recent span{font-size:12px}
+  .university-shell .university-duel-recent strong{font-size:14px}
+  .university-shell .university-duel-recent em{font-size:13px}
+}
