@@ -6,6 +6,7 @@ const GROUPS = ["A", "B", "C", "D"];
 const STORAGE_KEY = "jungman-cup-preview-v2";
 const PREVIOUS_STORAGE_KEY = "jungman-cup-preview-v1";
 const SHARED_STATE_API = "/api/jungman-cup-state";
+const KNOCKOUT_PROMOTION_DATE = "2026-09-03";
 const MATCH_TIER_OVERRIDES = new Map([
   ["아리송이", "7"],
   ["막내현진", "7"],
@@ -32,6 +33,11 @@ const cupStatsClose = document.getElementById("cupStatsClose");
 const cupStatsSummary = document.getElementById("cupStatsSummary");
 const cupStatsRows = document.getElementById("cupStatsRows");
 const cupStatsEmpty = document.getElementById("cupStatsEmpty");
+const cupHero = document.querySelector(".cup-hero");
+const cupLayout = document.querySelector(".cup-layout");
+const knockoutBracket = document.getElementById("knockoutBracket");
+const knockoutRounds = document.getElementById("knockoutRounds");
+const knockoutStatus = document.getElementById("knockoutStatus");
 
 const authenticated = true;
 let selectedMatch = null;
@@ -337,6 +343,7 @@ function renderGroups() {
       "</article>"
     ].join("");
   }).join("");
+  renderKnockoutBracket();
 }
 
 function matchScore(match) {
@@ -350,6 +357,128 @@ function matchScore(match) {
     if (home === 5 || away === 5) clinchedAt = index + 1;
   });
   return { home, away, clinchedAt };
+}
+
+function completedFixtureResult(group, fixture) {
+  if (!fixture?.home || !fixture?.away) return null;
+  const match = state.matches?.[matchKey(group, fixture.home, fixture.away)];
+  if (!match || !Array.isArray(match.games)) return null;
+  const score = matchScore(match);
+  if (score.home !== 5 && score.away !== 5) return null;
+  return {
+    home: fixture.home,
+    away: fixture.away,
+    homeScore: score.home,
+    awayScore: score.away
+  };
+}
+
+function groupUniversityStandings(group) {
+  const fixtures = (state.fixtures?.[group] || []).filter((fixture) => fixture?.home && fixture?.away);
+  const results = fixtures.map((fixture) => completedFixtureResult(group, fixture));
+  const complete = fixtures.length === 3 && results.every(Boolean);
+  const universities = new Map();
+  const rowFor = (name) => {
+    if (!universities.has(name)) {
+      universities.set(name, { name, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0 });
+    }
+    return universities.get(name);
+  };
+
+  results.filter(Boolean).forEach((result) => {
+    const home = rowFor(result.home);
+    const away = rowFor(result.away);
+    home.setsFor += result.homeScore;
+    home.setsAgainst += result.awayScore;
+    away.setsFor += result.awayScore;
+    away.setsAgainst += result.homeScore;
+    if (result.homeScore > result.awayScore) {
+      home.wins += 1;
+      away.losses += 1;
+    } else {
+      away.wins += 1;
+      home.losses += 1;
+    }
+  });
+
+  const rows = [...universities.values()].sort((a, b) =>
+    b.wins - a.wins ||
+    (b.setsFor - b.setsAgainst) - (a.setsFor - a.setsAgainst) ||
+    b.setsFor - a.setsFor ||
+    a.name.localeCompare(b.name, "ko")
+  );
+  return { complete, rows };
+}
+
+function groupStageComplete() {
+  return GROUPS.every((group) => groupUniversityStandings(group).complete);
+}
+
+function qualifiedTeam(group, rank) {
+  const standings = groupUniversityStandings(group);
+  return standings.complete && standings.rows[rank - 1]
+    ? standings.rows[rank - 1].name
+    : group + "조 " + rank + "위";
+}
+
+function knockoutMatch(number, home, away) {
+  return [
+    '<article class="knockout-match">',
+    '<span class="knockout-match-number">' + number + '경기</span>',
+    '<strong class="knockout-team">' + escapeHtml(home) + '</strong>',
+    '<b class="knockout-vs">VS</b>',
+    '<strong class="knockout-team">' + escapeHtml(away) + '</strong>',
+    '</article>'
+  ].join("");
+}
+
+function knockoutRound(label, title, dateText, matches, className) {
+  return [
+    '<section class="knockout-round ' + className + '">',
+    '<header><span>' + label + '</span><strong>' + title + '</strong><time>' + dateText + '</time></header>',
+    '<div class="knockout-match-list">' + matches.join("") + '</div>',
+    '</section>'
+  ].join("");
+}
+
+function knockoutArrow() {
+  return '<div class="round-arrow" aria-hidden="true"><span class="arrow-wide">→</span>' +
+    '<span class="arrow-narrow">↓</span><small>승자 진출</small></div>';
+}
+
+function renderKnockoutBracket() {
+  if (!knockoutBracket || !knockoutRounds) return;
+  const quarterfinals = [
+    knockoutMatch(1, qualifiedTeam("A", 1), qualifiedTeam("B", 2)),
+    knockoutMatch(2, qualifiedTeam("B", 1), qualifiedTeam("A", 2)),
+    knockoutMatch(3, qualifiedTeam("C", 1), qualifiedTeam("D", 2)),
+    knockoutMatch(4, qualifiedTeam("D", 1), qualifiedTeam("C", 2))
+  ];
+  const semifinals = [
+    knockoutMatch(1, "8강 1경기 승자", "8강 2경기 승자"),
+    knockoutMatch(2, "8강 3경기 승자", "8강 4경기 승자")
+  ];
+  const finalMatch = [knockoutMatch(1, "4강 1경기 승자", "4강 2경기 승자")];
+  knockoutRounds.innerHTML = [
+    knockoutRound("QUARTERFINAL", "8강", "9월 3일부터", quarterfinals, "quarterfinal-round"),
+    knockoutArrow(),
+    knockoutRound("SEMIFINAL", "4강", "9월 12일부터", semifinals, "semifinal-round"),
+    knockoutArrow(),
+    knockoutRound("FINAL", "결승", "9월 19일", finalMatch, "final-round")
+  ].join("");
+
+  const qualifiersFinished = groupStageComplete();
+  const promoted = qualifiersFinished || localDateKey() >= KNOCKOUT_PROMOTION_DATE;
+  knockoutBracket.classList.toggle("is-promoted", promoted);
+  if (promoted) {
+    cupHero.after(knockoutBracket);
+    knockoutStatus.textContent = qualifiersFinished
+      ? "조별리그 최종 순위를 반영한 본선 대진표입니다."
+      : "본선 일정이 시작되어 대진표를 화면 위에 표시합니다.";
+  } else {
+    cupLayout.after(knockoutBracket);
+    knockoutStatus.textContent = "조별리그가 끝나면 본선 대진표가 화면 맨 위로 이동합니다.";
+  }
 }
 
 function renderMatchPanel() {

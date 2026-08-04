@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>K-중만컵 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./jungman-cup.css?v=20260803-cup-layout-isolated">
+    <link rel="stylesheet" href="./jungman-cup.css?v=20260804-knockout-bracket">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   </head>
   <body class="jungman-cup-page">
@@ -68,6 +68,17 @@
 
         <aside id="matchPanel" class="match-panel" aria-live="polite"></aside>
       </div>
+
+      <section id="knockoutBracket" class="knockout-bracket" aria-labelledby="knockoutTitle">
+        <div class="section-heading knockout-heading">
+          <div>
+            <span>FINALS BRACKET</span>
+            <h2 id="knockoutTitle">8강 · 4강 · 결승 대진표</h2>
+          </div>
+          <p id="knockoutStatus">조별리그가 끝나면 본선 대진표가 화면 맨 위로 이동합니다.</p>
+        </div>
+        <div id="knockoutRounds" class="knockout-rounds" aria-live="polite"></div>
+      </section>
     </main>
 
     <dialog id="cupAdminDialog" class="cup-admin-dialog" aria-labelledby="cupAdminTitle">
@@ -112,6 +123,6 @@
       </div>
     </dialog>
 
-    <script src="./jungman-cup.js?v=20260803-shared-state-retry"></script>
+    <script src="./jungman-cup.js?v=20260804-knockout-bracket"></script>
   </body>
 </html>
