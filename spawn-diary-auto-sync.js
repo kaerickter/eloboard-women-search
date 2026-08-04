@@ -31,6 +31,14 @@ function clean(value, limit = 500) {
   return String(value ?? "").replace(/\r\n/g, "\n").trim().slice(0, limit);
 }
 
+function raceLabel(value) {
+  const normalized = clean(value, 30).toUpperCase();
+  if (normalized === "T" || normalized.includes("테란")) return "테란";
+  if (normalized === "P" || normalized.includes("프로토스")) return "프로토스";
+  if (normalized === "Z" || normalized.includes("저그")) return "저그";
+  return "";
+}
+
 function opponentIdentity(value) {
   const label = clean(value, 80);
   const raceMatch = label.match(/\s*\(([TPZ])\)\s*$/i);
@@ -102,7 +110,7 @@ function candidateFromMatch(playerName, match, roster) {
     gameFormat: classifyGameFormat(match),
     opponent,
     tier: tierSnapshot(opponentProfile),
-    opponentRace: clean(opponentProfile?.race, 30) || matchRace || opponentInfo.race || null,
+    opponentRace: raceLabel(opponentProfile?.race) || raceLabel(matchRace) || raceLabel(opponentInfo.race) || null,
     mapName: clean(match?.map, 80) || null,
     result: resultFromElo(match?.elo),
   };
@@ -140,6 +148,7 @@ async function initializeSpawnDiaryAutoSyncSchema(pool) {
     replay_number TEXT,
     source_sheet_id TEXT,
     source_row BIGINT,
+    source_position INTEGER,
     source_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -160,6 +169,7 @@ async function initializeSpawnDiaryAutoSyncSchema(pool) {
     ADD COLUMN IF NOT EXISTS replay_number TEXT,
     ADD COLUMN IF NOT EXISTS source_sheet_id TEXT,
     ADD COLUMN IF NOT EXISTS source_row BIGINT,
+    ADD COLUMN IF NOT EXISTS source_position INTEGER,
     ADD COLUMN IF NOT EXISTS source_url TEXT,
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -186,11 +196,12 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
   const uniqueCandidates = [];
   const sourceKeys = new Set();
   const autoMatchWindow = recentAutoMatchWindow();
-  for (const match of matches) {
+  for (const [profilePosition, match] of matches.entries()) {
     const candidate = candidateFromMatch(playerName, match, roster);
     if (!candidate.matchDate || !candidate.opponent || sourceKeys.has(candidate.sourceKey)) continue;
     if (candidate.matchDate < autoMatchWindow.from || candidate.matchDate > autoMatchWindow.to) continue;
     sourceKeys.add(candidate.sourceKey);
+    candidate.profilePosition = profilePosition;
     uniqueCandidates.push(candidate);
   }
 
@@ -228,6 +239,17 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       : { rows: [] };
     const seenKeys = new Set(seenKeysResult.rows.map((row) => row.source_key));
     const pendingCandidates = uniqueCandidates.filter((candidate) => !seenKeys.has(candidate.sourceKey));
+
+    for (const candidate of uniqueCandidates) {
+      await client.query(`
+        UPDATE spawn_diary_entries AS entry
+        SET source_position = $2,
+            opponent_race = COALESCE(NULLIF(entry.opponent_race, ''), $3)
+        FROM spawn_diary_auto_seen AS seen
+        WHERE seen.source_key = $1
+          AND seen.imported_entry_id = entry.id
+      `, [candidate.sourceKey, candidate.profilePosition, candidate.opponentRace]);
+    }
 
     if (!pendingCandidates.length) {
       await client.query("COMMIT");
@@ -310,12 +332,12 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
         INSERT INTO spawn_diary_entries (
           match_date, game_format, opponent, tier, opponent_race, map_name,
           result, opponent_build, my_build, feedback, reflection, keywords,
-          replay_number, source_sheet_id, source_row, source_url
+          replay_number, source_sheet_id, source_row, source_position, source_url
         )
         VALUES (
           $1, $2, $3, $4, $5, $6,
           $7, NULL, NULL, NULL, NULL, $8,
-          NULL, $9, $10, $11
+          NULL, $9, $10, $11, $12
         )
         RETURNING id
       `, [
@@ -329,6 +351,7 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
         "전적검색 자동등록",
         AUTO_SOURCE_ID,
         nextSourceRow,
+        candidate.profilePosition,
         candidate.sourceUrl,
       ]);
       nextSourceRow += 1;
