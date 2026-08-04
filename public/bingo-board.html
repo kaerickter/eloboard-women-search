@@ -204,11 +204,21 @@
       align-items: center;
       justify-content: center;
       gap: clamp(10px, 1.5vw, 18px);
+      font-size: clamp(23px, 3.2vw, 44px);
     }
 
     .bingo-heading .bingo-chicken {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .82em;
       filter: drop-shadow(0 3px 3px rgba(108, 62, 18, .22));
       transform: translateY(-1px);
+    }
+
+    .bingo-heading .bingo-chicken strong {
+      min-width: 1.2em;
+      font-variant-numeric: tabular-nums;
     }
 
     .stage-title[hidden] {
@@ -897,11 +907,11 @@
       box-shadow: 0 0 0 3px rgba(7, 89, 60, .34), 0 14px 28px rgba(6, 86, 57, .35), inset 0 -7px 0 rgba(2, 70, 45, .23), inset 0 1px 0 rgba(255, 255, 255, .35) !important;
     }
     .broadcast .preview-cell.bingo-line {
-      border-color: #824300 !important;
-      color: #fff !important;
-      background: linear-gradient(180deg, #f5b900 0%, #d27600 100%) !important;
-      text-shadow: 0 2px 2px rgba(92, 47, 0, .52) !important;
-      box-shadow: 0 0 0 4px rgba(255, 224, 112, .94), 0 0 0 8px rgba(181, 103, 0, .48), 0 16px 32px rgba(145, 76, 0, .38), inset 0 -7px 0 rgba(111, 55, 0, .2), inset 0 1px 0 rgba(255, 255, 255, .42) !important;
+      border-color: #b57817 !important;
+      color: #583400 !important;
+      background: linear-gradient(180deg, #fff0b8 0%, #f4c85c 100%) !important;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, .62) !important;
+      box-shadow: 0 0 0 3px rgba(255, 225, 127, .82), 0 0 0 6px rgba(190, 127, 25, .3), 0 14px 28px rgba(150, 91, 8, .25), inset 0 -6px 0 rgba(162, 99, 11, .12), inset 0 1px 0 rgba(255, 255, 255, .7) !important;
     }
     .broadcast .preview-cell.territory-cell,
     .editor .edit-cell.territory-cell {
@@ -922,9 +932,74 @@
       background: #18875d !important;
     }
     .editor .edit-cell.bingo-line {
-      border-color: #824300 !important;
-      color: #fff !important;
-      background: #d98200 !important;
+      border-color: #b57817 !important;
+      color: #583400 !important;
+      background: #f7d77d !important;
+    }
+
+    .title-chicken-settings {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .title-setting-field {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .title-setting-field input {
+      width: 100%;
+      min-height: 42px;
+      padding: 7px 11px;
+      border: 2px solid #b97836;
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fff;
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .chicken-counter-control {
+      display: grid;
+      grid-template-columns: 46px minmax(58px, auto) 46px;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chicken-counter-control output {
+      display: grid;
+      min-height: 42px;
+      place-items: center;
+      padding: 5px 10px;
+      border: 2px solid #d29a50;
+      border-radius: 8px;
+      color: #6a3f0d;
+      background: #fff7df;
+      font-size: 18px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .editor button.chicken-step-button {
+      min-height: 42px;
+      padding: 0 !important;
+      border: 2px solid #b97836 !important;
+      border-radius: 8px !important;
+      color: #6a3f0d !important;
+      background: #ffe8ad !important;
+      box-shadow: none !important;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    @media (max-width: 560px) {
+      .title-chicken-settings { grid-template-columns: 1fr; }
+      .chicken-counter-control { grid-template-columns: 46px 1fr 46px; }
     }
     .editor .segmented button {
       border: 0 !important;
@@ -1014,7 +1089,7 @@
       <div class="stage" id="stage">
         <div class="stage-title bingo-heading" id="bingoHeading">
           <strong id="bingoTitleText">빙고</strong>
-          <span class="bingo-chicken" aria-hidden="true">🍗</span>
+          <span class="bingo-chicken" aria-label="치킨 수"><span aria-hidden="true">🍗</span><strong id="bingoChickenCount">0</strong></span>
         </div>
         <div class="stage-title timer-display" id="timerDisplay" role="timer" aria-live="polite" hidden>00:00:00</div>
         <div class="preview-board" id="previewBoard"></div>
@@ -1030,6 +1105,18 @@
         </div>
         <button class="button" id="openBroadcast" type="button" title="송출 화면만 새 창으로 열기">새 창</button>
       </div>
+
+      <section class="section">
+        <div class="label">제목 / 치킨</div>
+        <div class="title-chicken-settings">
+          <label class="title-setting-field" for="bingoTitleInput"><span>제목</span><input id="bingoTitleInput" type="text" maxlength="20" value="빙고"></label>
+          <div class="chicken-counter-control" aria-label="치킨 수 조절">
+            <button id="chickenMinusButton" class="chicken-step-button" type="button" aria-label="치킨 1개 줄이기">-1</button>
+            <output id="chickenEditorCount" aria-live="polite">🍗 0</output>
+            <button id="chickenPlusButton" class="chicken-step-button" type="button" aria-label="치킨 1개 늘리기">+1</button>
+          </div>
+        </div>
+      </section>
 
       <section class="section">
         <div class="label">스톱워치 설정</div>
@@ -1122,6 +1209,7 @@
     const state = {
       size: 4,
       title: "빙고",
+      chickenCount: 0,
       cells: Array.from({ length: 25 }, () => ""),
       checked: Array.from({ length: 25 }, () => false),
       mode: "classic",
@@ -1155,6 +1243,11 @@
     const timerSeconds = document.getElementById("timerSeconds");
     const bingoHeading = document.getElementById("bingoHeading");
     const bingoTitleText = document.getElementById("bingoTitleText");
+    const bingoTitleInput = document.getElementById("bingoTitleInput");
+    const bingoChickenCount = document.getElementById("bingoChickenCount");
+    const chickenEditorCount = document.getElementById("chickenEditorCount");
+    const chickenMinusButton = document.getElementById("chickenMinusButton");
+    const chickenPlusButton = document.getElementById("chickenPlusButton");
     const timerDisplay = document.getElementById("timerDisplay");
     const timerStartButton = document.getElementById("timerStartButton");
     const timerResetButton = document.getElementById("timerResetButton");
@@ -1172,6 +1265,7 @@
     let timerLastTick = 0;
     let timerSyncing = false;
     let timerVisible = false;
+    let timerMode = null;
 
     const saved = localStorage.getItem("broadcast-bingo-state");
     if (saved) {
@@ -1184,6 +1278,7 @@
 
     state.mode = state.mode === "territory" ? "territory" : "classic";
     state.title = String(state.title || "빙고").slice(0, 20);
+    state.chickenCount = Math.max(0, Number.parseInt(state.chickenCount, 10) || 0);
     state.owners = Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(state.owners?.[index])) ? Number(state.owners[index]) : 0);
     state.teamColors = Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(state.teamColors?.[index] || "")
       ? state.teamColors[index]
@@ -1277,6 +1372,8 @@
     }
 
     function render() {
+      state.title = String(state.title || "빙고").slice(0, 20);
+      state.chickenCount = Math.max(0, Number.parseInt(state.chickenCount, 10) || 0);
       const count = activeCount();
       const isTerritory = state.mode === "territory";
       const bingoLines = isTerritory ? [] : getBingoLineIndexes();
@@ -1288,6 +1385,9 @@
       const grid = `repeat(${state.size}, minmax(0, 1fr))`;
 
       bingoTitleText.textContent = state.title;
+      bingoChickenCount.textContent = state.chickenCount;
+      chickenEditorCount.textContent = `🍗 ${state.chickenCount}`;
+      if (document.activeElement !== bingoTitleInput) bingoTitleInput.value = state.title;
       document.documentElement.style.setProperty("--team-1", state.teamColors[0]);
       document.documentElement.style.setProperty("--team-2", state.teamColors[1]);
       previewBoard.style.gridTemplateColumns = grid;
@@ -1405,6 +1505,23 @@
       });
       save();
     }
+
+    function updateChickenCount(change) {
+      state.chickenCount = Math.max(0, state.chickenCount + change);
+      bingoChickenCount.textContent = state.chickenCount;
+      chickenEditorCount.textContent = `🍗 ${state.chickenCount}`;
+      realtimeRoom?.sendSet("chickenCount", state.chickenCount);
+      save();
+    }
+
+    bingoTitleInput.addEventListener("input", event => {
+      state.title = event.target.value.slice(0, 20) || "빙고";
+      bingoTitleText.textContent = state.title;
+      realtimeRoom?.sendSet("title", state.title);
+      save();
+    });
+    chickenMinusButton.addEventListener("click", () => updateChickenCount(-1));
+    chickenPlusButton.addEventListener("click", () => updateChickenCount(1));
 
     function toggleCheck(index) {
       state.checked[index] = !state.checked[index];
@@ -1547,6 +1664,7 @@
           remaining: timerRemaining,
           running: Boolean(timerInterval),
           visible: timerVisible,
+          mode: timerMode,
           endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
         }
       });
@@ -1583,17 +1701,19 @@
     }
 
     function toggleTimer() {
-      if (timerInterval) {
+      if (timerInterval && timerMode === "duration") {
         stopTimer();
         timerStatus.textContent = "일시정지했습니다.";
         broadcastTimer();
         return;
       }
-      if (timerRemaining <= 0) timerRemaining = configuredSeconds();
+      if (timerInterval) stopTimer();
+      if (timerMode !== "duration" || timerRemaining <= 0) timerRemaining = configuredSeconds();
       if (timerRemaining <= 0) {
         timerStatus.textContent = "시간을 먼저 설정하세요.";
         return;
       }
+      timerMode = "duration";
       timerVisible = true;
       startTimerInterval();
       timerStatus.textContent = "스톱워치가 진행 중입니다.";
@@ -1601,14 +1721,18 @@
     }
 
     function resetTimer() {
+      const modeToReset = timerMode;
       stopTimer();
       timerRemaining = 0;
       timerVisible = false;
-      timerHours.value = 0;
-      timerMinutes.value = 0;
-      timerSeconds.value = 0;
-      targetHour.value = 0;
-      targetMinute.value = 0;
+      timerMode = null;
+      if (modeToReset === "target") {
+        setDefaultTargetTime();
+      } else {
+        timerHours.value = 0;
+        timerMinutes.value = 0;
+        timerSeconds.value = 0;
+      }
       timerStatus.textContent = "스톱워치를 초기화했습니다.";
       renderTimer();
       broadcastTimer();
@@ -1623,6 +1747,13 @@
         hour12: false
       }).formatToParts(date);
       return Object.fromEntries(parts.map(part => [part.type, Number(part.value)]));
+    }
+
+    function setDefaultTargetTime() {
+      const now = kstClockParts();
+      const nextHourTotal = (now.hour * 60 + now.minute + 60) % (24 * 60);
+      targetHour.value = Math.floor(nextHourTotal / 60);
+      targetMinute.value = nextHourTotal % 60;
     }
 
     function secondsUntilKstTarget(hour, minute) {
@@ -1641,9 +1772,7 @@
       stopTimer();
       timerRemaining = secondsUntilKstTarget(hour, minute);
       timerVisible = true;
-      timerHours.value = 0;
-      timerMinutes.value = 0;
-      timerSeconds.value = 0;
+      timerMode = "target";
       startTimerInterval();
       timerStatus.textContent = `한국 시간 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}에 종료됩니다.`;
       broadcastTimer();
@@ -1657,16 +1786,20 @@
         ? Math.max(0, (Number(timer.endAt) - Date.now()) / 1000)
         : Math.max(0, Number(timer.remaining) || 0);
       timerVisible = typeof timer.visible === "boolean" ? timer.visible : timerRemaining > 0;
+      timerMode = timer.mode === "target" ? "target" : timer.mode === "duration" ? "duration" : null;
       if (timer.running && timerRemaining > 0) startTimerInterval();
       renderTimer();
       timerSyncing = false;
     }
+
+    setDefaultTargetTime();
 
     [timerHours, timerMinutes, timerSeconds].forEach(input => {
       input.addEventListener("input", () => {
         if (!timerInterval) {
           timerRemaining = configuredSeconds();
           timerVisible = timerRemaining > 0;
+          timerMode = timerVisible ? "duration" : null;
           renderTimer();
           broadcastTimer();
         }
