@@ -1491,14 +1491,13 @@ async function fetchSoopLiveStatus(name, force = false) {
   }
 }
 
-function freshSharedLiveStatuses(names) {
-  const now = Date.now();
+function sharedLiveStatuses(names) {
   return [...new Set((names || []).map((name) => String(name || "").trim()).filter(Boolean))]
     .slice(0, 200)
     .map((name) => {
       const cached = liveNameCache.get(normalizePlayerName(name));
-      if (!cached || now - cached.cacheTime >= LIVE_CACHE_MS) return null;
-      return { ...cached.status, name };
+      if (!cached) return null;
+      return { ...cached.status, name, sharedAt: new Date(cached.cacheTime).toISOString() };
     })
     .filter(Boolean);
 }
@@ -1506,7 +1505,7 @@ function freshSharedLiveStatuses(names) {
 function setupLiveStatusSharing(socketServer) {
   socketServer.on("connection", (socket) => {
     socket.on("live:subscribe", (payload = {}) => {
-      const statuses = freshSharedLiveStatuses(Array.isArray(payload.names) ? payload.names : []);
+      const statuses = sharedLiveStatuses(Array.isArray(payload.names) ? payload.names : []);
       if (!statuses.length) return;
       socket.emit("live:statuses", {
         statuses,
@@ -2121,6 +2120,7 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, JSON.stringify({
         players: addTierProfileAssets(tierAdmin.applyOverrides(players)),
+        liveStatuses: sharedLiveStatuses(players.map((player) => player.name)),
         source: UNIVERSITY_LIST_URL,
         updatedAt: new Date(tierRosterCache?.cacheTime || Date.now()).toISOString(),
         refreshing: Boolean(tierRosterPromise)
