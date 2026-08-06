@@ -41,6 +41,7 @@ const tierAdminRevert = document.getElementById("tierAdminRevert");
 const tierAdminLogout = document.getElementById("tierAdminLogout");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
+const LIVE_SHARED_SYNC_MS = 1000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
 const TIER_ROSTER_CACHE_KEY = "tier-board-roster-v1";
 const TIER_VIEW_STATE_KEY = "tier-board-view-state-v1";
@@ -50,6 +51,7 @@ const ALL_DIVISIONS = "__all__";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 let livePollTimer = null;
+let liveSharedSyncTimer = null;
 let liveSocket = null;
 let pendingLiveReload = false;
 let pendingLiveForce = false;
@@ -895,6 +897,10 @@ async function loadRoster(force = false) {
     state.players = Array.isArray(data.players) ? data.players : [];
     saveTierRoster();
     keepRosterLiveStatuses();
+    const sharedStatuses = Array.isArray(data.liveStatuses)
+      ? new Map(data.liveStatuses.map((status) => [keyOf(status.name), status]))
+      : new Map();
+    if (sharedStatuses.size) mergeLiveStatuses(sharedStatuses);
     subscribeLiveStatuses();
     render();
     if (force) {
@@ -999,10 +1005,23 @@ function subscribeLiveStatuses() {
   });
 }
 
+function scheduleSharedLiveSync() {
+  clearTimeout(liveSharedSyncTimer);
+  liveSharedSyncTimer = null;
+  if (document.visibilityState !== "visible") return;
+  liveSharedSyncTimer = setTimeout(() => {
+    subscribeLiveStatuses();
+    scheduleSharedLiveSync();
+  }, LIVE_SHARED_SYNC_MS);
+}
+
 function connectLiveStatusSharing() {
   if (typeof window.io !== "function") return;
   liveSocket = window.io({ transports: ["websocket", "polling"] });
-  liveSocket.on("connect", subscribeLiveStatuses);
+  liveSocket.on("connect", () => {
+    subscribeLiveStatuses();
+    scheduleSharedLiveSync();
+  });
   liveSocket.on("live:statuses", (payload = {}) => {
     const statuses = Array.isArray(payload.statuses) ? payload.statuses : [];
     if (!statuses.length) return;
@@ -1316,9 +1335,12 @@ document.addEventListener("visibilitychange", () => {
   syncProfileAnimations();
   if (document.visibilityState === "visible") {
     scheduleLivePoll();
+    scheduleSharedLiveSync();
   } else {
     clearTimeout(livePollTimer);
     livePollTimer = null;
+    clearTimeout(liveSharedSyncTimer);
+    liveSharedSyncTimer = null;
   }
 });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
