@@ -1232,7 +1232,11 @@
       owners: Array.from({ length: 25 }, () => 0),
       teamColors: ["#ef5b78", "#3b82f6"],
       teamNames: ["1팀", "2팀"],
-      timer: { remaining: 0, running: false, visible: false, mode: null, endAt: null }
+      timer: {
+        remaining: 0, running: false, visible: false, mode: null, endAt: null,
+        durationHours: 0, durationMinutes: 0, durationSeconds: 0,
+        targetHour: 0, targetMinute: 0, revision: "", finishedAt: null
+      }
     };
 
     const previewBoard = document.getElementById("previewBoard");
@@ -1287,6 +1291,10 @@
     let timerMode = null;
     let timerBroadcastOwner = false;
     let timerLastSharedSecond = -1;
+    let timerEndAt = null;
+    let timerRevision = "";
+    let timerFinishedAt = null;
+    let lastHandledFinish = "";
 
     const saved = localStorage.getItem("broadcast-bingo-state");
     if (saved) {
@@ -1659,6 +1667,10 @@
       return hours * 3600 + minutes * 60 + seconds;
     }
 
+    function nextTimerRevision() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
     function formatTime(totalSeconds) {
       const safeSeconds = Math.max(0, Math.ceil(totalSeconds));
       const hours = Math.floor(safeSeconds / 3600);
@@ -1685,7 +1697,14 @@
         running: Boolean(timerInterval),
         visible: timerVisible,
         mode: timerMode,
-        endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
+        endAt: timerEndAt,
+        durationHours: clampNumber(timerHours.value, 0, 23),
+        durationMinutes: clampNumber(timerMinutes.value, 0, 59),
+        durationSeconds: clampNumber(timerSeconds.value, 0, 59),
+        targetHour: clampNumber(targetHour.value, 0, 23),
+        targetMinute: clampNumber(targetMinute.value, 0, 59),
+        revision: timerRevision,
+        finishedAt: timerFinishedAt
       };
     }
 
@@ -1707,13 +1726,21 @@
       window.setTimeout(() => timeUpEffect.classList.remove("show"), 2600);
     }
 
-    function finishTimer() {
+    function handleSharedTimeUp(revision, finishedAt) {
+      const key = String(revision || Number(finishedAt) || "timer");
+      if (!finishedAt || key === lastHandledFinish) return;
+      lastHandledFinish = key;
+      showTimeUpEffect();
+    }
+
+    function finishTimer(shouldBroadcast = timerBroadcastOwner) {
       stopTimer();
       timerRemaining = 0;
+      timerFinishedAt = timerFinishedAt || Date.now();
       renderTimer();
       timerStatus.textContent = "시간이 종료됐습니다.";
-      showTimeUpEffect();
-      broadcastTimer();
+      handleSharedTimeUp(timerRevision, timerFinishedAt);
+      if (shouldBroadcast) broadcastTimer();
     }
 
     function tickTimer() {
@@ -1730,6 +1757,7 @@
     }
 
     function startTimerInterval() {
+      window.clearInterval(timerInterval);
       timerLastTick = Date.now();
       timerStartButton.textContent = "일시정지";
       timerInterval = window.setInterval(tickTimer, 200);
@@ -1739,7 +1767,12 @@
 
     function toggleTimer() {
       if (timerInterval && timerMode === "duration") {
+        timerRemaining = timerEndAt ? Math.max(0, (timerEndAt - Date.now()) / 1000) : timerRemaining;
         stopTimer();
+        timerEndAt = null;
+        timerRevision = nextTimerRevision();
+        timerFinishedAt = null;
+        timerBroadcastOwner = true;
         timerStatus.textContent = "일시정지했습니다.";
         broadcastTimer();
         return;
@@ -1754,6 +1787,9 @@
       timerVisible = true;
       timerBroadcastOwner = true;
       timerLastSharedSecond = -1;
+      timerRevision = nextTimerRevision();
+      timerFinishedAt = null;
+      timerEndAt = Date.now() + timerRemaining * 1000;
       startTimerInterval();
       timerStatus.textContent = "스톱워치가 진행 중입니다.";
       broadcastTimer();
@@ -1766,6 +1802,9 @@
       timerVisible = false;
       timerMode = null;
       timerBroadcastOwner = true;
+      timerRevision = nextTimerRevision();
+      timerFinishedAt = null;
+      timerEndAt = null;
       if (modeToReset === "target") {
         setDefaultTargetTime();
       } else {
@@ -1815,6 +1854,9 @@
       timerMode = "target";
       timerBroadcastOwner = true;
       timerLastSharedSecond = -1;
+      timerRevision = nextTimerRevision();
+      timerFinishedAt = null;
+      timerEndAt = Date.now() + timerRemaining * 1000;
       startTimerInterval();
       timerStatus.textContent = `한국 시간 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}에 종료됩니다.`;
       broadcastTimer();
@@ -1823,15 +1865,33 @@
     function applyRemoteTimer(timer) {
       if (!timer) return;
       timerSyncing = true;
-      timerBroadcastOwner = false;
-      stopTimer();
-      timerRemaining = timer.running && timer.endAt
-        ? Math.max(0, (Number(timer.endAt) - Date.now()) / 1000)
+      const incomingEndAt = Number(timer.endAt) > 0 ? Number(timer.endAt) : null;
+      timerRemaining = timer.running && incomingEndAt
+        ? Math.max(0, (incomingEndAt - Date.now()) / 1000)
         : Math.max(0, Number(timer.remaining) || 0);
       timerVisible = typeof timer.visible === "boolean" ? timer.visible : timerRemaining > 0;
       timerMode = timer.mode === "target" ? "target" : timer.mode === "duration" ? "duration" : null;
-      if (timer.running && timerRemaining > 0) startTimerInterval();
+      timerEndAt = incomingEndAt;
+      timerRevision = String(timer.revision || "");
+      timerFinishedAt = Number(timer.finishedAt) > 0 ? Number(timer.finishedAt) : null;
+      timerBroadcastOwner = false;
+      timerHours.value = clampNumber(timer.durationHours, 0, 23);
+      timerMinutes.value = clampNumber(timer.durationMinutes, 0, 59);
+      timerSeconds.value = clampNumber(timer.durationSeconds, 0, 59);
+      targetHour.value = clampNumber(timer.targetHour, 0, 23);
+      targetMinute.value = clampNumber(timer.targetMinute, 0, 59);
+      if (timer.running && timerRemaining > 0) {
+        if (!timerInterval) startTimerInterval();
+        else timerLastTick = Date.now();
+        timerStatus.textContent = timerMode === "target" ? "공유된 종료 시각 타이머가 진행 중입니다." : "공유된 스톱워치가 진행 중입니다.";
+      } else {
+        stopTimer();
+        if (timerFinishedAt) timerStatus.textContent = "시간이 종료됐습니다.";
+        else if (timerVisible && timerRemaining > 0) timerStatus.textContent = "공유된 스톱워치가 일시정지됐습니다.";
+      }
       renderTimer();
+      handleSharedTimeUp(timerRevision, timerFinishedAt);
+      state.timer = { ...timer };
       timerSyncing = false;
     }
 
@@ -1843,9 +1903,24 @@
           timerRemaining = configuredSeconds();
           timerVisible = timerRemaining > 0;
           timerMode = timerVisible ? "duration" : null;
+          timerRevision = nextTimerRevision();
+          timerFinishedAt = null;
+          timerEndAt = null;
+          timerBroadcastOwner = true;
           renderTimer();
           broadcastTimer();
         }
+      });
+    });
+    [targetHour, targetMinute].forEach(input => {
+      input.addEventListener("input", () => {
+        if (timerInterval) return;
+        targetHour.value = clampNumber(targetHour.value, 0, 23);
+        targetMinute.value = clampNumber(targetMinute.value, 0, 59);
+        timerRevision = nextTimerRevision();
+        timerFinishedAt = null;
+        timerBroadcastOwner = true;
+        broadcastTimer();
       });
     });
     timerStartButton.addEventListener("click", toggleTimer);
@@ -1904,11 +1979,11 @@
     realtimeRoom = new RealtimeRoom({
       feature: "bingo",
       getState: () => state,
-      applyState: nextState => {
+      applyState: (nextState, meta = {}) => {
         syncing = true;
         Object.assign(state, nextState);
         RealtimeRoom.preserveFocus(render);
-        applyRemoteTimer(nextState.timer);
+        if (meta.joined || meta.reset || meta.path === "timer") applyRemoteTimer(nextState.timer);
         syncing = false;
       }
     });
