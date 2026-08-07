@@ -311,6 +311,9 @@ function setupCollaboration(io) {
         room.updatedAt = new Date().toISOString();
         const event = { opId: text(payload.opId, 80), path: text(payload.path, 120), kind: payload.kind === "increment" ? "increment" : "set", value: payload.value, delta: payload.delta, state: room.state, version: room.version, clientId: text(payload.clientId, 80) };
         socket.to(roomKey(feature, code)).emit("room:patch", event);
+        if (feature === "bingo" && payload.path === "timer") {
+          io.to(roomKey(feature, code)).emit("bingo:timer", { timer: room.state.timer });
+        }
         reply({ ok: true, version: room.version, state: room.state });
         scheduleSave(feature, code, room);
       } catch (error) { reply({ ok: false, error: error.message || "변경 사항을 저장하지 못했습니다." }); }
@@ -324,7 +327,7 @@ function setupCollaboration(io) {
       const timer = normalizeBingoTimer(payload.timer);
       if (room.state.timer?.revision && timer.revision !== room.state.timer.revision) return;
       room.state.timer = syncBingoTimerToServer(room.state.timer);
-      socket.to(roomKey("bingo", roomInfo.code)).emit("bingo:timer", { timer: room.state.timer });
+      io.to(roomKey("bingo", roomInfo.code)).emit("bingo:timer", { timer: room.state.timer });
     });
 
     socket.on("room:reset", async (payload = {}, reply = () => {}) => {
