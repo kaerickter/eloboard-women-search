@@ -110,8 +110,56 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 16px;
+      gap: 10px;
       flex-wrap: wrap;
+    }
+
+    .timer-control {
+      min-height: 54px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border: 1px solid var(--line, #d9dbd3);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .timer-control strong { color: var(--score); }
+
+    .timer-control label {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .timer-control input {
+      width: 42px;
+      height: 34px;
+      min-width: 0;
+      padding: 3px;
+      border: 1px solid var(--button-edge);
+      background: #fff;
+      color: var(--score);
+      font-size: 16px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .timer-control button {
+      min-width: 48px;
+      height: 34px;
+      padding: 0 8px;
+      border: 2px solid var(--button-edge);
+      border-radius: 7px;
+      background: var(--button);
+      color: var(--ink);
+      font-weight: 900;
+      cursor: pointer;
     }
 
     .chicken-kill-setting {
@@ -177,8 +225,10 @@
     .team-label {
       min-height: 38px;
       margin: 0;
-      display: grid;
-      place-items: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       padding: 5px 12px;
       border: 2px solid var(--panel-edge);
       border-radius: 8px;
@@ -190,6 +240,29 @@
       box-shadow: 0 5px 12px rgba(112, 72, 0, 0.12);
     }
 
+    .team-label-input {
+      width: min(100%, 170px);
+      min-width: 0;
+      height: 28px;
+      padding: 2px 8px;
+      border: 0;
+      border-bottom: 2px solid rgba(192, 92, 0, 0.45);
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: center;
+      outline: none;
+    }
+
+    .team-label-input:focus { border-bottom-color: var(--name); }
+
+    .team-time {
+      color: var(--score);
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
     .team-grid {
       display: grid;
       grid-auto-flow: column;
@@ -198,6 +271,36 @@
       gap: 12px;
       overflow-x: auto;
       padding: 2px 2px 8px;
+    }
+
+    .mode-section.two-team-mode {
+      transform: translateX(-6px);
+    }
+
+    .two-team-mode .team-grid {
+      grid-auto-columns: 310px;
+      overflow-x: hidden;
+    }
+
+    .two-team-mode .team-column,
+    .two-team-mode .team-label,
+    .two-team-mode .score-panel {
+      width: 310px;
+      min-width: 0;
+    }
+
+    .two-team-mode .score-panel {
+      padding-inline: 10px 7px;
+    }
+
+    .two-team-mode .counter-row {
+      grid-template-columns: minmax(48px, 1fr) 46px 32px 32px 42px 42px;
+      gap: 3px;
+    }
+
+    .two-team-mode .name-input {
+      width: 100%;
+      min-width: 0;
     }
 
     .mode-section.four-team-mode {
@@ -268,22 +371,6 @@
       font-size: 24px;
       font-weight: 900;
       line-height: 1;
-    }
-
-    .team-input {
-      width: 56px;
-      border: 0;
-      border-bottom: 2px solid rgba(192, 92, 0, 0.45);
-      background: transparent;
-      color: var(--score);
-      font: inherit;
-      font-weight: 900;
-      text-align: center;
-      outline: none;
-    }
-
-    .team-input:focus {
-      border-bottom-color: var(--name);
     }
 
     .total-count {
@@ -577,6 +664,20 @@
         <label class="chicken-kill-setting">🍗 치킨 킬수
           <input id="chickenKillValue" type="number" min="0" step="1" value="1" inputmode="numeric" aria-label="치킨 한 개당 킬수">
         </label>
+        <div class="timer-control" aria-label="스톱워치 설정">
+          <strong>스톱워치</strong>
+          <label>시 <input id="timerHours" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+          <label>분 <input id="timerMinutes" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          <label>초 <input id="timerSeconds" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          <button id="timerStartButton" type="button">시작</button>
+          <button id="timerResetButton" type="button">초기화</button>
+        </div>
+        <div class="timer-control" aria-label="종료 시각 설정">
+          <strong>종료 시각</strong>
+          <label>시 <input id="targetHour" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+          <label>분 <input id="targetMinute" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          <button id="targetStartButton" type="button">설정</button>
+        </div>
       </div>
       <div class="board"></div>
     </section>
@@ -596,8 +697,19 @@
     const storageKey = "eloboard.killBet.v1";
     const savedState = loadState();
     let realtimeRoom = null;
+    let timerInterval = null;
     const chickenKillInput = document.querySelector("#chickenKillValue");
+    const timerHours = document.querySelector("#timerHours");
+    const timerMinutes = document.querySelector("#timerMinutes");
+    const timerSeconds = document.querySelector("#timerSeconds");
+    const timerStartButton = document.querySelector("#timerStartButton");
+    const timerResetButton = document.querySelector("#timerResetButton");
+    const targetHour = document.querySelector("#targetHour");
+    const targetMinute = document.querySelector("#targetMinute");
+    const targetStartButton = document.querySelector("#targetStartButton");
     chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
+    savedState.timer = normalizeTimer(savedState.timer);
+    applyTimerInputs();
 
     function renderKillBoard() {
       board.innerHTML = "";
@@ -606,6 +718,7 @@
         section.className = [
           "mode-section",
           mode.wide ? "wide" : "",
+          mode.teams.length === 2 ? "two-team-mode" : "",
           mode.teams.length === 4 ? "four-team-mode" : "",
         ].filter(Boolean).join(" ");
         section.setAttribute("aria-label", `${mode.label} 구성`);
@@ -616,16 +729,23 @@
           const column = document.createElement("div");
           column.className = "team-column";
 
+          const panelId = `${mode.label}-${teamIndex}`;
           const label = document.createElement("h2");
           label.className = "team-label";
-          label.textContent = team;
+          label.innerHTML = `
+            <input class="team-input team-label-input" type="text" value="${escapeHtml(getSavedPanel(panelId).team || team)}" aria-label="팀 이름">
+            <span class="team-time" aria-label="설정 시간" hidden></span>
+          `;
 
-          column.append(label, createScorePanel(mode.label, team, teamIndex));
+          const panel = createScorePanel(mode.label, team, teamIndex);
+          column.append(label, panel);
+          initPanel(panel, panelId, team);
           grid.append(column);
         });
 
         board.append(section);
       });
+      renderTimer();
     }
 
     chickenKillInput.addEventListener("input", () => {
@@ -648,8 +768,6 @@
       panel.innerHTML = `
         <div class="title-row">
           <div class="title-main">
-            <input class="team-input" type="text" value="${getSavedPanel(panelId).team || teamName}" aria-label="팀 이름">
-            <span>:</span>
             <output class="total-count" aria-label="자동 합산">0킬</output>
           </div>
           <label class="panel-chicken-field" aria-label="팀 치킨 수"><span aria-hidden="true">🍗</span><input class="panel-chicken-input" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
@@ -661,7 +779,6 @@
         </section>
       `;
 
-      initPanel(panel, panelId, teamName);
       return panel;
     }
 
@@ -682,7 +799,7 @@
       const rows = [...panel.querySelectorAll(".counter-row")];
       const totalCount = panel.querySelector(".total-count");
       const resetButton = panel.querySelector(".reset-button");
-      const teamInput = panel.querySelector(".team-input");
+      const teamInput = panel.closest(".team-column").querySelector(".team-input");
       const panelChickenInput = panel.querySelector(".panel-chicken-input");
       const panelState = getSavedPanel(panelId);
 
@@ -805,7 +922,7 @@
         panels: {
           ...(savedState.panels || {}),
           [panelId]: {
-            team: panel.querySelector(".team-input").value,
+            team: panel.closest(".team-column").querySelector(".team-input").value,
             chicken: Number(panel.querySelector(".panel-chicken-input").value),
             rows: [...panel.querySelectorAll(".counter-row")].map((row) => ({
               name: row.querySelector(".name-input").value,
@@ -818,6 +935,164 @@
 
       savedState.panels = nextState.panels;
       persistState();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function clampNumber(value, min, max) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.trunc(parsed))) : min;
+    }
+
+    function normalizeTimer(raw = {}) {
+      const timer = raw && typeof raw === "object" ? raw : {};
+      return {
+        remaining: Math.max(0, Number(timer.remaining) || 0),
+        running: Boolean(timer.running),
+        visible: Boolean(timer.visible),
+        mode: timer.mode === "target" ? "target" : timer.mode === "duration" ? "duration" : null,
+        endAt: Number(timer.endAt) > 0 ? Number(timer.endAt) : null,
+        durationHours: clampNumber(timer.durationHours, 0, 23),
+        durationMinutes: clampNumber(timer.durationMinutes, 0, 59),
+        durationSeconds: clampNumber(timer.durationSeconds, 0, 59),
+        targetHour: clampNumber(timer.targetHour, 0, 23),
+        targetMinute: clampNumber(timer.targetMinute, 0, 59),
+      };
+    }
+
+    function applyTimerInputs() {
+      const timer = savedState.timer;
+      timerHours.value = timer.durationHours;
+      timerMinutes.value = timer.durationMinutes;
+      timerSeconds.value = timer.durationSeconds;
+      targetHour.value = timer.targetHour;
+      targetMinute.value = timer.targetMinute;
+    }
+
+    function formatTimer(totalSeconds) {
+      const seconds = Math.max(0, Math.ceil(Number(totalSeconds) || 0));
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const rest = seconds % 60;
+      return [hours, minutes, rest].map((value) => String(value).padStart(2, "0")).join(":");
+    }
+
+    function currentRemaining() {
+      const timer = savedState.timer;
+      if (timer.running && timer.endAt) return Math.max(0, (timer.endAt - Date.now()) / 1000);
+      return Math.max(0, Number(timer.remaining) || 0);
+    }
+
+    function renderTimer() {
+      const timer = savedState.timer;
+      const remaining = currentRemaining();
+      const text = formatTimer(remaining);
+      document.querySelectorAll(".team-time").forEach((output) => {
+        output.hidden = !timer.visible;
+        output.textContent = text;
+      });
+      timerStartButton.textContent = timer.running && timer.mode === "duration" ? "일시정지" : "시작";
+    }
+
+    function startTimerLoop() {
+      window.clearInterval(timerInterval);
+      timerInterval = window.setInterval(() => {
+        if (savedState.timer.running && currentRemaining() <= 0) {
+          savedState.timer.remaining = 0;
+          savedState.timer.running = false;
+          savedState.timer.endAt = null;
+          window.clearInterval(timerInterval);
+          timerInterval = null;
+          persistState();
+          realtimeRoom?.sendSet("timer", savedState.timer);
+        }
+        renderTimer();
+      }, 250);
+    }
+
+    function configuredDuration() {
+      const hours = clampNumber(timerHours.value, 0, 23);
+      const minutes = clampNumber(timerMinutes.value, 0, 59);
+      const seconds = clampNumber(timerSeconds.value, 0, 59);
+      timerHours.value = hours;
+      timerMinutes.value = minutes;
+      timerSeconds.value = seconds;
+      return { hours, minutes, seconds, total: hours * 3600 + minutes * 60 + seconds };
+    }
+
+    function toggleDurationTimer() {
+      const timer = savedState.timer;
+      if (timer.running && timer.mode === "duration") {
+        timer.remaining = currentRemaining();
+        timer.running = false;
+        timer.endAt = null;
+        window.clearInterval(timerInterval);
+        timerInterval = null;
+      } else {
+        const duration = configuredDuration();
+        const remaining = timer.mode === "duration" && timer.visible && timer.remaining > 0
+          ? timer.remaining : duration.total;
+        if (remaining <= 0) return;
+        timer.durationHours = duration.hours;
+        timer.durationMinutes = duration.minutes;
+        timer.durationSeconds = duration.seconds;
+        timer.mode = "duration";
+        timer.visible = true;
+        timer.running = true;
+        timer.remaining = remaining;
+        timer.endAt = Date.now() + remaining * 1000;
+        startTimerLoop();
+      }
+      renderTimer();
+      persistState();
+      realtimeRoom?.sendSet("timer", timer);
+    }
+
+    function resetTimer() {
+      window.clearInterval(timerInterval);
+      timerInterval = null;
+      savedState.timer = normalizeTimer();
+      applyTimerInputs();
+      renderTimer();
+      persistState();
+      realtimeRoom?.sendSet("timer", savedState.timer);
+    }
+
+    function secondsUntilKoreaTarget(hour, minute) {
+      const korea = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const nowSeconds = korea.getUTCHours() * 3600 + korea.getUTCMinutes() * 60 + korea.getUTCSeconds();
+      const targetSeconds = hour * 3600 + minute * 60;
+      const daySeconds = 24 * 3600;
+      return (targetSeconds - nowSeconds + daySeconds) % daySeconds || daySeconds;
+    }
+
+    function startTargetTimer() {
+      const hour = clampNumber(targetHour.value, 0, 23);
+      const minute = clampNumber(targetMinute.value, 0, 59);
+      const remaining = secondsUntilKoreaTarget(hour, minute);
+      targetHour.value = hour;
+      targetMinute.value = minute;
+      savedState.timer = {
+        ...savedState.timer,
+        remaining,
+        running: true,
+        visible: true,
+        mode: "target",
+        endAt: Date.now() + remaining * 1000,
+        targetHour: hour,
+        targetMinute: minute,
+      };
+      startTimerLoop();
+      renderTimer();
+      persistState();
+      realtimeRoom?.sendSet("timer", savedState.timer);
     }
 
     function persistState() {
@@ -836,15 +1111,27 @@
       }
     }
 
+    timerStartButton.addEventListener("click", toggleDurationTimer);
+    timerResetButton.addEventListener("click", resetTimer);
+    targetStartButton.addEventListener("click", startTargetTimer);
     renderKillBoard();
+    if (savedState.timer.running && savedState.timer.endAt && currentRemaining() > 0) startTimerLoop();
     realtimeRoom = new RealtimeRoom({
       feature: "kill-bet",
       getState: () => savedState,
       applyState: nextState => {
         savedState.chickenKillValue = nextState.chickenKillValue;
         savedState.panels = nextState.panels || {};
+        savedState.timer = normalizeTimer(nextState.timer);
         chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
+        applyTimerInputs();
         RealtimeRoom.preserveFocus(renderKillBoard);
+        if (savedState.timer.running && currentRemaining() > 0) startTimerLoop();
+        else {
+          window.clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        renderTimer();
         persistState();
       }
     });
