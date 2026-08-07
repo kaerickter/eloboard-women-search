@@ -1285,6 +1285,8 @@
     let timerSyncing = false;
     let timerVisible = false;
     let timerMode = null;
+    let timerBroadcastOwner = false;
+    let timerLastSharedSecond = -1;
 
     const saved = localStorage.getItem("broadcast-bingo-state");
     if (saved) {
@@ -1677,18 +1679,27 @@
       timerStartButton.textContent = "시작";
     }
 
-    function broadcastTimer() {
-      if (timerSyncing) return;
-      state.timer = {
+    function timerSnapshot() {
+      return {
         remaining: timerRemaining,
         running: Boolean(timerInterval),
         visible: timerVisible,
         mode: timerMode,
         endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
       };
+    }
+
+    function shareLiveTimer(timer = timerSnapshot()) {
+      realtimeRoom?.socket?.emit("bingo:timer", { timer });
+    }
+
+    function broadcastTimer() {
+      if (timerSyncing) return;
+      state.timer = timerSnapshot();
       save();
       channel?.postMessage({ type: "timer", timer: state.timer });
       realtimeRoom?.sendSet("timer", state.timer, 0);
+      shareLiveTimer(state.timer);
     }
 
     function showTimeUpEffect() {
@@ -1710,6 +1721,11 @@
       timerRemaining = Math.max(0, timerRemaining - (now - timerLastTick) / 1000);
       timerLastTick = now;
       timerValue.textContent = formatTime(timerRemaining);
+      const sharedSecond = Math.ceil(timerRemaining);
+      if (timerBroadcastOwner && sharedSecond !== timerLastSharedSecond) {
+        timerLastSharedSecond = sharedSecond;
+        shareLiveTimer();
+      }
       if (timerRemaining <= 0) finishTimer();
     }
 
@@ -1736,6 +1752,8 @@
       }
       timerMode = "duration";
       timerVisible = true;
+      timerBroadcastOwner = true;
+      timerLastSharedSecond = -1;
       startTimerInterval();
       timerStatus.textContent = "스톱워치가 진행 중입니다.";
       broadcastTimer();
@@ -1747,6 +1765,7 @@
       timerRemaining = 0;
       timerVisible = false;
       timerMode = null;
+      timerBroadcastOwner = true;
       if (modeToReset === "target") {
         setDefaultTargetTime();
       } else {
@@ -1794,6 +1813,8 @@
       timerRemaining = secondsUntilKstTarget(hour, minute);
       timerVisible = true;
       timerMode = "target";
+      timerBroadcastOwner = true;
+      timerLastSharedSecond = -1;
       startTimerInterval();
       timerStatus.textContent = `한국 시간 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}에 종료됩니다.`;
       broadcastTimer();
@@ -1802,6 +1823,7 @@
     function applyRemoteTimer(timer) {
       if (!timer) return;
       timerSyncing = true;
+      timerBroadcastOwner = false;
       stopTimer();
       timerRemaining = timer.running && timer.endAt
         ? Math.max(0, (Number(timer.endAt) - Date.now()) / 1000)
@@ -1890,6 +1912,7 @@
         syncing = false;
       }
     });
+    realtimeRoom.socket?.on("bingo:timer", payload => applyRemoteTimer(payload?.timer));
 
     applyRemoteTimer(state.timer);
     render();
