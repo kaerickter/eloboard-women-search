@@ -20,7 +20,11 @@ function defaultState(feature) {
       targetHour: 0, targetMinute: 0, revision: "", finishedAt: null, serverNow: null
     }
   };
-  if (feature === "kill-bet") return { chickenKillValue: 1, panels: {} };
+  if (feature === "kill-bet") return {
+    chickenKillValue: 1,
+    panels: {},
+    timer: normalizeBingoTimer()
+  };
   return {
     title: "매치 카멜레온", players: 7, games: 9, names: Array(7).fill(""),
     scores: Array.from({ length: 7 }, () => Array(9).fill("")),
@@ -124,7 +128,11 @@ function normalizeState(feature, raw = {}) {
         }))
       };
     }
-    return { chickenKillValue: number(raw.chickenKillValue, 0, 999, 1), panels };
+    return {
+      chickenKillValue: number(raw.chickenKillValue, 0, 999, 1),
+      panels,
+      timer: normalizeBingoTimer(raw.timer)
+    };
   }
   const players = number(raw.players, 1, 30, 7);
   const games = number(raw.games, 1, 20, 9);
@@ -269,7 +277,7 @@ function setupCollaboration(io) {
         let code;
         do { code = generateCode(); } while (await getRoom(feature, code));
         const room = { state: normalizeState(feature, payload.state || defaultState(feature)), version: 1, updatedAt: new Date().toISOString() };
-        if (feature === "bingo") room.state.timer = startBingoTimerFromServer(room.state.timer);
+        if (feature === "bingo" || feature === "kill-bet") room.state.timer = startBingoTimerFromServer(room.state.timer);
         rooms.set(roomKey(feature, code), room);
         await store.save(feature, code, room);
         await socket.join(roomKey(feature, code));
@@ -286,7 +294,7 @@ function setupCollaboration(io) {
         if (!validFeature(feature) || !validCode(code)) throw new Error("방 코드를 확인해 주세요.");
         const room = await getRoom(feature, code);
         if (!room) throw new Error("존재하지 않는 방입니다.");
-        if (feature === "bingo") room.state.timer = syncBingoTimerToServer(room.state.timer);
+        if (feature === "bingo" || feature === "kill-bet") room.state.timer = syncBingoTimerToServer(room.state.timer);
         if (socket.data.room) await socket.leave(roomKey(socket.data.room.feature, socket.data.room.code));
         await socket.join(roomKey(feature, code));
         socket.data.room = { feature, code };
@@ -304,7 +312,7 @@ function setupCollaboration(io) {
         const draft = structuredClone(room.state);
         setAtPath(draft, payload.path, payload.kind === "increment" ? payload.delta : payload.value, payload.kind);
         room.state = normalizeState(feature, draft);
-        if (feature === "bingo" && payload.path === "timer") {
+        if ((feature === "bingo" || feature === "kill-bet") && payload.path === "timer") {
           room.state.timer = startBingoTimerFromServer(room.state.timer);
         }
         room.version += 1;
