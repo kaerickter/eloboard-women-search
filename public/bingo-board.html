@@ -1995,7 +1995,9 @@
         syncing = false;
       }
     });
-    realtimeRoom.socket?.on("bingo:timer", payload => applyRemoteTimer(payload?.timer));
+    realtimeRoom.socket?.on("bingo:timer", payload => {
+      applyRemoteTimer(payload?.timer, { keepBroadcastOwner: true });
+    });
 
     applyRemoteTimer(state.timer);
     render();
