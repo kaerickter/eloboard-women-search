@@ -9,7 +9,13 @@ const ROOM_FILE = process.env.ROOM_DATA_FILE || path.join(__dirname, "data", "co
 const DATABASE_RETRY_MS = 15000;
 
 function defaultState(feature) {
-  if (feature === "bingo") return { size: 4, title: "빙고", cells: Array(25).fill(""), checked: Array(25).fill(false) };
+  if (feature === "bingo") return {
+    size: 4, title: "빙고", chickenCount: 0,
+    cells: Array(25).fill(""), checked: Array(25).fill(false),
+    mode: "classic", owners: Array(25).fill(0),
+    teamColors: ["#ef5b78", "#3b82f6"], teamNames: ["1팀", "2팀"],
+    timer: { remaining: 0, running: false, visible: false, mode: null, endAt: null }
+  };
   if (feature === "kill-bet") return { chickenKillValue: 1, panels: {} };
   return {
     title: "매치 카멜레온", players: 7, games: 9, names: Array(7).fill(""),
@@ -27,10 +33,26 @@ function number(value, min, max, fallback = min) {
 function normalizeState(feature, raw = {}) {
   if (feature === "bingo") {
     const size = Number(raw.size) === 5 ? 5 : 4;
+    const rawTimer = raw.timer && typeof raw.timer === "object" ? raw.timer : {};
+    const timerMode = rawTimer.mode === "target" ? "target" : rawTimer.mode === "duration" ? "duration" : null;
+    const endAtValue = Number(rawTimer.endAt);
     return {
       size, title: text(raw.title || "빙고", 28),
+      chickenCount: number(raw.chickenCount, 0, 999, 0),
       cells: Array.from({ length: 25 }, (_, index) => text(raw.cells?.[index], 34)),
-      checked: Array.from({ length: 25 }, (_, index) => Boolean(raw.checked?.[index]))
+      checked: Array.from({ length: 25 }, (_, index) => Boolean(raw.checked?.[index])),
+      mode: raw.mode === "territory" ? "territory" : "classic",
+      owners: Array.from({ length: 25 }, (_, index) => [1, 2].includes(Number(raw.owners?.[index])) ? Number(raw.owners[index]) : 0),
+      teamColors: Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(raw.teamColors?.[index] || "")
+        ? raw.teamColors[index] : ["#ef5b78", "#3b82f6"][index]),
+      teamNames: Array.from({ length: 2 }, (_, index) => text(raw.teamNames?.[index] || `${index + 1}팀`, 16)),
+      timer: {
+        remaining: number(rawTimer.remaining, 0, 86400, 0),
+        running: Boolean(rawTimer.running),
+        visible: Boolean(rawTimer.visible),
+        mode: timerMode,
+        endAt: Number.isFinite(endAtValue) && endAtValue > 0 ? endAtValue : null
+      }
     };
   }
   if (feature === "kill-bet") {
