@@ -967,6 +967,26 @@
       };
     }
 
+    function normalizeSharedTimer(raw = {}) {
+      const timer = normalizeTimer(raw);
+      if (!timer.running) {
+        timer.endAt = null;
+        return timer;
+      }
+
+      const serverNow = Number(raw?.serverNow);
+      const serverEndAt = Number(raw?.endAt);
+      const serverRemaining = Number.isFinite(serverNow) && serverNow > 0
+        && Number.isFinite(serverEndAt) && serverEndAt > 0
+        ? Math.max(0, (serverEndAt - serverNow) / 1000)
+        : Math.max(0, Number(raw?.remaining) || 0);
+
+      timer.remaining = serverRemaining;
+      timer.endAt = Date.now() + serverRemaining * 1000;
+      if (serverRemaining <= 0) timer.running = false;
+      return timer;
+    }
+
     function applyTimerInputs() {
       const timer = savedState.timer;
       timerHours.value = timer.durationHours;
@@ -1122,7 +1142,7 @@
       applyState: nextState => {
         savedState.chickenKillValue = nextState.chickenKillValue;
         savedState.panels = nextState.panels || {};
-        savedState.timer = normalizeTimer(nextState.timer);
+        savedState.timer = normalizeSharedTimer(nextState.timer);
         chickenKillInput.value = String(savedState.chickenKillValue ?? 1);
         applyTimerInputs();
         RealtimeRoom.preserveFocus(renderKillBoard);
