@@ -1235,7 +1235,7 @@
       timer: {
         remaining: 0, running: false, visible: false, mode: null, endAt: null,
         durationHours: 0, durationMinutes: 0, durationSeconds: 0,
-        targetHour: 0, targetMinute: 0, revision: "", finishedAt: null
+        targetHour: 0, targetMinute: 0, revision: "", finishedAt: null, serverNow: null
       }
     };
 
@@ -1862,19 +1862,25 @@
       broadcastTimer();
     }
 
-    function applyRemoteTimer(timer) {
+    function applyRemoteTimer(timer, options = {}) {
       if (!timer) return;
       timerSyncing = true;
-      const incomingEndAt = Number(timer.endAt) > 0 ? Number(timer.endAt) : null;
-      timerRemaining = timer.running && incomingEndAt
-        ? Math.max(0, (incomingEndAt - Date.now()) / 1000)
+      const keepBroadcastOwner = Boolean(options.keepBroadcastOwner && timerBroadcastOwner);
+      const serverNow = Number(timer.serverNow) > 0 ? Number(timer.serverNow) : null;
+      const serverEndAt = Number(timer.endAt) > 0 ? Number(timer.endAt) : null;
+      const serverRemaining = timer.running && serverNow && serverEndAt
+        ? Math.max(0, (serverEndAt - serverNow) / 1000)
+        : Math.max(0, Number(timer.remaining) || 0);
+      const incomingEndAt = timer.running ? Date.now() + serverRemaining * 1000 : null;
+      timerRemaining = timer.running
+        ? serverRemaining
         : Math.max(0, Number(timer.remaining) || 0);
       timerVisible = typeof timer.visible === "boolean" ? timer.visible : timerRemaining > 0;
       timerMode = timer.mode === "target" ? "target" : timer.mode === "duration" ? "duration" : null;
       timerEndAt = incomingEndAt;
       timerRevision = String(timer.revision || "");
       timerFinishedAt = Number(timer.finishedAt) > 0 ? Number(timer.finishedAt) : null;
-      timerBroadcastOwner = false;
+      timerBroadcastOwner = keepBroadcastOwner;
       timerHours.value = clampNumber(timer.durationHours, 0, 23);
       timerMinutes.value = clampNumber(timer.durationMinutes, 0, 59);
       timerSeconds.value = clampNumber(timer.durationSeconds, 0, 59);
@@ -1983,7 +1989,9 @@
         syncing = true;
         Object.assign(state, nextState);
         RealtimeRoom.preserveFocus(render);
-        if (meta.joined || meta.reset || meta.path === "timer") applyRemoteTimer(nextState.timer);
+        if (meta.joined || meta.reset || meta.path === "timer") {
+          applyRemoteTimer(nextState.timer, { keepBroadcastOwner: Boolean(meta.acknowledged) });
+        }
         syncing = false;
       }
     });

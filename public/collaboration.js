@@ -142,7 +142,9 @@
         const incomingVersion = Number(result.version || this.version);
         if (incomingVersion >= this.version) {
           this.version = incomingVersion;
-          if (change.kind === "increment" && result.state) this.applyState(result.state, { remote: false, acknowledged: true, path: change.path });
+          if ((change.kind === "increment" || change.path === "timer") && result.state) {
+            this.applyState(result.state, { remote: false, acknowledged: true, path: change.path });
+          }
         }
         this.setStatus("모두에게 저장됨", true);
       });
