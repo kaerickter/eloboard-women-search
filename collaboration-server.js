@@ -14,7 +14,11 @@ function defaultState(feature) {
     cells: Array(25).fill(""), checked: Array(25).fill(false),
     mode: "classic", owners: Array(25).fill(0),
     teamColors: ["#ef5b78", "#3b82f6"], teamNames: ["1팀", "2팀"],
-    timer: { remaining: 0, running: false, visible: false, mode: null, endAt: null }
+    timer: {
+      remaining: 0, running: false, visible: false, mode: null, endAt: null,
+      durationHours: 0, durationMinutes: 0, durationSeconds: 0,
+      targetHour: 0, targetMinute: 0, revision: "", finishedAt: null
+    }
   };
   if (feature === "kill-bet") return { chickenKillValue: 1, panels: {} };
   return {
@@ -39,7 +43,15 @@ function normalizeBingoTimer(rawTimer = {}) {
     running: Boolean(timer.running),
     visible: Boolean(timer.visible),
     mode: timerMode,
-    endAt: Number.isFinite(endAtValue) && endAtValue > 0 ? endAtValue : null
+    endAt: Number.isFinite(endAtValue) && endAtValue > 0 ? endAtValue : null,
+    durationHours: number(timer.durationHours, 0, 23, 0),
+    durationMinutes: number(timer.durationMinutes, 0, 59, 0),
+    durationSeconds: number(timer.durationSeconds, 0, 59, 0),
+    targetHour: number(timer.targetHour, 0, 23, 0),
+    targetMinute: number(timer.targetMinute, 0, 59, 0),
+    revision: text(timer.revision, 80),
+    finishedAt: Number.isFinite(Number(timer.finishedAt)) && Number(timer.finishedAt) > 0
+      ? Number(timer.finishedAt) : null
   };
 }
 
@@ -266,6 +278,7 @@ function setupCollaboration(io) {
       const room = await getRoom("bingo", roomInfo.code);
       if (!room) return;
       const timer = normalizeBingoTimer(payload.timer);
+      if (room.state.timer?.revision && timer.revision !== room.state.timer.revision) return;
       room.state.timer = timer;
       socket.to(roomKey("bingo", roomInfo.code)).emit("bingo:timer", { timer });
     });
