@@ -17,7 +17,7 @@ function defaultState(feature) {
     timer: {
       remaining: 0, running: false, visible: false, mode: null, endAt: null,
       durationHours: 0, durationMinutes: 0, durationSeconds: 0,
-      targetHour: 0, targetMinute: 0, revision: "", finishedAt: null
+      targetHour: 0, targetMinute: 0, revision: "", finishedAt: null, serverNow: null
     }
   };
   if (feature === "kill-bet") return { chickenKillValue: 1, panels: {} };
@@ -51,7 +51,46 @@ function normalizeBingoTimer(rawTimer = {}) {
     targetMinute: number(timer.targetMinute, 0, 59, 0),
     revision: text(timer.revision, 80),
     finishedAt: Number.isFinite(Number(timer.finishedAt)) && Number(timer.finishedAt) > 0
-      ? Number(timer.finishedAt) : null
+      ? Number(timer.finishedAt) : null,
+    serverNow: Number.isFinite(Number(timer.serverNow)) && Number(timer.serverNow) > 0
+      ? Number(timer.serverNow) : null
+  };
+}
+
+function secondsUntilKoreaTarget(hour, minute, now = Date.now()) {
+  const korea = new Date(now + 9 * 60 * 60 * 1000);
+  const nowSeconds = korea.getUTCHours() * 3600 + korea.getUTCMinutes() * 60 + korea.getUTCSeconds();
+  const targetSeconds = number(hour, 0, 23, 0) * 3600 + number(minute, 0, 59, 0) * 60;
+  const daySeconds = 24 * 3600;
+  return (targetSeconds - nowSeconds + daySeconds) % daySeconds || daySeconds;
+}
+
+function startBingoTimerFromServer(rawTimer, now = Date.now()) {
+  const timer = normalizeBingoTimer(rawTimer);
+  if (!timer.running) return { ...timer, serverNow: now };
+  const remaining = timer.mode === "target"
+    ? secondsUntilKoreaTarget(timer.targetHour, timer.targetMinute, now)
+    : timer.remaining;
+  return {
+    ...timer,
+    remaining,
+    endAt: now + remaining * 1000,
+    finishedAt: null,
+    serverNow: now
+  };
+}
+
+function syncBingoTimerToServer(rawTimer, now = Date.now()) {
+  const timer = normalizeBingoTimer(rawTimer);
+  if (!timer.running || !timer.endAt) return { ...timer, serverNow: now };
+  const remaining = Math.max(0, (timer.endAt - now) / 1000);
+  if (remaining > 0) return { ...timer, remaining, serverNow: now };
+  return {
+    ...timer,
+    remaining: 0,
+    running: false,
+    finishedAt: timer.finishedAt || timer.endAt,
+    serverNow: now
   };
 }
 
@@ -230,6 +269,7 @@ function setupCollaboration(io) {
         let code;
         do { code = generateCode(); } while (await getRoom(feature, code));
         const room = { state: normalizeState(feature, payload.state || defaultState(feature)), version: 1, updatedAt: new Date().toISOString() };
+        if (feature === "bingo") room.state.timer = startBingoTimerFromServer(room.state.timer);
         rooms.set(roomKey(feature, code), room);
         await store.save(feature, code, room);
         await socket.join(roomKey(feature, code));
@@ -246,6 +286,7 @@ function setupCollaboration(io) {
         if (!validFeature(feature) || !validCode(code)) throw new Error("방 코드를 확인해 주세요.");
         const room = await getRoom(feature, code);
         if (!room) throw new Error("존재하지 않는 방입니다.");
+        if (feature === "bingo") room.state.timer = syncBingoTimerToServer(room.state.timer);
         if (socket.data.room) await socket.leave(roomKey(socket.data.room.feature, socket.data.room.code));
         await socket.join(roomKey(feature, code));
         socket.data.room = { feature, code };
@@ -263,6 +304,9 @@ function setupCollaboration(io) {
         const draft = structuredClone(room.state);
         setAtPath(draft, payload.path, payload.kind === "increment" ? payload.delta : payload.value, payload.kind);
         room.state = normalizeState(feature, draft);
+        if (feature === "bingo" && payload.path === "timer") {
+          room.state.timer = startBingoTimerFromServer(room.state.timer);
+        }
         room.version += 1;
         room.updatedAt = new Date().toISOString();
         const event = { opId: text(payload.opId, 80), path: text(payload.path, 120), kind: payload.kind === "increment" ? "increment" : "set", value: payload.value, delta: payload.delta, state: room.state, version: room.version, clientId: text(payload.clientId, 80) };
@@ -279,8 +323,8 @@ function setupCollaboration(io) {
       if (!room) return;
       const timer = normalizeBingoTimer(payload.timer);
       if (room.state.timer?.revision && timer.revision !== room.state.timer.revision) return;
-      room.state.timer = timer;
-      socket.to(roomKey("bingo", roomInfo.code)).emit("bingo:timer", { timer });
+      room.state.timer = syncBingoTimerToServer(room.state.timer);
+      socket.to(roomKey("bingo", roomInfo.code)).emit("bingo:timer", { timer: room.state.timer });
     });
 
     socket.on("room:reset", async (payload = {}, reply = () => {}) => {
