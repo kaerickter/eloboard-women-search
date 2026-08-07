@@ -30,12 +30,22 @@ function number(value, min, max, fallback = min) {
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 }
 
+function normalizeBingoTimer(rawTimer = {}) {
+  const timer = rawTimer && typeof rawTimer === "object" ? rawTimer : {};
+  const timerMode = timer.mode === "target" ? "target" : timer.mode === "duration" ? "duration" : null;
+  const endAtValue = Number(timer.endAt);
+  return {
+    remaining: number(timer.remaining, 0, 86400, 0),
+    running: Boolean(timer.running),
+    visible: Boolean(timer.visible),
+    mode: timerMode,
+    endAt: Number.isFinite(endAtValue) && endAtValue > 0 ? endAtValue : null
+  };
+}
+
 function normalizeState(feature, raw = {}) {
   if (feature === "bingo") {
     const size = Number(raw.size) === 5 ? 5 : 4;
-    const rawTimer = raw.timer && typeof raw.timer === "object" ? raw.timer : {};
-    const timerMode = rawTimer.mode === "target" ? "target" : rawTimer.mode === "duration" ? "duration" : null;
-    const endAtValue = Number(rawTimer.endAt);
     return {
       size, title: text(raw.title || "빙고", 28),
       chickenCount: number(raw.chickenCount, 0, 999, 0),
@@ -46,13 +56,7 @@ function normalizeState(feature, raw = {}) {
       teamColors: Array.from({ length: 2 }, (_, index) => /^#[0-9a-f]{6}$/i.test(raw.teamColors?.[index] || "")
         ? raw.teamColors[index] : ["#ef5b78", "#3b82f6"][index]),
       teamNames: Array.from({ length: 2 }, (_, index) => text(raw.teamNames?.[index] || `${index + 1}팀`, 16)),
-      timer: {
-        remaining: number(rawTimer.remaining, 0, 86400, 0),
-        running: Boolean(rawTimer.running),
-        visible: Boolean(rawTimer.visible),
-        mode: timerMode,
-        endAt: Number.isFinite(endAtValue) && endAtValue > 0 ? endAtValue : null
-      }
+      timer: normalizeBingoTimer(raw.timer)
     };
   }
   if (feature === "kill-bet") {
@@ -254,6 +258,16 @@ function setupCollaboration(io) {
         reply({ ok: true, version: room.version, state: room.state });
         scheduleSave(feature, code, room);
       } catch (error) { reply({ ok: false, error: error.message || "변경 사항을 저장하지 못했습니다." }); }
+    });
+
+    socket.on("bingo:timer", async (payload = {}) => {
+      const roomInfo = socket.data.room;
+      if (roomInfo?.feature !== "bingo") return;
+      const room = await getRoom("bingo", roomInfo.code);
+      if (!room) return;
+      const timer = normalizeBingoTimer(payload.timer);
+      room.state.timer = timer;
+      socket.to(roomKey("bingo", roomInfo.code)).emit("bingo:timer", { timer });
     });
 
     socket.on("room:reset", async (payload = {}, reply = () => {}) => {
