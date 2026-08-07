@@ -1231,7 +1231,8 @@
       mode: "classic",
       owners: Array.from({ length: 25 }, () => 0),
       teamColors: ["#ef5b78", "#3b82f6"],
-      teamNames: ["1팀", "2팀"]
+      teamNames: ["1팀", "2팀"],
+      timer: { remaining: 0, running: false, visible: false, mode: null, endAt: null }
     };
 
     const previewBoard = document.getElementById("previewBoard");
@@ -1530,7 +1531,7 @@
       bingoChickenCount.textContent = state.chickenCount;
       timerChickenCount.textContent = state.chickenCount;
       chickenEditorCount.textContent = `🍗 ${state.chickenCount}`;
-      realtimeRoom?.sendSet("chickenCount", state.chickenCount);
+      realtimeRoom?.increment("chickenCount", change);
       save();
     }
 
@@ -1677,17 +1678,17 @@
     }
 
     function broadcastTimer() {
-      if (timerSyncing || !channel) return;
-      channel.postMessage({
-        type: "timer",
-        timer: {
-          remaining: timerRemaining,
-          running: Boolean(timerInterval),
-          visible: timerVisible,
-          mode: timerMode,
-          endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
-        }
-      });
+      if (timerSyncing) return;
+      state.timer = {
+        remaining: timerRemaining,
+        running: Boolean(timerInterval),
+        visible: timerVisible,
+        mode: timerMode,
+        endAt: timerInterval ? Date.now() + timerRemaining * 1000 : null
+      };
+      save();
+      channel?.postMessage({ type: "timer", timer: state.timer });
+      realtimeRoom?.sendSet("timer", state.timer, 0);
     }
 
     function showTimeUpEffect() {
@@ -1885,11 +1886,12 @@
         syncing = true;
         Object.assign(state, nextState);
         RealtimeRoom.preserveFocus(render);
+        applyRemoteTimer(nextState.timer);
         syncing = false;
       }
     });
 
-    renderTimer();
+    applyRemoteTimer(state.timer);
     render();
   </script>
 </body>
