@@ -6,7 +6,7 @@
     <title>cctv · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260808-cctv">
-    <link rel="stylesheet" href="./cctv.css?v=20260809-cctv10">
+    <link rel="stylesheet" href="./cctv.css?v=20260809-cctv13">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
   </head>
   <body class="cctv-page">
@@ -68,7 +68,13 @@
           <p id="universityRule" class="cctv-group-summary">뉴캐슬대학은 남자/여자 전체, 다른 대학은 여자만 표시됩니다.</p>
         </div>
 
-        <div id="groupSummary" class="cctv-group-summary">현재 기준: 6티어</div>
+        <div class="cctv-summary-row">
+          <div id="groupSummary" class="cctv-group-summary">현재 기준: 6티어</div>
+          <label class="cctv-offline-toggle">
+            <input id="showOfflineToggle" type="checkbox">
+            <span>오프라인도 표시</span>
+          </label>
+        </div>
         <div id="filterbar" class="cctv-filters hidden" aria-hidden="true"></div>
       </section>
 
@@ -106,6 +112,6 @@
       </div>
     </main>
 
-    <script src="./cctv.js?v=20260809-cctv10"></script>
+    <script src="./cctv.js?v=20260809-cctv13"></script>
   </body>
 </html>

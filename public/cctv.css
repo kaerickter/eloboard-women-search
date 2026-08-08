@@ -188,6 +188,27 @@ body.cctv-page {
   font-size: 12px;
   font-weight: 800;
 }
+.cctv-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cctv-offline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: #dbe3f2;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+}
+.cctv-offline-toggle input {
+  accent-color: #ffd400;
+}
 .cctv-participants {
   display: flex;
   flex-wrap: wrap;
@@ -258,6 +279,12 @@ body.cctv-page {
 }
 .cctv-card.active {
   outline: 2px solid #ffd400;
+}
+.cctv-card.live .cctv-status {
+  color: #51f3a1;
+}
+.cctv-card.offline {
+  opacity: 0.48;
 }
 .cctv-log {
   height: 170px;

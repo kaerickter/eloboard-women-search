@@ -12,6 +12,7 @@ const groupSummary = document.getElementById("groupSummary");
 const tierSelect = document.getElementById("tierSelect");
 const universitySelect = document.getElementById("universitySelect");
 const universityDivisionSelect = document.getElementById("universityDivisionSelect");
+const showOfflineToggle = document.getElementById("showOfflineToggle");
 
 const slots = [];
 let players = [];
@@ -20,6 +21,7 @@ let mainHls = null;
 let activeIndex = -1;
 let loadingVisible = false;
 let refreshingLive = false;
+let isShuttingDown = false;
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -139,9 +141,11 @@ function attach(video, url, label, slot = null) {
   });
   hls.on(Hls.Events.ERROR, (_, data) => {
     log(`${label} 오류: ${data.type} / ${data.details}${data.fatal ? " [FATAL]" : ""}`);
+    if (isShuttingDown) return;
     if (!data.fatal) return;
     try {
-      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+      if (data.details === "levelParsingError" && slot) setTimeout(() => reloadSlot(slot.index), 800);
+      else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
       else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
       else if (slot) setTimeout(() => reloadSlot(slot.index), 1200);
     } catch {
@@ -234,10 +238,46 @@ function matchesFilter(slot) {
   return true;
 }
 
+function isSlotLive(slot) {
+  return Boolean(slot?.data || slot?.player?.live?.isLive);
+}
+
+function isSlotKnownOffline(slot) {
+  return Boolean(slot?.player?.live && !slot.player.live.isLive && !slot.data);
+}
+
+function shouldShowSlot(slot) {
+  if (!matchesFilter(slot)) return false;
+  if (showOfflineToggle?.checked) return true;
+  return !isSlotKnownOffline(slot);
+}
+
+function slotSortRank(slot) {
+  if (isSlotLive(slot)) return 0;
+  if (!slot.player.live) return 1;
+  return 2;
+}
+
+function refreshSlotVisibilityAndOrder() {
+  slots.forEach((slot) => {
+    slot.card.classList.toggle("hidden", !shouldShowSlot(slot));
+    slot.card.classList.toggle("live", isSlotLive(slot));
+    slot.card.classList.toggle("offline", isSlotKnownOffline(slot));
+    slot.card.style.order = String(slotSortRank(slot) * 10000 + slot.index);
+  });
+  updateGroupSummary();
+}
+
 function updateGroupSummary() {
   const count = slots.filter(matchesFilter).length;
   const liveReady = slots.filter((slot) => matchesFilter(slot) && slot.data).length;
-  if (groupSummary) groupSummary.textContent = `현재 기준: ${filterLabel(currentFilter)} · 표시 인원 ${count}명 · 재생 준비 ${liveReady}명`;
+  const liveCount = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot)).length;
+  const offlineCount = slots.filter((slot) => matchesFilter(slot) && isSlotKnownOffline(slot)).length;
+  const visibleCount = slots.filter(shouldShowSlot).length;
+  if (groupSummary) {
+    const visibleText = showOfflineToggle?.checked ? ` · 표시 ${visibleCount}/${count}명` : "";
+    groupSummary.textContent = `현재 기준: ${filterLabel(currentFilter)} · LIVE ${liveCount}명 · 오프라인 ${offlineCount}명${visibleText} · 재생 준비 ${liveReady}명`;
+  }
 }
 
 async function refreshCurrentFilterLive(force = false) {
@@ -266,14 +306,13 @@ async function refreshCurrentFilterLive(force = false) {
     log(`${filterLabel(currentFilter)} LIVE 상태 조회 실패 - 현재 목록은 그대로 표시합니다: ${error.message}`);
   } finally {
     refreshingLive = false;
-    updateGroupSummary();
+    refreshSlotVisibilityAndOrder();
   }
 }
 
 function applyFilter(filter, shouldLoad = false) {
   currentFilter = filter;
-  slots.forEach((slot) => slot.card.classList.toggle("hidden", !matchesFilter(slot)));
-  updateGroupSummary();
+  refreshSlotVisibilityAndOrder();
   if (shouldLoad) refreshCurrentFilterLive(false).then(() => loadVisibleUnloaded());
 }
 
@@ -347,10 +386,12 @@ async function loadSlot(index) {
   const broadcastId = await resolveBroadcastId(slot);
   if (!broadcastId) {
     slot.status.textContent = "SOOP ID 없음";
+    refreshSlotVisibilityAndOrder();
     return false;
   }
   if (!slot.player.customCctv && slot.player.live && !slot.player.live.isLive) {
     slot.status.textContent = "오프라인";
+    refreshSlotVisibilityAndOrder();
     return false;
   }
 
@@ -358,6 +399,7 @@ async function loadSlot(index) {
   try {
     const data = await fetchJson(`/api/cctv/bootstrap/${encodeURIComponent(broadcastId)}`);
     slot.data = data;
+    slot.player.live = Object.assign({}, slot.player.live || {}, { isLive: true, broadcastId });
     slot.status.textContent = "LIVE";
     slot.meta.textContent = `${playerLabel(slot.player)} | LOW ${(data.lowMeta || {}).height || "?"}p | HIGH ${(data.highMeta || {}).height || "?"}p`;
     destroyHls(slot.hls);
@@ -366,12 +408,13 @@ async function loadSlot(index) {
     slot.video.load();
     slot.video.muted = true;
     slot.hls = attach(slot.video, data.lowUrl, `LOW ${slot.player.name}`, slot);
-    updateGroupSummary();
+    refreshSlotVisibilityAndOrder();
     return true;
   } catch (error) {
     slot.status.textContent = "실패";
     slot.meta.textContent = error.message;
     log(`${slot.player.name}: ${error.message}`);
+    refreshSlotVisibilityAndOrder();
     return false;
   }
 }
@@ -398,6 +441,7 @@ function shareMain(broadcastId) {
 async function setMain(index, options = {}) {
   const slot = slots[index];
   if (!slot?.data) return;
+  const cachedHighUrl = slot.data.highUrl;
   activeIndex = index;
   document.querySelectorAll(".cctv-card").forEach((card, cardIndex) => {
     card.classList.toggle("active", cardIndex === index);
@@ -405,12 +449,25 @@ async function setMain(index, options = {}) {
   if (!options.fromShare) shareMain(slot.data.bj);
 
   document.getElementById("mainTitle").textContent = "MAIN - " + slot.player.name;
-  document.getElementById("mainStatus").textContent = "최고화질 연결 중";
+  document.getElementById("mainStatus").textContent = cachedHighUrl ? "최고화질 연결 중" : "최고화질 조회 중";
+  const video = document.getElementById("mainVideo");
+  if (cachedHighUrl) {
+    destroyHls(mainHls);
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    document.getElementById("mainStatus").textContent = "최고화질";
+    document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | HIGH ${(slot.data.highMeta || {}).height || "?"}p`;
+    mainHls = attach(video, cachedHighUrl + "?r=" + Date.now(), `HIGH ${slot.player.name}`);
+    fetchJson(`/api/cctv/high/${encodeURIComponent(slot.data.bj)}`)
+      .then((data) => { slot.data = Object.assign({}, slot.data, data); })
+      .catch((error) => log(`${slot.player.name} HIGH 갱신 실패: ${error.message}`));
+    return;
+  }
   try {
     const data = await fetchJson(`/api/cctv/high/${encodeURIComponent(slot.data.bj)}`);
     slot.data = Object.assign({}, slot.data, data);
     destroyHls(mainHls);
-    const video = document.getElementById("mainVideo");
     video.pause();
     video.removeAttribute("src");
     video.load();
@@ -428,7 +485,7 @@ async function loadVisibleUnloaded() {
   loadingVisible = true;
   let first = -1;
   let cursor = 0;
-  const targets = slots.filter((slot) => matchesFilter(slot) && !slot.data && !slot.tried);
+  const targets = slots.filter((slot) => matchesFilter(slot) && !isSlotKnownOffline(slot) && !slot.data && !slot.tried);
   async function worker() {
     while (cursor < targets.length) {
       const slot = targets[cursor++];
@@ -439,7 +496,7 @@ async function loadVisibleUnloaded() {
   await Promise.all(Array.from({ length: Math.min(BOOTSTRAP_CONCURRENCY, targets.length) }, worker));
   if (activeIndex < 0 && first >= 0) await setMain(first);
   loadingVisible = false;
-  updateGroupSummary();
+  refreshSlotVisibilityAndOrder();
 }
 
 async function startVisibleLive() {
@@ -460,12 +517,14 @@ async function randomMain() {
   await setMain(slot.index);
 }
 
-function stopAll() {
+function stopAll(finalStop = false) {
+  if (finalStop) isShuttingDown = true;
   slots.forEach((slot) => {
     destroyHls(slot.hls);
     slot.hls = null;
     slot.video.pause();
     slot.video.removeAttribute("src");
+    slot.video.src = "";
     slot.video.load();
     slot.status.textContent = "정지";
   });
@@ -475,7 +534,13 @@ function stopAll() {
   const mainVideo = document.getElementById("mainVideo");
   mainVideo.pause();
   mainVideo.removeAttribute("src");
+  mainVideo.src = "";
   mainVideo.load();
+}
+
+function shutdownPlayers() {
+  try { stopAll(true); } catch {}
+  try { if (channel) channel.close(); } catch {}
 }
 
 async function refreshLive() {
@@ -626,6 +691,7 @@ document.getElementById("applyUniversityBtn").onclick = applyUniversityFromForm;
 document.getElementById("tierModeBtn").onclick = () => showMode("tier");
 document.getElementById("universityModeBtn").onclick = () => showMode("university");
 if (universitySelect) universitySelect.onchange = updateUniversityDivisionOptions;
+if (showOfflineToggle) showOfflineToggle.onchange = refreshSlotVisibilityAndOrder;
 showMode("tier");
 
 window.addEventListener("storage", (event) => {
@@ -633,6 +699,9 @@ window.addEventListener("storage", (event) => {
     try { handleShared(JSON.parse(event.newValue || "null")); } catch {}
   }
 });
+window.addEventListener("pagehide", shutdownPlayers);
+window.addEventListener("beforeunload", shutdownPlayers);
+window.addEventListener("unload", shutdownPlayers);
 if (channel) channel.onmessage = (event) => handleShared(event.data);
 
 renderManualParticipants();
