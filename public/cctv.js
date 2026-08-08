@@ -138,18 +138,23 @@ function attach(video, url, label, slot = null) {
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
     video.play().catch(() => {});
     log(`${label} 연결 완료`);
+    if (slot) {
+      setTimeout(() => {
+        if (!isShuttingDown && slot.hls === hls && slot.data && !slot.video.paused) slot.reloadCount = 0;
+      }, 30000);
+    }
   });
   hls.on(Hls.Events.ERROR, (_, data) => {
     log(`${label} 오류: ${data.type} / ${data.details}${data.fatal ? " [FATAL]" : ""}`);
     if (isShuttingDown) return;
     if (!data.fatal) return;
     try {
-      if (data.details === "levelParsingError" && slot) setTimeout(() => reloadSlot(slot.index), 800);
+      if (data.details === "levelParsingError" && slot) scheduleSlotReload(slot, "playlist");
       else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
       else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-      else if (slot) setTimeout(() => reloadSlot(slot.index), 1200);
+      else if (slot) scheduleSlotReload(slot, "fatal");
     } catch {
-      if (slot) setTimeout(() => reloadSlot(slot.index), 1200);
+      if (slot) scheduleSlotReload(slot, "fatal");
     }
   });
   return hls;
@@ -346,7 +351,21 @@ function createSlot(player) {
   card.onclick = () => setMain(index);
   grid.appendChild(card);
 
-  slots.push({ index, player, card, status, video, meta, hls: null, data: null, lastTime: 0, stuck: 0, tried: false });
+  slots.push({
+    index,
+    player,
+    card,
+    status,
+    video,
+    meta,
+    hls: null,
+    data: null,
+    lastTime: 0,
+    stuck: 0,
+    tried: false,
+    reloadTimer: null,
+    reloadCount: 0
+  });
 }
 
 function broadcastIdOf(player) {
@@ -399,6 +418,7 @@ async function loadSlot(index) {
   try {
     const data = await fetchJson(`/api/cctv/bootstrap/${encodeURIComponent(broadcastId)}`);
     slot.data = data;
+    slot.reloadCount = 0;
     slot.player.live = Object.assign({}, slot.player.live || {}, { isLive: true, broadcastId });
     slot.status.textContent = "LIVE";
     slot.meta.textContent = `${playerLabel(slot.player)} | LOW ${(data.lowMeta || {}).height || "?"}p | HIGH ${(data.highMeta || {}).height || "?"}p`;
@@ -419,9 +439,27 @@ async function loadSlot(index) {
   }
 }
 
+function scheduleSlotReload(slot, reason = "error") {
+  if (!slot || isShuttingDown || slot.reloadTimer) return;
+  const delays = [5000, 15000, 30000, 60000];
+  const delay = delays[Math.min(slot.reloadCount, delays.length - 1)];
+  slot.reloadCount += 1;
+  slot.status.textContent = delay >= 30000 ? "불안정 - 잠시 후 복구" : "복구 대기";
+  log(`${slot.player.name} 작은화면 복구 예약: ${Math.round(delay / 1000)}초 후 (${reason})`);
+  slot.reloadTimer = setTimeout(() => {
+    slot.reloadTimer = null;
+    if (!isShuttingDown) reloadSlot(slot.index);
+  }, delay);
+}
+
 async function reloadSlot(index) {
   const slot = slots[index];
+  if (isShuttingDown) return false;
   if (!slot.data) return loadSlot(index);
+  if (slot.reloadTimer) {
+    clearTimeout(slot.reloadTimer);
+    slot.reloadTimer = null;
+  }
   destroyHls(slot.hls);
   slot.video.pause();
   slot.video.removeAttribute("src");
@@ -434,6 +472,12 @@ async function reloadSlot(index) {
 
 function shareMain(broadcastId) {
   const payload = { broadcastId, at: Date.now() };
+  localStorage.setItem(SHARED_KEY, JSON.stringify(payload));
+  if (channel) channel.postMessage(payload);
+}
+
+function shareMainStop() {
+  const payload = { stopMain: true, at: Date.now() };
   localStorage.setItem(SHARED_KEY, JSON.stringify(payload));
   if (channel) channel.postMessage(payload);
 }
@@ -483,26 +527,21 @@ async function setMain(index, options = {}) {
 async function loadVisibleUnloaded() {
   if (loadingVisible) return;
   loadingVisible = true;
-  let first = -1;
   let cursor = 0;
   const targets = slots.filter((slot) => matchesFilter(slot) && !isSlotKnownOffline(slot) && !slot.data && !slot.tried);
   async function worker() {
     while (cursor < targets.length) {
       const slot = targets[cursor++];
-      const ok = await loadSlot(slot.index);
-      if (ok && first < 0) first = slot.index;
+      await loadSlot(slot.index);
     }
   }
   await Promise.all(Array.from({ length: Math.min(BOOTSTRAP_CONCURRENCY, targets.length) }, worker));
-  if (activeIndex < 0 && first >= 0) await setMain(first);
   loadingVisible = false;
   refreshSlotVisibilityAndOrder();
 }
 
 async function startVisibleLive() {
   await loadVisibleUnloaded();
-  const first = slots.find((slot) => matchesFilter(slot) && slot.data);
-  if (first) await setMain(first.index);
 }
 
 async function randomMain() {
@@ -517,9 +556,29 @@ async function randomMain() {
   await setMain(slot.index);
 }
 
+function stopMainOnly(options = {}) {
+  destroyHls(mainHls);
+  mainHls = null;
+  activeIndex = -1;
+  document.querySelectorAll(".cctv-card").forEach((card) => card.classList.remove("active"));
+  const mainVideo = document.getElementById("mainVideo");
+  mainVideo.pause();
+  mainVideo.removeAttribute("src");
+  mainVideo.src = "";
+  mainVideo.load();
+  document.getElementById("mainTitle").textContent = "MAIN - 선택 없음";
+  document.getElementById("mainStatus").textContent = "정지";
+  document.getElementById("mainMeta").textContent = "작은화면은 계속 유지됩니다. 보고 싶은 작은화면을 클릭하면 MAIN에 표시됩니다.";
+  if (!options.fromShare) shareMainStop();
+}
+
 function stopAll(finalStop = false) {
   if (finalStop) isShuttingDown = true;
   slots.forEach((slot) => {
+    if (slot.reloadTimer) {
+      clearTimeout(slot.reloadTimer);
+      slot.reloadTimer = null;
+    }
     destroyHls(slot.hls);
     slot.hls = null;
     slot.video.pause();
@@ -554,6 +613,10 @@ async function refreshLive() {
 }
 
 function handleShared(payload) {
+  if (payload?.stopMain) {
+    stopMainOnly({ fromShare: true });
+    return;
+  }
   if (!payload?.broadcastId) return;
   const index = slots.findIndex((slot) => slot.data?.bj === payload.broadcastId);
   if (index >= 0 && index !== activeIndex) setMain(index, { fromShare: true });
@@ -672,7 +735,7 @@ setInterval(() => {
       slot.stuck += 1;
       if (slot.stuck >= 5) {
         slot.stuck = 0;
-        reloadSlot(slot.index);
+        scheduleSlotReload(slot, "stuck");
       }
     } else {
       slot.stuck = 0;
@@ -684,7 +747,7 @@ setInterval(() => {
 document.getElementById("randomBtn").onclick = randomMain;
 document.getElementById("retryBtn").onclick = () => slots.forEach((slot) => { if (slot.data) reloadSlot(slot.index); });
 document.getElementById("refreshBtn").onclick = refreshLive;
-document.getElementById("stopBtn").onclick = stopAll;
+document.getElementById("stopBtn").onclick = stopMainOnly;
 document.getElementById("addParticipantBtn").onclick = saveParticipantFromForm;
 document.getElementById("applyTierBtn").onclick = applyTierFromForm;
 document.getElementById("applyUniversityBtn").onclick = applyUniversityFromForm;
