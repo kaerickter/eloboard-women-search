@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv27";
+const CCTV_VERSION = "cctv28";
 const BOOTSTRAP_CONCURRENCY = 2;
 const FIRST_SMALL_COUNT = 2;
 const SERVER_COOLDOWN_MS = 30000;
@@ -102,6 +102,11 @@ function soopDirectUrl(player) {
   if (existingUrl) return existingUrl;
   const id = broadcastIdOf(player);
   return id ? `https://ch.sooplive.co.kr/${encodeURIComponent(id)}` : "";
+}
+
+function soopEmbedUrl(player) {
+  const id = broadcastIdOf(player);
+  return id ? `https://play.sooplive.com/embed/${encodeURIComponent(id)}` : soopDirectUrl(player);
 }
 
 function loadManualParticipants() {
@@ -343,6 +348,10 @@ function stopSmallPlayback(slot, statusText = "대기") {
     clearTimeout(slot.reloadTimer);
     slot.reloadTimer = null;
   }
+  if (slot.directFallbackTimer) {
+    clearTimeout(slot.directFallbackTimer);
+    slot.directFallbackTimer = null;
+  }
   destroyHls(slot.hls);
   slot.hls = null;
   restoreSlotVideo(slot);
@@ -479,8 +488,9 @@ function createSlot(player) {
     meta,
     hls: null,
     data: null,
-    directPreview: false,
-    lastTime: 0,
+   directPreview: false,
+    directFallbackTimer: null,
+   lastTime: 0,
     stuck: 0,
     tried: false,
     reloadTimer: null,
@@ -562,6 +572,15 @@ async function loadSlot(index, options = {}) {
     refreshSlotVisibilityAndOrder();
     return true;
   } catch (error) {
+    if (/not currently live|currently live|오프라인|offline/i.test(error.message || "")) {
+      slot.player.live = Object.assign({}, slot.player.live || {}, { isLive: false });
+      slot.tried = true;
+      slot.status.textContent = "오프라인";
+      slot.meta.textContent = "LIVE 목록에는 잡혔지만 실제 스트림은 현재 꺼져 있습니다.";
+      log(`${slot.player.name}: 실제 방송이 꺼져 있어 오프라인으로 처리합니다.`);
+      refreshSlotVisibilityAndOrder();
+      return false;
+    }
     if (error.code === "EMPTY_JSON" || error.code === "INVALID_JSON") {
       slot.tried = false;
       slot.status.textContent = "잠시 후";
@@ -581,7 +600,7 @@ async function loadSlot(index, options = {}) {
 function showSoopDirectPreview(index) {
   const slot = slots[index];
   if (!slot || slot.directPreview) return false;
-  const url = soopDirectUrl(slot.player);
+  const url = soopEmbedUrl(slot.player);
   if (!url) {
     slot.status.textContent = "SOOP 주소 없음";
     return false;
@@ -615,14 +634,21 @@ function showSoopDirectPreview(index) {
   overlay.onclick = (event) => {
     event.preventDefault();
     event.stopPropagation();
-    setMain(index);
+    setProxyMain(index);
   };
 
   wrap.append(iframe, hint, overlay);
   slot.playerBox.appendChild(wrap);
   slot.directPreview = true;
-  slot.status.textContent = "SOOP 원본";
-  slot.meta.textContent = `${playerLabel(slot.player)} | 원본 화면 우선 · 클릭하면 MAIN`;
+  slot.status.textContent = "SOOP 시도";
+  slot.meta.textContent = `${playerLabel(slot.player)} | 원본 화면 시도 중 · 안 보이면 HLS로 대체`;
+  slot.directFallbackTimer = setTimeout(() => {
+    slot.directFallbackTimer = null;
+    if (isShuttingDown || !slot.directPreview || slot.data || !matchesFilter(slot) || !isSlotLive(slot)) return;
+    log(`${slot.player.name} SOOP 원본 작은화면이 보이지 않을 수 있어 HLS로 대체합니다.`);
+    restoreSlotVideo(slot);
+    loadSlot(index, { attachSmall: true });
+  }, 8000);
   refreshSlotVisibilityAndOrder();
   return true;
 }
@@ -632,6 +658,10 @@ function restoreSlotVideo(slot) {
   slot.playerBox.innerHTML = "";
   slot.playerBox.appendChild(slot.video);
   slot.directPreview = false;
+  if (slot.directFallbackTimer) {
+    clearTimeout(slot.directFallbackTimer);
+    slot.directFallbackTimer = null;
+  }
 }
 
 function scheduleSlotReload(slot, reason = "error") {
