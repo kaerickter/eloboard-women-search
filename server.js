@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const { execFile } = require("node:child_process");
 const { Server: SocketIOServer } = require("socket.io");
 const { setupCollaboration } = require("./collaboration-server");
 const { normalizeBjListPlayerText } = require("./eloboard-utils");
@@ -107,6 +108,9 @@ const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 15;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 20;
+const CCTV_STREAM_CACHE_MS = 9 * 60 * 1000;
+const CCTV_STALE_CACHE_MS = 25 * 60 * 1000;
+const CCTV_PROXY_TOKEN_MS = 2 * 60 * 1000;
 const tierAdmin = new TierAdmin();
 const spawnDiaryAdmin = new SpawnDiaryAdmin();
 const playerAnalysisStore = new PlayerAnalysisStore({ pool: tierAdmin.pool });
@@ -1594,6 +1598,225 @@ function readJsonBody(req) {
     req.on("error", reject);
   });
 }
+
+const cctvStreamCache = new Map();
+const cctvInflight = new Map();
+const cctvProxyTokens = new Map();
+
+function safeCctvBj(value) {
+  const bj = String(value || "").trim();
+  return /^[a-zA-Z0-9_-]+$/.test(bj) ? bj : "";
+}
+
+function cctvPageUrl(bj) {
+  return "https://play.sooplive.com/" + encodeURIComponent(bj);
+}
+
+function execYtdlpCommand(command, args) {
+  return new Promise((resolve, reject) => {
+    execFile(command.file, [...command.args, ...args], { windowsHide: true, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error) return reject(new Error(String(stderr || error.message || "").trim()));
+      resolve(String(stdout || "").trim());
+    });
+  });
+}
+
+async function runYtdlp(args) {
+  const commands = [
+    process.env.YT_DLP_PATH ? { file: process.env.YT_DLP_PATH, args: [] } : null,
+    { file: "yt-dlp", args: [] },
+    { file: "python3", args: ["-m", "yt_dlp"] },
+    { file: "python", args: ["-m", "yt_dlp"] }
+  ].filter(Boolean);
+
+  let lastError = null;
+  for (const command of commands) {
+    try {
+      return await execYtdlpCommand(command, args);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("yt-dlp 실행 파일을 찾지 못했습니다.");
+}
+
+function cctvFormats(info) {
+  return (info.formats || [])
+    .map((format) => ({
+      id: String(format.format_id || ""),
+      height: Number(format.height || 0),
+      width: Number(format.width || 0),
+      tbr: Number(format.tbr || 0),
+      fps: Number(format.fps || 0),
+      vcodec: String(format.vcodec || ""),
+      resolution: String(format.resolution || "")
+    }))
+    .filter((format) => format.height > 0 && format.vcodec !== "none")
+    .sort((a, b) => (a.height - b.height) || (a.tbr - b.tbr));
+}
+
+function cctvLow(formats) {
+  const low = formats.filter((format) => format.height <= 360);
+  return low.length ? low[low.length - 1] : formats[0] || null;
+}
+
+function cctvHigh(formats) {
+  return formats[formats.length - 1] || null;
+}
+
+async function cctvDirectUrl(bj, formatId, fallback) {
+  const output = await runYtdlp(["-g", "--no-playlist", "-f", formatId || fallback, cctvPageUrl(bj)]);
+  const urls = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!urls.length) throw new Error("스트림 URL을 찾지 못했습니다.");
+  return urls[0];
+}
+
+function cctvFresh(entry) {
+  return entry && Date.now() - entry.refreshedAt < CCTV_STREAM_CACHE_MS;
+}
+
+function cctvUsableStale(entry) {
+  return entry && Date.now() - entry.refreshedAt < CCTV_STALE_CACHE_MS;
+}
+
+async function refreshCctvStream(bj) {
+  const running = cctvInflight.get(bj);
+  if (running) return running;
+  const task = (async () => {
+    const raw = await runYtdlp(["-J", "--no-playlist", cctvPageUrl(bj)]);
+    const info = JSON.parse(raw);
+    const formats = cctvFormats(info);
+    const lowMeta = cctvLow(formats);
+    const highMeta = cctvHigh(formats);
+    if (!lowMeta && !highMeta) throw new Error("재생 가능한 화질을 찾지 못했습니다.");
+    const [lowUpstream, highUpstream] = await Promise.all([
+      cctvDirectUrl(bj, (lowMeta || highMeta).id, "worst"),
+      cctvDirectUrl(bj, (highMeta || lowMeta).id, "best")
+    ]);
+    const entry = {
+      bj,
+      title: info.title || bj,
+      thumbnail: info.thumbnail || "",
+      lowMeta: lowMeta || highMeta,
+      highMeta: highMeta || lowMeta,
+      lowUpstream,
+      highUpstream,
+      refreshedAt: Date.now()
+    };
+    cctvStreamCache.set(bj, entry);
+    return entry;
+  })();
+  cctvInflight.set(bj, task);
+  try {
+    return await task;
+  } finally {
+    cctvInflight.delete(bj);
+  }
+}
+
+async function getCctvStream(bj, allowStale = false) {
+  const entry = cctvStreamCache.get(bj);
+  if (cctvFresh(entry)) return entry;
+  if (allowStale && cctvUsableStale(entry)) {
+    refreshCctvStream(bj).catch((error) => console.error("cctv refresh failed:", bj, error.message));
+    return entry;
+  }
+  return refreshCctvStream(bj);
+}
+
+function cctvPayload(entry) {
+  return {
+    ok: true,
+    bj: entry.bj,
+    title: entry.title,
+    thumbnail: entry.thumbnail,
+    lowMeta: entry.lowMeta,
+    highMeta: entry.highMeta,
+    lowUrl: "/cctv/stream/" + encodeURIComponent(entry.bj) + "/low/master.m3u8",
+    highUrl: "/cctv/stream/" + encodeURIComponent(entry.bj) + "/high/master.m3u8",
+    refreshedAt: entry.refreshedAt
+  };
+}
+
+function cctvToken(remoteUrl) {
+  const url = new URL(remoteUrl);
+  if (!["http:", "https:"].includes(url.protocol)) throw new Error("bad protocol");
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  cctvProxyTokens.set(token, { url: url.href, expiresAt: Date.now() + CCTV_PROXY_TOKEN_MS });
+  return "/cctv/proxy/" + token;
+}
+
+function cleanupCctvTokens() {
+  const now = Date.now();
+  for (const [token, item] of cctvProxyTokens) {
+    if (!item || item.expiresAt < now) cctvProxyTokens.delete(token);
+  }
+}
+
+function rewriteCctvM3u8(text, baseUrl) {
+  cleanupCctvTokens();
+  return String(text || "").split(/\r?\n/).map((line) => {
+    if (!line) return line;
+    line = line.replace(/URI="([^"]+)"/g, (_, uri) => 'URI="' + cctvToken(new URL(uri, baseUrl).href) + '"');
+    if (line.startsWith("#")) return line;
+    return cctvToken(new URL(line, baseUrl).href);
+  }).join("\n");
+}
+
+async function fetchCctvRemote(remoteUrl, req) {
+  return fetch(remoteUrl, {
+    redirect: "follow",
+    headers: {
+      "User-Agent": req.headers["user-agent"] || "Mozilla/5.0",
+      "Referer": "https://play.sooplive.com/",
+      "Origin": "https://play.sooplive.com",
+      "Accept": "*/*"
+    }
+  });
+}
+
+async function handleCctvStream(req, res, bj, mode) {
+  try {
+    let entry = await getCctvStream(bj, true);
+    let upstreamUrl = mode === "low" ? entry.lowUpstream : entry.highUpstream;
+    let upstream = await fetchCctvRemote(upstreamUrl, req);
+    if (!upstream.ok) {
+      entry = await refreshCctvStream(bj);
+      upstreamUrl = mode === "low" ? entry.lowUpstream : entry.highUpstream;
+      upstream = await fetchCctvRemote(upstreamUrl, req);
+    }
+    if (!upstream.ok) return send(res, upstream.status, "upstream " + upstream.status);
+    const text = await upstream.text();
+    return send(res, 200, rewriteCctvM3u8(text, upstream.url || upstreamUrl), "application/vnd.apple.mpegurl; charset=utf-8");
+  } catch (error) {
+    return send(res, 500, error.message || "cctv stream failed");
+  }
+}
+
+async function handleCctvProxy(req, res, token) {
+  cleanupCctvTokens();
+  const item = cctvProxyTokens.get(String(token || ""));
+  if (!item) return send(res, 404, "expired token");
+  try {
+    const upstream = await fetchCctvRemote(item.url, req);
+    if (!upstream.ok) return send(res, upstream.status, "upstream " + upstream.status);
+    const contentType = upstream.headers.get("content-type") || "";
+    const looksM3u8 = contentType.includes("mpegurl") || contentType.includes("m3u8") || new URL(item.url).pathname.toLowerCase().includes(".m3u8");
+    if (looksM3u8) {
+      const text = await upstream.text();
+      return send(res, 200, rewriteCctvM3u8(text, upstream.url || item.url), "application/vnd.apple.mpegurl; charset=utf-8");
+    }
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    res.writeHead(200, {
+      "Content-Type": contentType || "application/octet-stream",
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*"
+    });
+    return res.end(buffer);
+  } catch (error) {
+    return send(res, 502, error.message || "proxy failed");
+  }
+}
 function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
   const pathname = url.pathname === "/" ? "/tiers.html" : url.pathname;
@@ -1639,6 +1862,38 @@ const server = http.createServer(async (req, res) => {
     }), "application/json; charset=utf-8");
   }
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname.startsWith("/api/cctv/bootstrap/") && req.method === "GET") {
+    const bj = safeCctvBj(decodeURIComponent(url.pathname.split("/").pop() || ""));
+    if (!bj) return send(res, 400, JSON.stringify({ ok: false, error: "잘못된 방송 ID입니다." }), "application/json; charset=utf-8");
+    try {
+      const entry = await getCctvStream(bj);
+      return send(res, 200, JSON.stringify(cctvPayload(entry)), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ ok: false, error: error.message || "방송 정보를 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname.startsWith("/api/cctv/high/") && req.method === "GET") {
+    const bj = safeCctvBj(decodeURIComponent(url.pathname.split("/").pop() || ""));
+    if (!bj) return send(res, 400, JSON.stringify({ ok: false, error: "잘못된 방송 ID입니다." }), "application/json; charset=utf-8");
+    try {
+      const entry = await getCctvStream(bj, true);
+      return send(res, 200, JSON.stringify(cctvPayload(entry)), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ ok: false, error: error.message || "방송 정보를 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  {
+    const streamMatch = url.pathname.match(/^\/cctv\/stream\/([a-zA-Z0-9_-]+)\/(low|high)\/master\.m3u8$/);
+    if (streamMatch && req.method === "GET") {
+      return handleCctvStream(req, res, streamMatch[1], streamMatch[2]);
+    }
+  }
+  {
+    const proxyMatch = url.pathname.match(/^\/cctv\/proxy\/([a-zA-Z0-9]+)$/);
+    if (proxyMatch && req.method === "GET") {
+      return handleCctvProxy(req, res, proxyMatch[1]);
+    }
+  }
   if (url.pathname === "/api/scoreboard-state" && req.method === "GET") {
     try {
       return send(
