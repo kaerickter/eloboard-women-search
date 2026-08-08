@@ -1,4 +1,4 @@
-const BOOTSTRAP_CONCURRENCY = 5;
+const BOOTSTRAP_CONCURRENCY = 2;
 const DEFAULT_FILTER = "tier:6";
 const MANUAL_KEY = "elo-kitten-cctv-manual-participants-v3";
 const SHARED_KEY = "elo-kitten-cctv-main-v3";
@@ -318,7 +318,7 @@ async function refreshCurrentFilterLive(force = false) {
 function applyFilter(filter, shouldLoad = false) {
   currentFilter = filter;
   refreshSlotVisibilityAndOrder();
-  if (shouldLoad) refreshCurrentFilterLive(false).then(() => loadVisibleUnloaded());
+  if (shouldLoad) refreshCurrentFilterLive(false);
 }
 
 function createSlot(player) {
@@ -348,7 +348,7 @@ function createSlot(player) {
   meta.textContent = playerLabel(player);
 
   card.append(head, playerBox, meta);
-  card.onclick = () => setMain(index);
+  card.onclick = () => openSlotMain(index);
   grid.appendChild(card);
 
   slots.push({
@@ -544,12 +544,28 @@ async function startVisibleLive() {
   await loadVisibleUnloaded();
 }
 
+async function openSlotMain(index) {
+  const slot = slots[index];
+  if (!slot) return;
+  if (!slot.data) {
+    const ok = await loadSlot(index);
+    if (!ok) return;
+  }
+  await setMain(index);
+}
+
 async function randomMain() {
   const candidates = slots.filter((slot) => slot.data && matchesFilter(slot));
   if (!candidates.length) {
-    log("현재 기준에서 재생 가능한 방송이 아직 없습니다.");
     await refreshCurrentFilterLive(false);
-    await loadVisibleUnloaded();
+    const liveTargets = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !slot.data && !isSlotKnownOffline(slot));
+    if (!liveTargets.length) {
+      log("현재 기준에서 재생 가능한 방송이 아직 없습니다.");
+      return;
+    }
+    const target = liveTargets[Math.floor(Math.random() * liveTargets.length)];
+    const ok = await loadSlot(target.index);
+    if (ok) await setMain(target.index);
     return;
   }
   const slot = candidates[Math.floor(Math.random() * candidates.length)];
@@ -603,13 +619,10 @@ function shutdownPlayers() {
 }
 
 async function refreshLive() {
-  stopAll();
   slots.forEach((slot) => {
-    slot.data = null;
     slot.tried = false;
   });
   await refreshCurrentFilterLive(true);
-  await startVisibleLive();
 }
 
 function handleShared(payload) {
@@ -723,8 +736,7 @@ async function init(force = false) {
   applyFilter(currentFilter);
   log(`티어표 기준 화면 표시 완료: ${players.length}명`);
   await refreshCurrentFilterLive(force);
-  await startVisibleLive();
-  log(`cctv 준비 완료: ${filterLabel(currentFilter)}`);
+  log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · 작은화면은 버튼을 누르면 시작됩니다.`);
 }
 
 setInterval(() => {
@@ -745,6 +757,7 @@ setInterval(() => {
 }, 2000);
 
 document.getElementById("randomBtn").onclick = randomMain;
+document.getElementById("startSmallBtn").onclick = startVisibleLive;
 document.getElementById("retryBtn").onclick = () => slots.forEach((slot) => { if (slot.data) reloadSlot(slot.index); });
 document.getElementById("refreshBtn").onclick = refreshLive;
 document.getElementById("stopBtn").onclick = stopMainOnly;
