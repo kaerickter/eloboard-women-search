@@ -93,6 +93,15 @@ function broadcastIdFromUrl(value) {
   return safeBroadcastId(match?.[1]);
 }
 
+function soopDirectUrl(player) {
+  const existingUrl = [player.broadcastUrl, player.stationUrl, player.station_url, player.soopUrl, player.soop_url, player.afreecaUrl, player.afreeca_url]
+    .map((item) => String(item || "").trim())
+    .find((item) => /^https?:\/\//i.test(item));
+  if (existingUrl) return existingUrl;
+  const id = broadcastIdOf(player);
+  return id ? `https://ch.sooplive.co.kr/${encodeURIComponent(id)}` : "";
+}
+
 function loadManualParticipants() {
   try {
     const saved = JSON.parse(localStorage.getItem(MANUAL_KEY) || "[]");
@@ -394,10 +403,12 @@ function createSlot(player) {
     player,
     card,
     status,
+    playerBox,
     video,
     meta,
     hls: null,
     data: null,
+    directPreview: false,
     lastTime: 0,
     stuck: 0,
     tried: false,
@@ -464,6 +475,7 @@ async function loadSlot(index) {
     slot.player.live = Object.assign({}, slot.player.live || {}, { isLive: true, broadcastId });
     slot.status.textContent = "LIVE";
     slot.meta.textContent = `${playerLabel(slot.player)} | LOW ${(data.lowMeta || {}).height || "?"}p | HIGH ${(data.highMeta || {}).height || "?"}p`;
+    restoreSlotVideo(slot);
     destroyHls(slot.hls);
     slot.video.pause();
     slot.video.removeAttribute("src");
@@ -489,6 +501,53 @@ async function loadSlot(index) {
   }
 }
 
+function showSoopDirectPreview(index) {
+  const slot = slots[index];
+  if (!slot || slot.directPreview) return false;
+  const url = soopDirectUrl(slot.player);
+  if (!url) {
+    slot.status.textContent = "SOOP 주소 없음";
+    return false;
+  }
+  destroyHls(slot.hls);
+  slot.hls = null;
+  clearVideo(slot.video);
+  slot.playerBox.innerHTML = "";
+
+  const wrap = document.createElement("div");
+  wrap.className = "cctv-soop-preview";
+  const iframe = document.createElement("iframe");
+  iframe.src = url;
+  iframe.loading = "lazy";
+  iframe.referrerPolicy = "no-referrer-when-downgrade";
+  iframe.allow = "autoplay; fullscreen; picture-in-picture";
+
+  const open = document.createElement("a");
+  open.href = url;
+  open.target = "_blank";
+  open.rel = "noopener noreferrer";
+  open.textContent = "SOOP 바로 열기";
+  open.onclick = (event) => event.stopPropagation();
+
+  const hint = document.createElement("span");
+  hint.textContent = "원본 화면";
+
+  wrap.append(iframe, hint, open);
+  slot.playerBox.appendChild(wrap);
+  slot.directPreview = true;
+  slot.status.textContent = "SOOP 원본";
+  slot.meta.textContent = `${playerLabel(slot.player)} | 원본 화면 우선 · 클릭하면 MAIN`;
+  refreshSlotVisibilityAndOrder();
+  return true;
+}
+
+function restoreSlotVideo(slot) {
+  if (!slot || !slot.directPreview) return;
+  slot.playerBox.innerHTML = "";
+  slot.playerBox.appendChild(slot.video);
+  slot.directPreview = false;
+}
+
 function scheduleSlotReload(slot, reason = "error") {
   if (!slot || isShuttingDown || slot.reloadTimer) return;
   const delays = [5000, 15000, 30000, 60000];
@@ -511,6 +570,7 @@ async function reloadSlot(index) {
     slot.reloadTimer = null;
   }
   destroyHls(slot.hls);
+  restoreSlotVideo(slot);
   slot.video.pause();
   slot.video.removeAttribute("src");
   slot.video.load();
@@ -630,7 +690,14 @@ async function loadVisibleUnloaded(limit = Infinity) {
 }
 
 async function startVisibleLive() {
-  await loadVisibleUnloaded(FIRST_SMALL_COUNT);
+  const targets = slots
+    .filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot) && !slot.directPreview)
+    .slice(0, FIRST_SMALL_COUNT);
+  let shown = 0;
+  targets.forEach((slot) => {
+    if (showSoopDirectPreview(slot.index)) shown += 1;
+  });
+  log(shown ? `SOOP 원본 빠른 화면 ${shown}명 표시 완료` : "표시할 LIVE 원본 화면이 아직 없습니다.");
 }
 
 async function openSlotMain(index) {
@@ -698,6 +765,7 @@ function stopAll(finalStop = false) {
     }
     destroyHls(slot.hls);
     slot.hls = null;
+    restoreSlotVideo(slot);
     slot.video.pause();
     slot.video.removeAttribute("src");
     slot.video.src = "";
