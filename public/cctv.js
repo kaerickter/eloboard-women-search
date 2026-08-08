@@ -12,12 +12,14 @@ const groupSummary = document.getElementById("groupSummary");
 const tierSelect = document.getElementById("tierSelect");
 const universitySelect = document.getElementById("universitySelect");
 const universityDivisionSelect = document.getElementById("universityDivisionSelect");
+
 const slots = [];
 let players = [];
 let currentFilter = DEFAULT_FILTER;
 let mainHls = null;
 let activeIndex = -1;
 let loadingVisible = false;
+let refreshingLive = false;
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -38,6 +40,11 @@ function normalizeUniversity(value) {
   return String(value || "").replace(/\s+/g, "").toLowerCase();
 }
 
+function isNewcastleUniversity(university) {
+  const name = normalizeUniversity(university);
+  return name.includes("뉴캐슬") || name.includes("뉴캣슬");
+}
+
 function universityNames(player) {
   return [...new Set([
     ...(Array.isArray(player.universities) ? player.universities : []),
@@ -48,11 +55,6 @@ function universityNames(player) {
 function hasUniversity(player, university) {
   const target = normalizeUniversity(university);
   return universityNames(player).some((name) => normalizeUniversity(name) === target);
-}
-
-function isNewcastleUniversity(university) {
-  const name = normalizeUniversity(university);
-  return name.includes("뉴캐슬") || name.includes("뉴캣슬");
 }
 
 function playerDivisionLabel(player) {
@@ -171,25 +173,7 @@ async function fetchLiveStatuses(names, force = false) {
   return { statuses };
 }
 
-function createFilter(label, filter) {
-  const button = document.createElement("button");
-  button.className = "cctv-filter";
-  button.type = "button";
-  button.dataset.filter = filter;
-  button.textContent = label;
-  button.onclick = () => applyFilter(filter, true);
-  return button;
-}
-
-function appendFilterOnce(seen, label, filter) {
-  if (seen.has(filter)) return;
-  seen.add(filter);
-  filterbar.appendChild(createFilter(label, filter));
-}
-
-function renderFilters() {
-  if (filterbar) filterbar.innerHTML = "";
-
+function renderSelectors() {
   const tiers = [...new Set(players.map((player) => tierNumber(player.tier)).filter(Boolean))]
     .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b, "ko"));
   if (tierSelect) {
@@ -202,7 +186,6 @@ function renderFilters() {
       option.selected = tier === selectedTier;
       tierSelect.appendChild(option);
     });
-    if (!tiers.includes(selectedTier) && tiers.length) tierSelect.value = tiers[0];
   }
 
   const universities = [...new Set(players.flatMap(universityNames))]
@@ -222,29 +205,23 @@ function renderFilters() {
     });
     updateUniversityDivisionOptions();
   }
+
+  if (filterbar) filterbar.innerHTML = "";
 }
 
 function updateUniversityDivisionOptions() {
   if (!universitySelect || !universityDivisionSelect) return;
   const university = universitySelect.value;
   universityDivisionSelect.innerHTML = "";
-  if (isNewcastleUniversity(university)) {
-    [
-      ["all", "남자+여자 전체"],
-      ["women", "여자만"],
-      ["men", "남자만"]
-    ].forEach(([value, label]) => {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      universityDivisionSelect.appendChild(option);
-    });
-  } else {
+  const options = isNewcastleUniversity(university)
+    ? [["all", "남자+여자 전체"], ["women", "여자만"], ["men", "남자만"]]
+    : [["women", "여자만"]];
+  options.forEach(([value, label]) => {
     const option = document.createElement("option");
-    option.value = "women";
-    option.textContent = "여자만";
+    option.value = value;
+    option.textContent = label;
     universityDivisionSelect.appendChild(option);
-  }
+  });
 }
 
 function matchesFilter(slot) {
@@ -260,17 +237,44 @@ function matchesFilter(slot) {
 function updateGroupSummary() {
   const count = slots.filter(matchesFilter).length;
   const liveReady = slots.filter((slot) => matchesFilter(slot) && slot.data).length;
-  if (groupSummary) groupSummary.textContent = `현재 기준: ${filterLabel(currentFilter)} · 티어표 인원 ${count}명 · 재생 준비 ${liveReady}명`;
+  if (groupSummary) groupSummary.textContent = `현재 기준: ${filterLabel(currentFilter)} · 표시 인원 ${count}명 · 재생 준비 ${liveReady}명`;
+}
+
+async function refreshCurrentFilterLive(force = false) {
+  if (refreshingLive) return;
+  const targets = slots.filter(matchesFilter);
+  const names = targets.map((slot) => slot.player.name).filter(Boolean);
+  if (!names.length) return;
+  refreshingLive = true;
+  log(`${filterLabel(currentFilter)} LIVE 상태 조회 중: ${names.length}명`);
+  try {
+    const live = await fetchLiveStatuses(names, force);
+    const liveByName = new Map((live.statuses || []).map((status) => [key(status.name), status]));
+    targets.forEach((slot) => {
+      const status = liveByName.get(key(slot.player.name));
+      if (!status) return;
+      slot.player.live = status;
+      slot.player.broadcastId = status.broadcastId || slot.player.broadcastId;
+      slot.player.broadcastUrl = status.broadcastUrl || slot.player.broadcastUrl;
+      if (!slot.data) {
+        slot.tried = false;
+        slot.status.textContent = status.isLive ? "LIVE 확인" : "오프라인";
+      }
+    });
+    log(`${filterLabel(currentFilter)} LIVE 상태 반영 완료`);
+  } catch (error) {
+    log(`${filterLabel(currentFilter)} LIVE 상태 조회 실패 - 현재 목록은 그대로 표시합니다: ${error.message}`);
+  } finally {
+    refreshingLive = false;
+    updateGroupSummary();
+  }
 }
 
 function applyFilter(filter, shouldLoad = false) {
   currentFilter = filter;
-  document.querySelectorAll(".cctv-filter").forEach((button) => {
-    button.classList.toggle("active", button.dataset.filter === filter);
-  });
   slots.forEach((slot) => slot.card.classList.toggle("hidden", !matchesFilter(slot)));
   updateGroupSummary();
-  if (shouldLoad) loadVisibleUnloaded();
+  if (shouldLoad) refreshCurrentFilterLive(false).then(() => loadVisibleUnloaded());
 }
 
 function createSlot(player) {
@@ -410,7 +414,6 @@ async function setMain(index, options = {}) {
     video.pause();
     video.removeAttribute("src");
     video.load();
-    document.getElementById("mainTitle").textContent = "MAIN - " + slot.player.name;
     document.getElementById("mainStatus").textContent = "최고화질";
     document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | HIGH ${(data.highMeta || {}).height || "?"}p`;
     mainHls = attach(video, data.highUrl + "?r=" + Date.now(), `HIGH ${slot.player.name}`);
@@ -449,6 +452,7 @@ async function randomMain() {
   const candidates = slots.filter((slot) => slot.data && matchesFilter(slot));
   if (!candidates.length) {
     log("현재 기준에서 재생 가능한 방송이 아직 없습니다.");
+    await refreshCurrentFilterLive(false);
     await loadVisibleUnloaded();
     return;
   }
@@ -476,7 +480,12 @@ function stopAll() {
 
 async function refreshLive() {
   stopAll();
-  await init(true);
+  slots.forEach((slot) => {
+    slot.data = null;
+    slot.tried = false;
+  });
+  await refreshCurrentFilterLive(true);
+  await startVisibleLive();
 }
 
 function handleShared(payload) {
@@ -485,22 +494,12 @@ function handleShared(payload) {
   if (index >= 0 && index !== activeIndex) setMain(index, { fromShare: true });
 }
 
-function mergePlayers(tierPlayers, manualPlayers, liveByName) {
+function mergePlayers(tierPlayers, manualPlayers) {
   const merged = new Map();
-  tierPlayers.forEach((player) => {
-    const normalized = {
-      ...player,
-      live: liveByName.get(key(player.name)) || null
-    };
-    merged.set(key(normalized.name), normalized);
-  });
+  tierPlayers.forEach((player) => merged.set(key(player.name), { ...player }));
   manualPlayers.forEach((manual) => {
     const existing = merged.get(key(manual.name)) || {};
-    merged.set(key(manual.name), {
-      ...existing,
-      ...manual,
-      live: existing.live || null
-    });
+    merged.set(key(manual.name), { ...existing, ...manual, live: existing.live || null });
   });
   return [...merged.values()];
 }
@@ -548,7 +547,7 @@ function saveParticipantFromForm() {
   init(false);
 }
 
-function applyGroupFromForm() {
+function applyTierFromForm() {
   const tier = tierNumber(tierSelect?.value);
   if (tier) applyFilter(`tier:${tier}`, true);
   else log("티어를 선택해 주세요.");
@@ -587,34 +586,17 @@ async function init(force = false) {
     log("티어표 로딩 실패: " + error.message);
   }
 
-  players = mergePlayers(tierPlayers, loadManualParticipants(), new Map());
-
+  players = mergePlayers(tierPlayers, loadManualParticipants());
   grid.innerHTML = "";
   slots.length = 0;
   activeIndex = -1;
   players.forEach(createSlot);
-  renderFilters();
+  renderSelectors();
   applyFilter(currentFilter);
   log(`티어표 기준 화면 표시 완료: ${players.length}명`);
-
-  const names = tierPlayers.map((player) => player.name);
-  try {
-    const live = names.length ? await fetchLiveStatuses(names, force) : { statuses: [] };
-    const liveByName = new Map((live.statuses || []).map((status) => [key(status.name), status]));
-    players = mergePlayers(tierPlayers, loadManualParticipants(), liveByName);
-    grid.innerHTML = "";
-    slots.length = 0;
-    activeIndex = -1;
-    players.forEach(createSlot);
-    renderFilters();
-    applyFilter(currentFilter);
-    log("LIVE 상태 반영 완료");
-  } catch (error) {
-    log("LIVE 상태 조회 실패 - 티어표 목록은 그대로 표시합니다: " + error.message);
-  }
-
+  await refreshCurrentFilterLive(force);
   await startVisibleLive();
-  log(`cctv 준비 완료: ${players.length}명`);
+  log(`cctv 준비 완료: ${filterLabel(currentFilter)}`);
 }
 
 setInterval(() => {
@@ -639,7 +621,7 @@ document.getElementById("retryBtn").onclick = () => slots.forEach((slot) => { if
 document.getElementById("refreshBtn").onclick = refreshLive;
 document.getElementById("stopBtn").onclick = stopAll;
 document.getElementById("addParticipantBtn").onclick = saveParticipantFromForm;
-document.getElementById("applyTierBtn").onclick = applyGroupFromForm;
+document.getElementById("applyTierBtn").onclick = applyTierFromForm;
 document.getElementById("applyUniversityBtn").onclick = applyUniversityFromForm;
 document.getElementById("tierModeBtn").onclick = () => showMode("tier");
 document.getElementById("universityModeBtn").onclick = () => showMode("university");
