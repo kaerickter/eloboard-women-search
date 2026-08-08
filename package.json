@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "postinstall": "python -m pip install --user -U yt-dlp || python3 -m pip install --user -U yt-dlp || echo yt-dlp install skipped",
+    "postinstall": "node scripts/install-yt-dlp.js || echo yt-dlp install skipped",
     "start": "node server.js",
     "test": "node --test"
   },

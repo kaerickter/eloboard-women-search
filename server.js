@@ -34,6 +34,7 @@ const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const MEN_TIER_FALLBACK_FILE = path.join(ROOT, "data", "men-tier-fallback.json");
 const SCOREBOARD_STATE_FILE = path.join(ROOT, "data", "scoreboard-state.json");
 const JUNGMAN_CUP_STATE_FILE = path.join(ROOT, "data", "jungman-cup-state.json");
+const BUNDLED_YT_DLP = path.join(ROOT, "vendor", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
 const MAX_SCOREBOARD_STATE_SIZE = 200000;
 const PINNED_SOOP_ALIASES = {
   "핑핑": {
@@ -1653,6 +1654,7 @@ function execYtdlpCommand(command, args) {
 
 async function runYtdlp(args) {
   const commands = [
+    fs.existsSync(BUNDLED_YT_DLP) ? { file: BUNDLED_YT_DLP, args: [] } : null,
     process.env.YT_DLP_PATH ? { file: process.env.YT_DLP_PATH, args: [] } : null,
     { file: "yt-dlp", args: [] },
     { file: "python3", args: ["-m", "yt_dlp"] },
