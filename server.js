@@ -111,7 +111,7 @@ const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 20;
 const CCTV_STREAM_CACHE_MS = 9 * 60 * 1000;
 const CCTV_STALE_CACHE_MS = 25 * 60 * 1000;
-const CCTV_PROXY_TOKEN_MS = 2 * 60 * 1000;
+const CCTV_PROXY_TOKEN_MS = 30 * 60 * 1000;
 const tierAdmin = new TierAdmin();
 const spawnDiaryAdmin = new SpawnDiaryAdmin();
 const playerAnalysisStore = new PlayerAnalysisStore({ pool: tierAdmin.pool });
@@ -1633,6 +1633,7 @@ function readJsonBody(req) {
 const cctvStreamCache = new Map();
 const cctvInflight = new Map();
 const cctvProxyTokens = new Map();
+const cctvProxyUrlTokens = new Map();
 
 function safeCctvBj(value) {
   const bj = String(value || "").trim();
@@ -1662,15 +1663,15 @@ async function runYtdlp(args) {
     { file: "py", args: ["-m", "yt_dlp"] }
   ].filter(Boolean);
 
-  let lastError = null;
+  const errors = [];
   for (const command of commands) {
     try {
       return await execYtdlpCommand(command, args);
     } catch (error) {
-      lastError = error;
+      errors.push(`${command.file}: ${error.message || error}`);
     }
   }
-  throw lastError || new Error("yt-dlp 실행 파일을 찾지 못했습니다.");
+  throw new Error("yt-dlp 실행 파일을 찾지 못했습니다. npm start가 vendor/yt-dlp 설치를 먼저 완료해야 합니다. " + errors.join(" | "));
 }
 
 function cctvFormats(info) {
@@ -1774,25 +1775,43 @@ function cctvPayload(entry) {
 function cctvToken(remoteUrl) {
   const url = new URL(remoteUrl);
   if (!["http:", "https:"].includes(url.protocol)) throw new Error("bad protocol");
+  const existingToken = cctvProxyUrlTokens.get(url.href);
+  const existing = existingToken ? cctvProxyTokens.get(existingToken) : null;
+  if (existing && existing.expiresAt > Date.now() + 60 * 1000) return "/cctv/proxy/" + existingToken;
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
   cctvProxyTokens.set(token, { url: url.href, expiresAt: Date.now() + CCTV_PROXY_TOKEN_MS });
+  cctvProxyUrlTokens.set(url.href, token);
   return "/cctv/proxy/" + token;
 }
 
 function cleanupCctvTokens() {
   const now = Date.now();
   for (const [token, item] of cctvProxyTokens) {
-    if (!item || item.expiresAt < now) cctvProxyTokens.delete(token);
+    if (!item || item.expiresAt < now) {
+      cctvProxyTokens.delete(token);
+      if (item?.url && cctvProxyUrlTokens.get(item.url) === token) cctvProxyUrlTokens.delete(item.url);
+    }
   }
 }
 
 function rewriteCctvM3u8(text, baseUrl) {
   cleanupCctvTokens();
-  return String(text || "").split(/\r?\n/).map((line) => {
-    if (!line) return line;
-    line = line.replace(/URI="([^"]+)"/g, (_, uri) => 'URI="' + cctvToken(new URL(uri, baseUrl).href) + '"');
-    if (line.startsWith("#")) return line;
-    return cctvToken(new URL(line, baseUrl).href);
+  return String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/).map((rawLine) => {
+    const line = String(rawLine || "").trim();
+    if (!line) return "";
+    const rewritten = line.replace(/URI="([^"]+)"/g, (_, uri) => {
+      try {
+        return 'URI="' + cctvToken(new URL(uri, baseUrl).href) + '"';
+      } catch {
+        return 'URI="' + uri + '"';
+      }
+    });
+    if (rewritten.startsWith("#")) return rewritten;
+    try {
+      return cctvToken(new URL(rewritten, baseUrl).href);
+    } catch {
+      return rewritten;
+    }
   }).join("\n");
 }
 
