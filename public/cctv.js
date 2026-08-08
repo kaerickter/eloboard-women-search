@@ -476,17 +476,16 @@ function applyGroupFromForm() {
 }
 
 async function init(force = false) {
-  log("티어표와 LIVE 상태를 불러오는 중");
-  const tiers = await fetchJson(`/api/tiers${force ? "?refresh=1" : ""}`);
-  const tierPlayers = (tiers.players || []).filter((player) => player.name && player.tier);
-  const names = tierPlayers.map((player) => player.name);
-  const live = names.length ? await fetchJson("/api/live-status" + (force ? "?refresh=1" : ""), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify({ names, refresh: force })
-  }) : { statuses: [] };
-  const liveByName = new Map((live.statuses || []).map((status) => [key(status.name), status]));
-  players = mergePlayers(tierPlayers, loadManualParticipants(), liveByName);
+  log("티어표를 불러오는 중");
+  let tierPlayers = [];
+  try {
+    const tiers = await fetchJson(`/api/tiers${force ? "?refresh=1" : ""}`);
+    tierPlayers = (tiers.players || []).filter((player) => player.name && player.tier);
+  } catch (error) {
+    log("티어표 로딩 실패: " + error.message);
+  }
+
+  players = mergePlayers(tierPlayers, loadManualParticipants(), new Map());
 
   grid.innerHTML = "";
   slots.length = 0;
@@ -494,6 +493,28 @@ async function init(force = false) {
   players.forEach(createSlot);
   renderFilters();
   applyFilter(currentFilter);
+  log(`티어표 기준 화면 표시 완료: ${players.length}명`);
+
+  const names = tierPlayers.map((player) => player.name);
+  try {
+    const live = names.length ? await fetchJson("/api/live-status" + (force ? "?refresh=1" : ""), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ names, refresh: force })
+    }) : { statuses: [] };
+    const liveByName = new Map((live.statuses || []).map((status) => [key(status.name), status]));
+    players = mergePlayers(tierPlayers, loadManualParticipants(), liveByName);
+    grid.innerHTML = "";
+    slots.length = 0;
+    activeIndex = -1;
+    players.forEach(createSlot);
+    renderFilters();
+    applyFilter(currentFilter);
+    log("LIVE 상태 반영 완료");
+  } catch (error) {
+    log("LIVE 상태 조회 실패 - 티어표 목록은 그대로 표시합니다: " + error.message);
+  }
+
   await startVisibleLive();
   log(`cctv 준비 완료: ${players.length}명`);
 }
