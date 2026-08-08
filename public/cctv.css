@@ -56,6 +56,9 @@ body.cctv-page {
   border-radius: 8px;
   background: #141925;
 }
+.hidden {
+  display: none !important;
+}
 .cctv-filter-panel {
   padding: 10px;
   margin-bottom: 14px;
@@ -81,6 +84,61 @@ body.cctv-page {
   margin: 0 0 10px;
   color: #9ca7ba;
   font-size: 12px;
+}
+.cctv-mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.cctv-mode-tabs button {
+  border: 1px solid #30384a;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #222a39;
+  color: #f5f7fb;
+  font-weight: 900;
+  cursor: pointer;
+}
+.cctv-mode-tabs button.active {
+  border-color: #ffd400;
+  background: #ffd400;
+  color: #111;
+}
+.cctv-choice-panel {
+  border: 1px solid #252f42;
+  border-radius: 10px;
+  padding: 12px;
+  background: #101622;
+}
+.cctv-choice-panel label {
+  display: block;
+  margin-bottom: 8px;
+  color: #dbe3f2;
+  font-size: 13px;
+  font-weight: 900;
+}
+.cctv-choice-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 220px) auto;
+  gap: 8px;
+}
+.cctv-choice-row select,
+.cctv-choice-row button {
+  min-width: 0;
+  border: 1px solid #30384a;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: #0d111a;
+  color: #f5f7fb;
+  font: inherit;
+}
+.cctv-choice-row button {
+  border-color: #ffd400;
+  background: #ffd400;
+  color: #111;
+  font-weight: 900;
+  cursor: pointer;
 }
 .cctv-manager-row,
 .cctv-group-row {
@@ -222,6 +280,7 @@ body.cctv-page {
   .cctv-grid { grid-template-columns: 1fr; }
   .cctv-hero { display: block; }
   .cctv-actions { margin-top: 12px; }
+  .cctv-choice-row { grid-template-columns: 1fr; }
   .cctv-manager-row,
   .cctv-group-row { grid-template-columns: 1fr; }
 }

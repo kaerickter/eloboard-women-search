@@ -6,7 +6,7 @@
     <title>cctv · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260808-cctv">
-    <link rel="stylesheet" href="./cctv.css?v=20260808-cctv7">
+    <link rel="stylesheet" href="./cctv.css?v=20260808-cctv9">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
   </head>
   <body class="cctv-page">
@@ -33,7 +33,7 @@
       <header class="cctv-hero">
         <div>
           <h1>cctv</h1>
-          <p>첫 화면은 6티어입니다. 기본 10명은 쓰지 않고, 티어표에 있는 티어/대학/성별 기준으로 한 번에 방송 대상을 잡습니다.</p>
+          <p>티어표 기준으로 방송을 골라 봅니다. 첫 화면은 6티어이며, 대학별은 뉴캐슬대학만 남자/여자 전체를 보여주고 다른 대학은 여자만 보여줍니다.</p>
         </div>
         <div class="cctv-actions">
           <button id="randomBtn" class="primary" type="button">아무나 방송보기</button>
@@ -43,34 +43,38 @@
         </div>
       </header>
 
-      <section class="cctv-panel cctv-filter-panel">
-        <strong class="cctv-panel-title">티어표 기준 빠른 선택</strong>
-        <div id="filterbar" class="cctv-filters" aria-label="cctv 필터"></div>
-      </section>
-
-      <section class="cctv-panel cctv-group-maker" aria-label="티어표 기준 설정">
-        <h2>티어표 기준으로 보기</h2>
-        <p>한 명씩 넣는 방식이 아니라, 티어표에 있는 기준을 입력하면 해당 그룹 전체를 한 번에 불러옵니다. 예: 8티어, 4티어, JSA, 케이대, 뉴캐슬대학</p>
-        <div class="cctv-group-row">
-          <select id="groupType">
-            <option value="tier">티어별</option>
-            <option value="university">대학별</option>
-            <option value="university_division">대학 + 여자/남자</option>
-          </select>
-          <input id="groupTier" placeholder="티어 예: 6티어">
-          <input id="groupUniversity" placeholder="대학 예: 뉴캐슬대학">
-          <select id="groupDivision">
-            <option value="women">여자</option>
-            <option value="men">남자</option>
-          </select>
-          <button id="applyGroupBtn" type="button">이 기준으로 보기</button>
+      <section class="cctv-panel cctv-group-maker" aria-label="방송 보기 선택">
+        <h2>방송 보기 선택</h2>
+        <div class="cctv-mode-tabs">
+          <button id="tierModeBtn" class="active" type="button">티어별 보기</button>
+          <button id="universityModeBtn" type="button">대학별 보기</button>
         </div>
+
+        <div id="tierPanel" class="cctv-choice-panel">
+          <label for="tierSelect">티어 선택</label>
+          <div class="cctv-choice-row">
+            <select id="tierSelect"></select>
+            <button id="applyTierBtn" type="button">이 티어 보기</button>
+          </div>
+        </div>
+
+        <div id="universityPanel" class="cctv-choice-panel hidden">
+          <label for="universitySelect">대학 선택</label>
+          <div class="cctv-choice-row">
+            <select id="universitySelect"></select>
+            <select id="universityDivisionSelect"></select>
+            <button id="applyUniversityBtn" type="button">이 대학 보기</button>
+          </div>
+          <p id="universityRule" class="cctv-group-summary">뉴캐슬대학은 남자/여자 전체, 다른 대학은 여자만 표시됩니다.</p>
+        </div>
+
         <div id="groupSummary" class="cctv-group-summary">현재 기준: 6티어</div>
+        <div id="filterbar" class="cctv-filters hidden" aria-hidden="true"></div>
       </section>
 
       <section class="cctv-panel cctv-manager" aria-label="방송 아이디 보조 입력">
         <h2>방송 아이디 보조 입력</h2>
-        <p>티어표에는 있는데 방송 아이디가 자동으로 안 잡히는 사람만 여기서 보조로 넣어주세요. 그룹 선택은 위에서 티어표 기준으로 합니다.</p>
+        <p>티어표에는 있는데 방송 아이디가 자동으로 안 잡히는 사람만 보조로 저장해 주세요.</p>
         <div class="cctv-manager-row">
           <input id="addName" placeholder="티어표 이름">
           <input id="addBroadcastId" placeholder="SOOP 아이디">
@@ -102,6 +106,6 @@
       </div>
     </main>
 
-    <script src="./cctv.js?v=20260808-cctv7"></script>
+    <script src="./cctv.js?v=20260808-cctv9"></script>
   </body>
 </html>

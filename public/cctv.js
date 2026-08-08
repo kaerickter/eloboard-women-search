@@ -9,6 +9,9 @@ const filterbar = document.getElementById("filterbar");
 const logBox = document.getElementById("log");
 const participantList = document.getElementById("participantList");
 const groupSummary = document.getElementById("groupSummary");
+const tierSelect = document.getElementById("tierSelect");
+const universitySelect = document.getElementById("universitySelect");
+const universityDivisionSelect = document.getElementById("universityDivisionSelect");
 const slots = [];
 let players = [];
 let currentFilter = DEFAULT_FILTER;
@@ -45,6 +48,11 @@ function universityNames(player) {
 function hasUniversity(player, university) {
   const target = normalizeUniversity(university);
   return universityNames(player).some((name) => normalizeUniversity(name) === target);
+}
+
+function isNewcastleUniversity(university) {
+  const name = normalizeUniversity(university);
+  return name.includes("뉴캐슬") || name.includes("뉴캣슬");
 }
 
 function playerDivisionLabel(player) {
@@ -148,6 +156,21 @@ async function fetchJson(url, options) {
   return data;
 }
 
+async function fetchLiveStatuses(names, force = false) {
+  const uniqueNames = [...new Set((names || []).map((name) => String(name || "").trim()).filter(Boolean))];
+  const statuses = [];
+  for (let index = 0; index < uniqueNames.length; index += 200) {
+    const batch = uniqueNames.slice(index, index + 200);
+    const live = await fetchJson("/api/live-status" + (force ? "?refresh=1" : ""), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ names: batch, refresh: force })
+    });
+    statuses.push(...(live.statuses || []));
+  }
+  return { statuses };
+}
+
 function createFilter(label, filter) {
   const button = document.createElement("button");
   button.className = "cctv-filter";
@@ -165,34 +188,63 @@ function appendFilterOnce(seen, label, filter) {
 }
 
 function renderFilters() {
-  filterbar.innerHTML = "";
-  const seen = new Set();
-  appendFilterOnce(seen, "전체", "all");
-  appendFilterOnce(seen, "5티어", "tier:5");
-  appendFilterOnce(seen, "6티어", "tier:6");
-  appendFilterOnce(seen, "뉴캐슬대학", "university:뉴캐슬대학");
-  appendFilterOnce(seen, "뉴캐슬대학 여자", "university_division:뉴캐슬대학:women");
-  appendFilterOnce(seen, "뉴캐슬대학 남자", "university_division:뉴캐슬대학:men");
+  if (filterbar) filterbar.innerHTML = "";
 
   const tiers = [...new Set(players.map((player) => tierNumber(player.tier)).filter(Boolean))]
     .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b, "ko"));
-  tiers.forEach((tier) => appendFilterOnce(seen, `${tier}티어`, `tier:${tier}`));
+  if (tierSelect) {
+    const selectedTier = currentFilter.startsWith("tier:") ? currentFilter.split(":")[1] : "6";
+    tierSelect.innerHTML = "";
+    tiers.forEach((tier) => {
+      const option = document.createElement("option");
+      option.value = tier;
+      option.textContent = `${tier}티어`;
+      option.selected = tier === selectedTier;
+      tierSelect.appendChild(option);
+    });
+    if (!tiers.includes(selectedTier) && tiers.length) tierSelect.value = tiers[0];
+  }
 
   const universities = [...new Set(players.flatMap(universityNames))]
     .sort((a, b) => a.localeCompare(b, "ko"));
-  universities.forEach((university) => appendFilterOnce(seen, university, `university:${university}`));
-
-  universities.forEach((university) => {
-    ["women", "men"].forEach((division) => {
-      if (players.some((player) => player.division === division && hasUniversity(player, university))) {
-        appendFilterOnce(
-          seen,
-          `${university} ${division === "men" ? "남자" : "여자"}`,
-          `university_division:${university}:${division}`
-        );
-      }
+  if (universitySelect) {
+    const selectedUniversity = currentFilter.startsWith("university") ? currentFilter.split(":")[1] : "";
+    universitySelect.innerHTML = "";
+    universities.forEach((university) => {
+      const hasWomen = players.some((player) => player.division === "women" && hasUniversity(player, university));
+      const hasMen = players.some((player) => player.division === "men" && hasUniversity(player, university));
+      if (!hasWomen && !(isNewcastleUniversity(university) && hasMen)) return;
+      const option = document.createElement("option");
+      option.value = university;
+      option.textContent = university;
+      option.selected = normalizeUniversity(university) === normalizeUniversity(selectedUniversity);
+      universitySelect.appendChild(option);
     });
-  });
+    updateUniversityDivisionOptions();
+  }
+}
+
+function updateUniversityDivisionOptions() {
+  if (!universitySelect || !universityDivisionSelect) return;
+  const university = universitySelect.value;
+  universityDivisionSelect.innerHTML = "";
+  if (isNewcastleUniversity(university)) {
+    [
+      ["all", "남자+여자 전체"],
+      ["women", "여자만"],
+      ["men", "남자만"]
+    ].forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      universityDivisionSelect.appendChild(option);
+    });
+  } else {
+    const option = document.createElement("option");
+    option.value = "women";
+    option.textContent = "여자만";
+    universityDivisionSelect.appendChild(option);
+  }
 }
 
 function matchesFilter(slot) {
@@ -497,14 +549,32 @@ function saveParticipantFromForm() {
 }
 
 function applyGroupFromForm() {
-  const type = document.getElementById("groupType").value;
-  const tier = tierNumber(document.getElementById("groupTier").value);
-  const university = document.getElementById("groupUniversity").value.trim();
-  const division = document.getElementById("groupDivision").value;
-  if (type === "tier" && tier) applyFilter(`tier:${tier}`, true);
-  else if (type === "university" && university) applyFilter(`university:${university}`, true);
-  else if (type === "university_division" && university && division) applyFilter(`university_division:${university}:${division}`, true);
-  else log("티어 또는 대학 이름을 입력해 주세요.");
+  const tier = tierNumber(tierSelect?.value);
+  if (tier) applyFilter(`tier:${tier}`, true);
+  else log("티어를 선택해 주세요.");
+}
+
+function applyUniversityFromForm() {
+  const university = universitySelect?.value || "";
+  const division = universityDivisionSelect?.value || "women";
+  if (!university) {
+    log("대학을 선택해 주세요.");
+    return;
+  }
+  if (isNewcastleUniversity(university) && division === "all") applyFilter(`university:${university}`, true);
+  else applyFilter(`university_division:${university}:${division}`, true);
+}
+
+function showMode(mode) {
+  const tierPanel = document.getElementById("tierPanel");
+  const universityPanel = document.getElementById("universityPanel");
+  const tierModeBtn = document.getElementById("tierModeBtn");
+  const universityModeBtn = document.getElementById("universityModeBtn");
+  const isTier = mode === "tier";
+  tierPanel?.classList.toggle("hidden", !isTier);
+  universityPanel?.classList.toggle("hidden", isTier);
+  tierModeBtn?.classList.toggle("active", isTier);
+  universityModeBtn?.classList.toggle("active", !isTier);
 }
 
 async function init(force = false) {
@@ -529,11 +599,7 @@ async function init(force = false) {
 
   const names = tierPlayers.map((player) => player.name);
   try {
-    const live = names.length ? await fetchJson("/api/live-status" + (force ? "?refresh=1" : ""), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ names, refresh: force })
-    }) : { statuses: [] };
+    const live = names.length ? await fetchLiveStatuses(names, force) : { statuses: [] };
     const liveByName = new Map((live.statuses || []).map((status) => [key(status.name), status]));
     players = mergePlayers(tierPlayers, loadManualParticipants(), liveByName);
     grid.innerHTML = "";
@@ -573,14 +639,12 @@ document.getElementById("retryBtn").onclick = () => slots.forEach((slot) => { if
 document.getElementById("refreshBtn").onclick = refreshLive;
 document.getElementById("stopBtn").onclick = stopAll;
 document.getElementById("addParticipantBtn").onclick = saveParticipantFromForm;
-document.getElementById("applyGroupBtn").onclick = applyGroupFromForm;
-document.getElementById("groupType").onchange = () => {
-  const type = document.getElementById("groupType").value;
-  document.getElementById("groupTier").style.display = type === "tier" ? "" : "none";
-  document.getElementById("groupUniversity").style.display = type === "tier" ? "none" : "";
-  document.getElementById("groupDivision").style.display = type === "university_division" ? "" : "none";
-};
-document.getElementById("groupType").dispatchEvent(new Event("change"));
+document.getElementById("applyTierBtn").onclick = applyGroupFromForm;
+document.getElementById("applyUniversityBtn").onclick = applyUniversityFromForm;
+document.getElementById("tierModeBtn").onclick = () => showMode("tier");
+document.getElementById("universityModeBtn").onclick = () => showMode("university");
+if (universitySelect) universitySelect.onchange = updateUniversityDivisionOptions;
+showMode("tier");
 
 window.addEventListener("storage", (event) => {
   if (event.key === SHARED_KEY) {
