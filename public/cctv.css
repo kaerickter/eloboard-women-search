@@ -6,7 +6,8 @@ body.cctv-page {
   font-family: Arial, "Noto Sans KR", sans-serif;
 }
 .cctv-shell {
-  max-width: 1760px;
+  width: 2068px;
+  max-width: none;
   margin: 0 auto;
   padding: 18px;
 }
@@ -335,6 +336,7 @@ body.cctv-page {
   background: #07090d;
 }
 @media (max-width: 1180px) {
+  .cctv-shell { width: auto; max-width: 1760px; }
   .cctv-layout { grid-template-columns: 1fr; }
   .cctv-main { position: static; }
   .cctv-manager-row,

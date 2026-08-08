@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv28";
+const CCTV_VERSION = "cctv29";
 const BOOTSTRAP_CONCURRENCY = 2;
 const FIRST_SMALL_COUNT = 2;
 const SERVER_COOLDOWN_MS = 30000;
@@ -157,6 +157,8 @@ function ensureHlsLibrary() {
 
 function attach(video, url, label, slot = null, options = {}) {
   let fatalHandled = false;
+  let softErrorCount = 0;
+  let lastSoftLogAt = 0;
   const hls = new Hls({
     enableWorker: true,
     lowLatencyMode: true,
@@ -181,9 +183,25 @@ function attach(video, url, label, slot = null, options = {}) {
     }
   });
   hls.on(Hls.Events.ERROR, (_, data) => {
-    log(`${label} 오류: ${data.type} / ${data.details}${data.fatal ? " [FATAL]" : ""}`);
     if (isShuttingDown) return;
-    if (!data.fatal) return;
+    const isSoftStall = data.type === Hls.ErrorTypes.MEDIA_ERROR && /bufferStalled|bufferSeekOverHole/i.test(data.details || "");
+    if (!data.fatal) {
+      if (isSoftStall) {
+        softErrorCount += 1;
+        if (Date.now() - lastSoftLogAt > 10000 || softErrorCount === 1 || softErrorCount === 3) {
+          lastSoftLogAt = Date.now();
+          log(`${label} 일시 멈춤 감지 ${softErrorCount}회`);
+        }
+        try { hls.recoverMediaError(); } catch {}
+        if (!slot && softErrorCount >= 3 && typeof options.onUnstable === "function") {
+          options.onUnstable(data, hls);
+        }
+        return;
+      }
+      log(`${label} 오류: ${data.type} / ${data.details}`);
+      return;
+    }
+    log(`${label} 오류: ${data.type} / ${data.details} [FATAL]`);
     if (!slot) {
       if (fatalHandled) return;
       fatalHandled = true;
@@ -820,6 +838,14 @@ async function setProxyMain(index = activeIndex) {
     document.getElementById("mainStatus").textContent = "프록시 LOW";
     document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | HIGH가 불안정해서 LOW로 전환했습니다.`;
     mainHls = attach(video, cacheBust(slot.data.lowUrl), `PROXY-LOW ${slot.player.name}`, null, {
+      onUnstable: () => {
+        if (mainPlayId !== currentPlayId) return;
+        destroyHls(mainHls);
+        mainHls = null;
+        showMainDirect(slot.player);
+        document.getElementById("mainStatus").textContent = "SOOP 원본";
+        document.getElementById("mainMeta").textContent = "프록시 LOW도 불안정해서 SOOP 원본 화면으로 되돌렸습니다.";
+      },
       onFatal: () => {
         if (mainPlayId !== currentPlayId) return;
         destroyHls(mainHls);
@@ -842,6 +868,19 @@ async function setProxyMain(index = activeIndex) {
   document.getElementById("mainStatus").textContent = slot.data?.highUrl ? "프록시 HIGH" : "프록시 LOW";
   document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | 프록시 MAIN · 선택한 한 명만 재생 중`;
   mainHls = attach(video, cacheBust(highUrl), `${slot.data?.highUrl ? "PROXY-HIGH" : "PROXY-LOW"} ${slot.player.name}`, null, {
+    onUnstable: () => {
+      if (mainPlayId !== currentPlayId) return;
+      if (slot.data?.highUrl && slot.data?.lowUrl && slot.data.highUrl !== slot.data.lowUrl) {
+        log(`${slot.player.name} 프록시 HIGH 멈춤 반복 - LOW로 전환합니다.`);
+        playLow();
+      } else {
+        destroyHls(mainHls);
+        mainHls = null;
+        showMainDirect(slot.player);
+        document.getElementById("mainStatus").textContent = "SOOP 원본";
+        document.getElementById("mainMeta").textContent = "프록시가 반복해서 멈춰 SOOP 원본 화면으로 되돌렸습니다.";
+      }
+    },
     onFatal: () => {
       if (mainPlayId !== currentPlayId) return;
       if (slot.data?.highUrl && slot.data?.lowUrl && slot.data.highUrl !== slot.data.lowUrl) {
