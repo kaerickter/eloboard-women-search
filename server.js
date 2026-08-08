@@ -1668,7 +1668,11 @@ async function runYtdlp(args) {
     try {
       return await execYtdlpCommand(command, args);
     } catch (error) {
-      errors.push(`${command.file}: ${error.message || error}`);
+      const message = String(error.message || error || "");
+      errors.push(`${command.file}: ${message}`);
+      if (/not currently live|This channel is not currently live|offline|private|members-only|login required|No video formats/i.test(message)) {
+        throw new Error(message);
+      }
     }
   }
   throw new Error("yt-dlp 실행 파일을 찾지 못했습니다. npm start가 vendor/yt-dlp 설치를 먼저 완료해야 합니다. " + errors.join(" | "));
