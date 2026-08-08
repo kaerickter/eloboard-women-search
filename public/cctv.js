@@ -1,6 +1,5 @@
-const CCTV_VERSION = "cctv29";
+const CCTV_VERSION = "cctv31";
 const BOOTSTRAP_CONCURRENCY = 2;
-const FIRST_SMALL_COUNT = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
 const MANUAL_KEY = "elo-kitten-cctv-manual-participants-v3";
@@ -429,8 +428,6 @@ async function refreshCurrentFilterLive(force = false) {
 async function prepareCurrentFilterScreens(force = false) {
   await refreshCurrentFilterLive(force);
   const liveSlots = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot));
-  const directSlots = liveSlots.slice(0, FIRST_SMALL_COUNT);
-  const hlsSlots = liveSlots.slice(FIRST_SMALL_COUNT);
 
   slots.forEach((slot) => {
     if (!matchesFilter(slot) || isSlotKnownOffline(slot)) {
@@ -438,26 +435,21 @@ async function prepareCurrentFilterScreens(force = false) {
     }
   });
 
-  directSlots.forEach((slot) => {
-    stopSmallPlayback(slot, "SOOP 준비");
-    showSoopDirectPreview(slot.index);
-  });
-
-  if (hlsSlots.length) {
+  if (liveSlots.length) {
     ensureHlsLibrary().catch((error) => log(`HLS 준비 실패: ${error.message}`));
   }
 
   let cursor = 0;
   async function worker() {
-    while (cursor < hlsSlots.length && !isServerCoolingDown()) {
-      const slot = hlsSlots[cursor++];
+    while (cursor < liveSlots.length && !isServerCoolingDown()) {
+      const slot = liveSlots[cursor++];
       if (slot.directPreview) restoreSlotVideo(slot);
       if (!slot.data || !slot.hls) await loadSlot(slot.index, { attachSmall: true });
     }
   }
-  await Promise.all(Array.from({ length: Math.min(BOOTSTRAP_CONCURRENCY, hlsSlots.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(BOOTSTRAP_CONCURRENCY, liveSlots.length) }, worker));
   refreshSlotVisibilityAndOrder();
-  log(`${filterLabel(currentFilter)} 기본 구성 완료: SOOP 원본 ${directSlots.length}명 · HLS ${hlsSlots.length}명`);
+  log(`${filterLabel(currentFilter)} 기본 구성 완료: LIVE ${liveSlots.length}명 · LOW HLS 2명씩 연결 · MAIN용 HIGH 캐시 준비`);
 }
 
 function applyFilter(filter, shouldLoad = false) {
