@@ -1300,6 +1300,36 @@ function addTierProfileAssets(players) {
   return (players || []).map((player) => ({ ...player, ...tierProfileAssets(player) }));
 }
 
+function addTierCctvSources(players) {
+  return addTierProfileAssets(players).map((player) => {
+    const directChannel = soopChannelFromHtml([
+      player.broadcastId,
+      player.broadcastUrl,
+      player.stationUrl,
+      player.station_url,
+      player.soopUrl,
+      player.soop_url,
+      player.afreecaUrl,
+      player.afreeca_url,
+      player.profileUrl
+    ].filter(Boolean).join(" "));
+    const broadcastId = String(
+      directChannel?.broadcastId ||
+      pinnedBroadcastIdFor(player.name) ||
+      channelRegistry[normalizePlayerName(player.name)] ||
+      player.broadcastId ||
+      ""
+    ).trim();
+    if (!/^[a-z0-9_-]+$/i.test(broadcastId)) return player;
+    return {
+      ...player,
+      broadcastId,
+      broadcastUrl: "https://play.sooplive.co.kr/" + encodeURIComponent(broadcastId),
+      cctvSource: directChannel?.broadcastId ? "tier-url" : "soop-alias"
+    };
+  });
+}
+
 async function discoverSoopChannel(name) {
   const key = normalizePlayerName(name);
   const aliasId = pinnedBroadcastIdFor(name);
@@ -2374,7 +2404,7 @@ const server = http.createServer(async (req, res) => {
         players = await tierRosterPromise;
       }
       return send(res, 200, JSON.stringify({
-        players: addTierProfileAssets(tierAdmin.applyOverrides(players)),
+        players: addTierCctvSources(tierAdmin.applyOverrides(players)),
         liveStatuses: sharedLiveStatuses(players.map((player) => player.name)),
         source: UNIVERSITY_LIST_URL,
         updatedAt: new Date(tierRosterCache?.cacheTime || Date.now()).toISOString(),
