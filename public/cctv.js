@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv24";
+const CCTV_VERSION = "cctv27";
 const BOOTSTRAP_CONCURRENCY = 2;
 const FIRST_SMALL_COUNT = 2;
 const SERVER_COOLDOWN_MS = 30000;
@@ -416,6 +416,10 @@ async function prepareCurrentFilterScreens(force = false) {
     showSoopDirectPreview(slot.index);
   });
 
+  if (hlsSlots.length) {
+    ensureHlsLibrary().catch((error) => log(`HLS 준비 실패: ${error.message}`));
+  }
+
   let cursor = 0;
   async function worker() {
     while (cursor < hlsSlots.length && !isServerCoolingDown()) {
@@ -594,18 +598,27 @@ function showSoopDirectPreview(index) {
   iframe.loading = "lazy";
   iframe.referrerPolicy = "no-referrer-when-downgrade";
   iframe.allow = "autoplay; fullscreen; picture-in-picture";
-
-  const open = document.createElement("a");
-  open.href = url;
-  open.target = "_blank";
-  open.rel = "noopener noreferrer";
-  open.textContent = "SOOP 바로 열기";
-  open.onclick = (event) => event.stopPropagation();
+  iframe.style.pointerEvents = "none";
+  wrap.onclick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMain(index);
+  };
 
   const hint = document.createElement("span");
-  hint.textContent = "원본 화면";
+  hint.textContent = "SOOP 원본 · 클릭하면 MAIN";
 
-  wrap.append(iframe, hint, open);
+  const overlay = document.createElement("button");
+  overlay.type = "button";
+  overlay.className = "cctv-preview-hit";
+  overlay.setAttribute("aria-label", `${slot.player.name} MAIN으로 보기`);
+  overlay.onclick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMain(index);
+  };
+
+  wrap.append(iframe, hint, overlay);
   slot.playerBox.appendChild(wrap);
   slot.directPreview = true;
   slot.status.textContent = "SOOP 원본";
@@ -1017,7 +1030,7 @@ function showMode(mode) {
 }
 
 async function init(force = false) {
-  log(`${CCTV_VERSION} 적용됨 · 기본은 6티어 LIVE만 표시하고, 맨 위 2명은 SOOP 원본 / 나머지는 HLS로 구성합니다.`);
+  log(`${CCTV_VERSION} 적용됨 · 기본은 6티어 목록만 먼저 표시하고, 영상은 버튼을 누르면 구성합니다.`);
   log("티어표를 불러오는 중");
   let tierPlayers = [];
   try {
@@ -1035,8 +1048,7 @@ async function init(force = false) {
   renderSelectors();
   applyFilter(currentFilter);
   log(`티어표 기준 화면 표시 완료: ${players.length}명`);
-  await prepareCurrentFilterScreens(force);
-  log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · 현재 LIVE 기준으로 작은 화면을 구성했습니다.`);
+  log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · 사이트 접속 속도를 위해 영상은 자동 시작하지 않습니다. '현재 LIVE 다시 구성'을 눌러 주세요.`);
 }
 
 setInterval(() => {
