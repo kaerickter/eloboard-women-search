@@ -22,6 +22,7 @@ let activeIndex = -1;
 let loadingVisible = false;
 let refreshingLive = false;
 let isShuttingDown = false;
+let mainPlayId = 0;
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -120,7 +121,8 @@ function destroyHls(hls) {
   }
 }
 
-function attach(video, url, label, slot = null) {
+function attach(video, url, label, slot = null, options = {}) {
+  let fatalHandled = false;
   const hls = new Hls({
     enableWorker: true,
     lowLatencyMode: true,
@@ -148,6 +150,13 @@ function attach(video, url, label, slot = null) {
     log(`${label} 오류: ${data.type} / ${data.details}${data.fatal ? " [FATAL]" : ""}`);
     if (isShuttingDown) return;
     if (!data.fatal) return;
+    if (!slot) {
+      if (fatalHandled) return;
+      fatalHandled = true;
+      try { if (typeof options.onFatal === "function") options.onFatal(data, hls); }
+      catch {}
+      return;
+    }
     try {
       if (data.details === "levelParsingError" && slot) scheduleSlotReload(slot, "playlist");
       else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
@@ -482,10 +491,23 @@ function shareMainStop() {
   if (channel) channel.postMessage(payload);
 }
 
+function cacheBust(url) {
+  return url + (String(url).includes("?") ? "&" : "?") + "r=" + Date.now();
+}
+
+function clearVideo(video) {
+  video.pause();
+  video.removeAttribute("src");
+  video.src = "";
+  video.load();
+}
+
 async function setMain(index, options = {}) {
   const slot = slots[index];
   if (!slot?.data) return;
   const cachedHighUrl = slot.data.highUrl;
+  const currentPlayId = ++mainPlayId;
+  let usedLowFallback = false;
   activeIndex = index;
   document.querySelectorAll(".cctv-card").forEach((card, cardIndex) => {
     card.classList.toggle("active", cardIndex === index);
@@ -495,14 +517,31 @@ async function setMain(index, options = {}) {
   document.getElementById("mainTitle").textContent = "MAIN - " + slot.player.name;
   document.getElementById("mainStatus").textContent = cachedHighUrl ? "최고화질 연결 중" : "최고화질 조회 중";
   const video = document.getElementById("mainVideo");
-  if (cachedHighUrl) {
+  const playMainUrl = (url, quality) => {
     destroyHls(mainHls);
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    document.getElementById("mainStatus").textContent = "최고화질";
-    document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | HIGH ${(slot.data.highMeta || {}).height || "?"}p`;
-    mainHls = attach(video, cachedHighUrl + "?r=" + Date.now(), `HIGH ${slot.player.name}`);
+    clearVideo(video);
+    document.getElementById("mainStatus").textContent = quality;
+    document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | ${quality} ${(quality === "LOW" ? (slot.data.lowMeta || {}).height : (slot.data.highMeta || {}).height) || "?"}p`;
+    mainHls = attach(video, cacheBust(url), `${quality} ${slot.player.name}`, null, {
+      onFatal: () => {
+        if (currentPlayId !== mainPlayId || isShuttingDown) return;
+        destroyHls(mainHls);
+        mainHls = null;
+        if (!usedLowFallback && quality === "HIGH" && slot.data.lowUrl) {
+          usedLowFallback = true;
+          document.getElementById("mainStatus").textContent = "HIGH 불안정 · LOW로 전환";
+          log(`${slot.player.name} MAIN HIGH 불안정 - LOW로 전환합니다.`);
+          playMainUrl(slot.data.lowUrl, "LOW");
+          return;
+        }
+        clearVideo(video);
+        document.getElementById("mainStatus").textContent = "재생 불안정";
+        document.getElementById("mainMeta").textContent = "이 방송 주소가 불안정해서 MAIN 재시도를 멈췄습니다. 다른 방송을 선택해 주세요.";
+      }
+    });
+  };
+  if (cachedHighUrl) {
+    playMainUrl(cachedHighUrl, "HIGH");
     fetchJson(`/api/cctv/high/${encodeURIComponent(slot.data.bj)}`)
       .then((data) => { slot.data = Object.assign({}, slot.data, data); })
       .catch((error) => log(`${slot.player.name} HIGH 갱신 실패: ${error.message}`));
@@ -511,13 +550,7 @@ async function setMain(index, options = {}) {
   try {
     const data = await fetchJson(`/api/cctv/high/${encodeURIComponent(slot.data.bj)}`);
     slot.data = Object.assign({}, slot.data, data);
-    destroyHls(mainHls);
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    document.getElementById("mainStatus").textContent = "최고화질";
-    document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | HIGH ${(data.highMeta || {}).height || "?"}p`;
-    mainHls = attach(video, data.highUrl + "?r=" + Date.now(), `HIGH ${slot.player.name}`);
+    playMainUrl(data.highUrl, "HIGH");
   } catch (error) {
     document.getElementById("mainStatus").textContent = "실패";
     document.getElementById("mainMeta").textContent = error.message;
@@ -573,6 +606,7 @@ async function randomMain() {
 }
 
 function stopMainOnly(options = {}) {
+  mainPlayId += 1;
   destroyHls(mainHls);
   mainHls = null;
   activeIndex = -1;
@@ -590,6 +624,7 @@ function stopMainOnly(options = {}) {
 
 function stopAll(finalStop = false) {
   if (finalStop) isShuttingDown = true;
+  mainPlayId += 1;
   slots.forEach((slot) => {
     if (slot.reloadTimer) {
       clearTimeout(slot.reloadTimer);
