@@ -1,4 +1,6 @@
 const BOOTSTRAP_CONCURRENCY = 2;
+const FIRST_SMALL_COUNT = 2;
+const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
 const MANUAL_KEY = "elo-kitten-cctv-manual-participants-v3";
 const SHARED_KEY = "elo-kitten-cctv-main-v3";
@@ -23,6 +25,8 @@ let loadingVisible = false;
 let refreshingLive = false;
 let isShuttingDown = false;
 let mainPlayId = 0;
+let cctvServerCooldownUntil = 0;
+let lastCooldownLogAt = 0;
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -171,9 +175,34 @@ function attach(video, url, label, slot = null, options = {}) {
 
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
-  const data = await response.json();
+  const text = await response.text();
+  if (!text.trim()) {
+    const error = new Error("서버 응답이 비어 있어 30초 쉬어갑니다.");
+    error.code = "EMPTY_JSON";
+    throw error;
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    const error = new Error("서버 응답이 깨져 있어 30초 쉬어갑니다.");
+    error.code = "INVALID_JSON";
+    throw error;
+  }
   if (!response.ok || data.ok === false) throw new Error(data.error || "요청 실패");
   return data;
+}
+
+function isServerCoolingDown() {
+  return Date.now() < cctvServerCooldownUntil;
+}
+
+function enterServerCooldown(message) {
+  cctvServerCooldownUntil = Date.now() + SERVER_COOLDOWN_MS;
+  if (Date.now() - lastCooldownLogAt > 5000) {
+    lastCooldownLogAt = Date.now();
+    log(`${message} 30초 후 다시 시도해 주세요.`);
+  }
 }
 
 async function fetchLiveStatuses(names, force = false) {
@@ -410,6 +439,10 @@ async function resolveBroadcastId(slot) {
 
 async function loadSlot(index) {
   const slot = slots[index];
+  if (isServerCoolingDown()) {
+    slot.status.textContent = "서버 쉬는 중";
+    return false;
+  }
   slot.tried = true;
   const broadcastId = await resolveBroadcastId(slot);
   if (!broadcastId) {
@@ -440,6 +473,14 @@ async function loadSlot(index) {
     refreshSlotVisibilityAndOrder();
     return true;
   } catch (error) {
+    if (error.code === "EMPTY_JSON" || error.code === "INVALID_JSON") {
+      slot.tried = false;
+      slot.status.textContent = "잠시 후";
+      slot.meta.textContent = error.message;
+      enterServerCooldown(error.message);
+      refreshSlotVisibilityAndOrder();
+      return false;
+    }
     slot.status.textContent = "실패";
     slot.meta.textContent = error.message;
     log(`${slot.player.name}: ${error.message}`);
@@ -544,7 +585,10 @@ async function setMain(index, options = {}) {
     playMainUrl(cachedHighUrl, "HIGH");
     fetchJson(`/api/cctv/high/${encodeURIComponent(slot.data.bj)}`)
       .then((data) => { slot.data = Object.assign({}, slot.data, data); })
-      .catch((error) => log(`${slot.player.name} HIGH 갱신 실패: ${error.message}`));
+      .catch((error) => {
+        if (error.code === "EMPTY_JSON" || error.code === "INVALID_JSON") enterServerCooldown(error.message);
+        else log(`${slot.player.name} HIGH 갱신 실패: ${error.message}`);
+      });
     return;
   }
   try {
@@ -552,18 +596,30 @@ async function setMain(index, options = {}) {
     slot.data = Object.assign({}, slot.data, data);
     playMainUrl(data.highUrl, "HIGH");
   } catch (error) {
+    if (error.code === "EMPTY_JSON" || error.code === "INVALID_JSON") {
+      enterServerCooldown(error.message);
+      document.getElementById("mainStatus").textContent = "잠시 후";
+      document.getElementById("mainMeta").textContent = error.message;
+      return;
+    }
     document.getElementById("mainStatus").textContent = "실패";
     document.getElementById("mainMeta").textContent = error.message;
   }
 }
 
-async function loadVisibleUnloaded() {
+async function loadVisibleUnloaded(limit = Infinity) {
   if (loadingVisible) return;
+  if (isServerCoolingDown()) {
+    log("서버가 잠시 쉬는 중입니다. 조금 뒤 다시 시도해 주세요.");
+    return;
+  }
   loadingVisible = true;
   let cursor = 0;
-  const targets = slots.filter((slot) => matchesFilter(slot) && !isSlotKnownOffline(slot) && !slot.data && !slot.tried);
+  const targets = slots
+    .filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot) && !slot.data && !slot.tried)
+    .slice(0, limit);
   async function worker() {
-    while (cursor < targets.length) {
+    while (cursor < targets.length && !isServerCoolingDown()) {
       const slot = targets[cursor++];
       await loadSlot(slot.index);
     }
@@ -574,12 +630,17 @@ async function loadVisibleUnloaded() {
 }
 
 async function startVisibleLive() {
-  await loadVisibleUnloaded();
+  await loadVisibleUnloaded(FIRST_SMALL_COUNT);
 }
 
 async function openSlotMain(index) {
   const slot = slots[index];
   if (!slot) return;
+  if (isServerCoolingDown() && !slot.data) {
+    slot.status.textContent = "서버 쉬는 중";
+    log("서버가 잠시 쉬는 중입니다. 30초 뒤 다시 클릭해 주세요.");
+    return;
+  }
   if (!slot.data) {
     const ok = await loadSlot(index);
     if (!ok) return;
@@ -588,9 +649,14 @@ async function openSlotMain(index) {
 }
 
 async function randomMain() {
+  if (isServerCoolingDown()) {
+    log("서버가 잠시 쉬는 중입니다. 30초 뒤 다시 시도해 주세요.");
+    return;
+  }
   const candidates = slots.filter((slot) => slot.data && matchesFilter(slot));
   if (!candidates.length) {
     await refreshCurrentFilterLive(false);
+    if (isServerCoolingDown()) return;
     const liveTargets = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !slot.data && !isSlotKnownOffline(slot));
     if (!liveTargets.length) {
       log("현재 기준에서 재생 가능한 방송이 아직 없습니다.");
