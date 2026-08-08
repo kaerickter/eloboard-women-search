@@ -1,10 +1,11 @@
+const CCTV_VERSION = "cctv22";
 const BOOTSTRAP_CONCURRENCY = 2;
 const FIRST_SMALL_COUNT = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
 const MANUAL_KEY = "elo-kitten-cctv-manual-participants-v3";
 const SHARED_KEY = "elo-kitten-cctv-main-v3";
-const channel = "BroadcastChannel" in window ? new BroadcastChannel("elo-kitten-cctv") : null;
+const channel = null;
 
 const grid = document.getElementById("grid");
 const filterbar = document.getElementById("filterbar");
@@ -27,6 +28,7 @@ let isShuttingDown = false;
 let mainPlayId = 0;
 let cctvServerCooldownUntil = 0;
 let lastCooldownLogAt = 0;
+let hlsLibraryPromise = null;
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -132,6 +134,20 @@ function destroyHls(hls) {
   if (hls) {
     try { hls.destroy(); } catch {}
   }
+}
+
+function ensureHlsLibrary() {
+  if (window.Hls) return Promise.resolve(window.Hls);
+  if (hlsLibraryPromise) return hlsLibraryPromise;
+  hlsLibraryPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
+    script.async = true;
+    script.onload = () => window.Hls ? resolve(window.Hls) : reject(new Error("HLS 라이브러리를 불러오지 못했습니다."));
+    script.onerror = () => reject(new Error("HLS 라이브러리를 불러오지 못했습니다."));
+    document.head.appendChild(script);
+  });
+  return hlsLibraryPromise;
 }
 
 function attach(video, url, label, slot = null, options = {}) {
@@ -448,8 +464,9 @@ async function resolveBroadcastId(slot) {
   }
 }
 
-async function loadSlot(index) {
+async function loadSlot(index, options = {}) {
   const slot = slots[index];
+  const attachSmall = options.attachSmall === true;
   if (isServerCoolingDown()) {
     slot.status.textContent = "서버 쉬는 중";
     return false;
@@ -475,13 +492,18 @@ async function loadSlot(index) {
     slot.player.live = Object.assign({}, slot.player.live || {}, { isLive: true, broadcastId });
     slot.status.textContent = "LIVE";
     slot.meta.textContent = `${playerLabel(slot.player)} | LOW ${(data.lowMeta || {}).height || "?"}p | HIGH ${(data.highMeta || {}).height || "?"}p`;
-    restoreSlotVideo(slot);
-    destroyHls(slot.hls);
-    slot.video.pause();
-    slot.video.removeAttribute("src");
-    slot.video.load();
-    slot.video.muted = true;
-    slot.hls = attach(slot.video, data.lowUrl, `LOW ${slot.player.name}`, slot);
+    if (attachSmall) {
+      await ensureHlsLibrary();
+      restoreSlotVideo(slot);
+      destroyHls(slot.hls);
+      slot.video.pause();
+      slot.video.removeAttribute("src");
+      slot.video.load();
+      slot.video.muted = true;
+      slot.hls = attach(slot.video, data.lowUrl, `LOW ${slot.player.name}`, slot);
+    } else if (!slot.directPreview) {
+      slot.status.textContent = "MAIN 준비";
+    }
     refreshSlotVisibilityAndOrder();
     return true;
   } catch (error) {
@@ -564,7 +586,7 @@ function scheduleSlotReload(slot, reason = "error") {
 async function reloadSlot(index) {
   const slot = slots[index];
   if (isShuttingDown) return false;
-  if (!slot.data) return loadSlot(index);
+  if (!slot.data) return loadSlot(index, { attachSmall: true });
   if (slot.reloadTimer) {
     clearTimeout(slot.reloadTimer);
     slot.reloadTimer = null;
@@ -581,15 +603,11 @@ async function reloadSlot(index) {
 }
 
 function shareMain(broadcastId) {
-  const payload = { broadcastId, at: Date.now() };
-  localStorage.setItem(SHARED_KEY, JSON.stringify(payload));
-  if (channel) channel.postMessage(payload);
+  return;
 }
 
 function shareMainStop() {
-  const payload = { stopMain: true, at: Date.now() };
-  localStorage.setItem(SHARED_KEY, JSON.stringify(payload));
-  if (channel) channel.postMessage(payload);
+  return;
 }
 
 function cacheBust(url) {
@@ -603,68 +621,151 @@ function clearVideo(video) {
   video.load();
 }
 
+function clearMainFrame() {
+  const video = document.getElementById("mainVideo");
+  const box = video?.parentElement;
+  box?.querySelectorAll(".cctv-main-frame").forEach((item) => item.remove());
+  if (video) video.style.display = "";
+}
+
+function showMainDirect(player) {
+  const url = soopDirectUrl(player);
+  const video = document.getElementById("mainVideo");
+  const box = video?.parentElement;
+  if (!url || !box || !video) return false;
+  destroyHls(mainHls);
+  mainHls = null;
+  clearVideo(video);
+  video.style.display = "none";
+  box.querySelectorAll(".cctv-main-frame").forEach((item) => item.remove());
+  const frame = document.createElement("iframe");
+  frame.className = "cctv-main-frame";
+  frame.src = url;
+  frame.loading = "eager";
+  frame.referrerPolicy = "no-referrer-when-downgrade";
+  frame.allow = "autoplay; fullscreen; picture-in-picture";
+  box.appendChild(frame);
+  return true;
+}
+
 async function setMain(index, options = {}) {
   const slot = slots[index];
-  if (!slot?.data) return;
-  const cachedHighUrl = slot.data.highUrl;
+  if (!slot) return;
   const currentPlayId = ++mainPlayId;
-  let usedLowFallback = false;
   activeIndex = index;
   document.querySelectorAll(".cctv-card").forEach((card, cardIndex) => {
     card.classList.toggle("active", cardIndex === index);
   });
-  if (!options.fromShare) shareMain(slot.data.bj);
 
   document.getElementById("mainTitle").textContent = "MAIN - " + slot.player.name;
-  document.getElementById("mainStatus").textContent = cachedHighUrl ? "최고화질 연결 중" : "최고화질 조회 중";
+  document.getElementById("mainStatus").textContent = "SOOP 원본";
+  if (showMainDirect(slot.player)) {
+    document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | SOOP 원본 화면입니다. 서버 프록시를 사용하지 않습니다.`;
+  } else {
+    document.getElementById("mainStatus").textContent = "주소 없음";
+    document.getElementById("mainMeta").textContent = "SOOP 주소를 찾지 못했습니다. 방송 아이디 보조 입력을 확인해 주세요.";
+  }
+}
+
+async function setProxyMain(index = activeIndex) {
+  let slot = slots[index];
+  if (!slot || !matchesFilter(slot) || isSlotKnownOffline(slot)) {
+    slot = slots.find((item) => matchesFilter(item) && isSlotLive(item) && !isSlotKnownOffline(item));
+  }
+  if (!slot) {
+    await refreshCurrentFilterLive(false);
+    slot = slots.find((item) => matchesFilter(item) && isSlotLive(item) && !isSlotKnownOffline(item));
+  }
+  if (!slot) {
+    log("프록시 MAIN으로 볼 수 있는 LIVE 방송이 아직 없습니다.");
+    return;
+  }
+
+  const indexToPlay = slot.index;
+  const currentPlayId = ++mainPlayId;
+  activeIndex = indexToPlay;
+  document.querySelectorAll(".cctv-card").forEach((card, cardIndex) => {
+    card.classList.toggle("active", cardIndex === indexToPlay);
+  });
+
+  document.getElementById("mainTitle").textContent = "MAIN - " + slot.player.name;
+  document.getElementById("mainStatus").textContent = "프록시 준비";
+  document.getElementById("mainMeta").textContent = "프록시 MAIN은 선택한 한 명만 재생합니다.";
+
+  try {
+    await ensureHlsLibrary();
+  } catch (error) {
+    log(`프록시 MAIN 준비 실패: ${error.message}`);
+    showMainDirect(slot.player);
+    document.getElementById("mainStatus").textContent = "SOOP 원본";
+    document.getElementById("mainMeta").textContent = "HLS 재생 도구를 불러오지 못해 SOOP 원본 화면으로 표시합니다.";
+    return;
+  }
+
+  if (!slot.data) {
+    const ok = await loadSlot(indexToPlay, { attachSmall: false });
+    if (!ok || mainPlayId !== currentPlayId) {
+      document.getElementById("mainStatus").textContent = "프록시 대기";
+      document.getElementById("mainMeta").textContent = "방송 주소를 바로 가져오지 못했습니다. 잠시 뒤 다시 눌러 주세요.";
+      return;
+    }
+  }
+
   const video = document.getElementById("mainVideo");
-  const playMainUrl = (url, quality) => {
+  clearMainFrame();
+  destroyHls(mainHls);
+  mainHls = null;
+  clearVideo(video);
+  video.muted = false;
+  video.controls = true;
+
+  const playLow = () => {
+    if (mainPlayId !== currentPlayId || !slot.data?.lowUrl) return;
     destroyHls(mainHls);
     clearVideo(video);
-    document.getElementById("mainStatus").textContent = quality;
-    document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | ${quality} ${(quality === "LOW" ? (slot.data.lowMeta || {}).height : (slot.data.highMeta || {}).height) || "?"}p`;
-    mainHls = attach(video, cacheBust(url), `${quality} ${slot.player.name}`, null, {
+    document.getElementById("mainStatus").textContent = "프록시 LOW";
+    document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | HIGH가 불안정해서 LOW로 전환했습니다.`;
+    mainHls = attach(video, cacheBust(slot.data.lowUrl), `PROXY-LOW ${slot.player.name}`, null, {
       onFatal: () => {
-        if (currentPlayId !== mainPlayId || isShuttingDown) return;
+        if (mainPlayId !== currentPlayId) return;
         destroyHls(mainHls);
         mainHls = null;
-        if (!usedLowFallback && quality === "HIGH" && slot.data.lowUrl) {
-          usedLowFallback = true;
-          document.getElementById("mainStatus").textContent = "HIGH 불안정 · LOW로 전환";
-          log(`${slot.player.name} MAIN HIGH 불안정 - LOW로 전환합니다.`);
-          playMainUrl(slot.data.lowUrl, "LOW");
-          return;
-        }
-        clearVideo(video);
-        document.getElementById("mainStatus").textContent = "재생 불안정";
-        document.getElementById("mainMeta").textContent = "이 방송 주소가 불안정해서 MAIN 재시도를 멈췄습니다. 다른 방송을 선택해 주세요.";
+        showMainDirect(slot.player);
+        document.getElementById("mainStatus").textContent = "SOOP 원본";
+        document.getElementById("mainMeta").textContent = "프록시가 불안정해서 SOOP 원본 화면으로 되돌렸습니다.";
       }
     });
   };
-  if (cachedHighUrl) {
-    playMainUrl(cachedHighUrl, "HIGH");
-    fetchJson(`/api/cctv/high/${encodeURIComponent(slot.data.bj)}`)
-      .then((data) => { slot.data = Object.assign({}, slot.data, data); })
-      .catch((error) => {
-        if (error.code === "EMPTY_JSON" || error.code === "INVALID_JSON") enterServerCooldown(error.message);
-        else log(`${slot.player.name} HIGH 갱신 실패: ${error.message}`);
-      });
+
+  const highUrl = slot.data?.highUrl || slot.data?.lowUrl;
+  if (!highUrl) {
+    showMainDirect(slot.player);
+    document.getElementById("mainStatus").textContent = "SOOP 원본";
+    document.getElementById("mainMeta").textContent = "프록시 주소가 없어 SOOP 원본 화면으로 표시합니다.";
     return;
   }
-  try {
-    const data = await fetchJson(`/api/cctv/high/${encodeURIComponent(slot.data.bj)}`);
-    slot.data = Object.assign({}, slot.data, data);
-    playMainUrl(data.highUrl, "HIGH");
-  } catch (error) {
-    if (error.code === "EMPTY_JSON" || error.code === "INVALID_JSON") {
-      enterServerCooldown(error.message);
-      document.getElementById("mainStatus").textContent = "잠시 후";
-      document.getElementById("mainMeta").textContent = error.message;
-      return;
+
+  document.getElementById("mainStatus").textContent = slot.data?.highUrl ? "프록시 HIGH" : "프록시 LOW";
+  document.getElementById("mainMeta").textContent = `${playerLabel(slot.player)} | 프록시 MAIN · 선택한 한 명만 재생 중`;
+  mainHls = attach(video, cacheBust(highUrl), `${slot.data?.highUrl ? "PROXY-HIGH" : "PROXY-LOW"} ${slot.player.name}`, null, {
+    onFatal: () => {
+      if (mainPlayId !== currentPlayId) return;
+      if (slot.data?.highUrl && slot.data?.lowUrl && slot.data.highUrl !== slot.data.lowUrl) {
+        log(`${slot.player.name} 프록시 HIGH 불안정 - LOW로 전환합니다.`);
+        playLow();
+      } else {
+        destroyHls(mainHls);
+        mainHls = null;
+        showMainDirect(slot.player);
+        document.getElementById("mainStatus").textContent = "SOOP 원본";
+        document.getElementById("mainMeta").textContent = "프록시가 불안정해서 SOOP 원본 화면으로 되돌렸습니다.";
+      }
     }
-    document.getElementById("mainStatus").textContent = "실패";
-    document.getElementById("mainMeta").textContent = error.message;
-  }
+  });
+}
+
+async function proxyMain() {
+  await setProxyMain(activeIndex);
 }
 
 async function loadVisibleUnloaded(limit = Infinity) {
@@ -681,7 +782,7 @@ async function loadVisibleUnloaded(limit = Infinity) {
   async function worker() {
     while (cursor < targets.length && !isServerCoolingDown()) {
       const slot = targets[cursor++];
-      await loadSlot(slot.index);
+      await loadSlot(slot.index, { attachSmall: true });
     }
   }
   await Promise.all(Array.from({ length: Math.min(BOOTSTRAP_CONCURRENCY, targets.length) }, worker));
@@ -690,6 +791,9 @@ async function loadVisibleUnloaded(limit = Infinity) {
 }
 
 async function startVisibleLive() {
+  if (!slots.some((slot) => matchesFilter(slot) && slot.player.live)) {
+    await refreshCurrentFilterLive(false);
+  }
   const targets = slots
     .filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot) && !slot.directPreview)
     .slice(0, FIRST_SMALL_COUNT);
@@ -703,36 +807,18 @@ async function startVisibleLive() {
 async function openSlotMain(index) {
   const slot = slots[index];
   if (!slot) return;
-  if (isServerCoolingDown() && !slot.data) {
-    slot.status.textContent = "서버 쉬는 중";
-    log("서버가 잠시 쉬는 중입니다. 30초 뒤 다시 클릭해 주세요.");
-    return;
-  }
-  if (!slot.data) {
-    const ok = await loadSlot(index);
-    if (!ok) return;
-  }
   await setMain(index);
 }
 
 async function randomMain() {
-  if (isServerCoolingDown()) {
-    log("서버가 잠시 쉬는 중입니다. 30초 뒤 다시 시도해 주세요.");
-    return;
-  }
-  const candidates = slots.filter((slot) => slot.data && matchesFilter(slot));
+  let candidates = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot));
   if (!candidates.length) {
     await refreshCurrentFilterLive(false);
-    if (isServerCoolingDown()) return;
-    const liveTargets = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !slot.data && !isSlotKnownOffline(slot));
-    if (!liveTargets.length) {
+    candidates = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot));
+    if (!candidates.length) {
       log("현재 기준에서 재생 가능한 방송이 아직 없습니다.");
       return;
     }
-    const target = liveTargets[Math.floor(Math.random() * liveTargets.length)];
-    const ok = await loadSlot(target.index);
-    if (ok) await setMain(target.index);
-    return;
   }
   const slot = candidates[Math.floor(Math.random() * candidates.length)];
   await setMain(slot.index);
@@ -744,6 +830,7 @@ function stopMainOnly(options = {}) {
   mainHls = null;
   activeIndex = -1;
   document.querySelectorAll(".cctv-card").forEach((card) => card.classList.remove("active"));
+  clearMainFrame();
   const mainVideo = document.getElementById("mainVideo");
   mainVideo.pause();
   mainVideo.removeAttribute("src");
@@ -775,6 +862,7 @@ function stopAll(finalStop = false) {
   destroyHls(mainHls);
   mainHls = null;
   activeIndex = -1;
+  clearMainFrame();
   const mainVideo = document.getElementById("mainVideo");
   mainVideo.pause();
   mainVideo.removeAttribute("src");
@@ -795,6 +883,7 @@ async function refreshLive() {
 }
 
 function handleShared(payload) {
+  return;
   if (payload?.stopMain) {
     stopMainOnly({ fromShare: true });
     return;
@@ -887,6 +976,7 @@ function showMode(mode) {
 }
 
 async function init(force = false) {
+  log(`${CCTV_VERSION} 적용됨 · 첫 화면은 목록만, 영상은 SOOP 원본만 사용합니다.`);
   log("티어표를 불러오는 중");
   let tierPlayers = [];
   try {
@@ -904,11 +994,11 @@ async function init(force = false) {
   renderSelectors();
   applyFilter(currentFilter);
   log(`티어표 기준 화면 표시 완료: ${players.length}명`);
-  await refreshCurrentFilterLive(force);
-  log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · 작은화면은 버튼을 누르면 시작됩니다.`);
+  log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · LIVE 조회/영상 시작은 버튼을 누르면 실행됩니다.`);
 }
 
 setInterval(() => {
+  return;
   slots.forEach((slot) => {
     if (!slot.data || !slot.video || slot.video.paused) return;
     const now = slot.video.currentTime || 0;
@@ -927,7 +1017,14 @@ setInterval(() => {
 
 document.getElementById("randomBtn").onclick = randomMain;
 document.getElementById("startSmallBtn").onclick = startVisibleLive;
-document.getElementById("retryBtn").onclick = () => slots.forEach((slot) => { if (slot.data) reloadSlot(slot.index); });
+document.getElementById("proxyMainBtn").onclick = proxyMain;
+document.getElementById("retryBtn").onclick = () => {
+  slots
+    .filter((slot) => matchesFilter(slot) && isSlotLive(slot))
+    .slice(0, FIRST_SMALL_COUNT)
+    .forEach((slot) => showSoopDirectPreview(slot.index));
+  log("작은 화면 복구는 HLS 재시작 없이 SOOP 원본 화면만 다시 표시합니다.");
+};
 document.getElementById("refreshBtn").onclick = refreshLive;
 document.getElementById("stopBtn").onclick = stopMainOnly;
 document.getElementById("addParticipantBtn").onclick = saveParticipantFromForm;
