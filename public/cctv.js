@@ -71,6 +71,11 @@ function safeBroadcastId(value) {
   return /^[a-zA-Z0-9_-]+$/.test(id) ? id : "";
 }
 
+function broadcastIdFromUrl(value) {
+  const match = String(value || "").match(/https?:\/\/(?:bj\.afreecatv\.com|ch\.sooplive\.co\.kr|play\.sooplive\.co\.kr)\/([a-z0-9_-]+)/i);
+  return safeBroadcastId(match?.[1]);
+}
+
 function loadManualParticipants() {
   try {
     const saved = JSON.parse(localStorage.getItem(MANUAL_KEY) || "[]");
@@ -250,13 +255,40 @@ function createSlot(player) {
 }
 
 function broadcastIdOf(player) {
-  return safeBroadcastId(player.live?.broadcastId || player.broadcastId);
+  return safeBroadcastId(player.live?.broadcastId) ||
+    safeBroadcastId(player.broadcastId) ||
+    broadcastIdFromUrl(player.broadcastUrl) ||
+    broadcastIdFromUrl(player.stationUrl) ||
+    broadcastIdFromUrl(player.station_url) ||
+    broadcastIdFromUrl(player.soopUrl) ||
+    broadcastIdFromUrl(player.soop_url) ||
+    broadcastIdFromUrl(player.afreecaUrl) ||
+    broadcastIdFromUrl(player.afreeca_url);
+}
+
+async function resolveBroadcastId(slot) {
+  const existing = broadcastIdOf(slot.player);
+  if (existing) return existing;
+  slot.status.textContent = "아이디 찾는 중";
+  try {
+    const live = await fetchJson("/api/live-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ names: [slot.player.name] })
+    });
+    const status = (live.statuses || [])[0];
+    if (status) slot.player.live = status;
+    return broadcastIdOf(slot.player);
+  } catch (error) {
+    log(`${slot.player.name} 아이디 조회 실패: ${error.message}`);
+    return "";
+  }
 }
 
 async function loadSlot(index) {
   const slot = slots[index];
   slot.tried = true;
-  const broadcastId = broadcastIdOf(slot.player);
+  const broadcastId = await resolveBroadcastId(slot);
   if (!broadcastId) {
     slot.status.textContent = "SOOP ID 없음";
     return false;
