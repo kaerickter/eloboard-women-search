@@ -6,7 +6,7 @@
     <title>cctv · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260808-cctv">
-    <link rel="stylesheet" href="./cctv.css?v=20260809-cctv22">
+    <link rel="stylesheet" href="./cctv.css?v=20260809-cctv24">
   </head>
   <body class="cctv-page">
     <nav class="site-nav" aria-label="페이지 이동">
@@ -31,7 +31,7 @@
           <p>티어표 기준으로 방송을 골라 봅니다. 첫 화면은 6티어이며, 대학별은 뉴캐슬대학만 남자/여자 전체를 보여주고 다른 대학은 여자만 보여줍니다.</p>
         </div>
         <div class="cctv-actions">
-          <button id="startSmallBtn" class="primary" type="button">빠른 2명 시작</button>
+          <button id="startSmallBtn" class="primary" type="button">현재 LIVE 다시 구성</button>
           <button id="randomBtn" type="button">아무나 방송보기</button>
           <button id="proxyMainBtn" type="button">프록시 MAIN</button>
           <button id="retryBtn" type="button">작은 화면 복구</button>
@@ -101,7 +101,7 @@
               <span id="mainStatus" class="cctv-status">대기</span>
             </div>
             <div class="cctv-player"><video id="mainVideo" controls autoplay playsinline></video></div>
-            <div id="mainMeta" class="cctv-meta">방송 중인 작은 화면을 클릭하거나 아무나 방송보기를 누르면 다른 화면에서도 같은 MAIN 방송을 볼 수 있습니다.</div>
+            <div id="mainMeta" class="cctv-meta">방송 중인 작은 화면을 클릭하거나 아무나 방송보기를 누르면 MAIN에 표시됩니다. 작은 화면은 계속 유지됩니다.</div>
           </section>
           <div id="log" class="cctv-panel cctv-log"></div>
         </div>
@@ -109,6 +109,6 @@
       </div>
     </main>
 
-    <script src="./cctv.js?v=20260809-cctv22"></script>
+    <script src="./cctv.js?v=20260809-cctv24"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv22";
+const CCTV_VERSION = "cctv24";
 const BOOTSTRAP_CONCURRENCY = 2;
 const FIRST_SMALL_COUNT = 2;
 const SERVER_COOLDOWN_MS = 30000;
@@ -307,11 +307,12 @@ function matchesFilter(slot) {
 }
 
 function isSlotLive(slot) {
-  return Boolean(slot?.data || slot?.player?.live?.isLive);
+  if (slot?.player?.live) return Boolean(slot.player.live.isLive);
+  return Boolean(slot?.data);
 }
 
 function isSlotKnownOffline(slot) {
-  return Boolean(slot?.player?.live && !slot.player.live.isLive && !slot.data);
+  return Boolean(slot?.player?.live && !slot.player.live.isLive);
 }
 
 function shouldShowSlot(slot) {
@@ -334,6 +335,19 @@ function refreshSlotVisibilityAndOrder() {
     slot.card.style.order = String(slotSortRank(slot) * 10000 + slot.index);
   });
   updateGroupSummary();
+}
+
+function stopSmallPlayback(slot, statusText = "대기") {
+  if (!slot) return;
+  if (slot.reloadTimer) {
+    clearTimeout(slot.reloadTimer);
+    slot.reloadTimer = null;
+  }
+  destroyHls(slot.hls);
+  slot.hls = null;
+  restoreSlotVideo(slot);
+  clearVideo(slot.video);
+  slot.status.textContent = statusText;
 }
 
 function updateGroupSummary() {
@@ -360,7 +374,14 @@ async function refreshCurrentFilterLive(force = false) {
     const liveByName = new Map((live.statuses || []).map((status) => [key(status.name), status]));
     targets.forEach((slot) => {
       const status = liveByName.get(key(slot.player.name));
-      if (!status) return;
+      if (!status) {
+        slot.player.live = { isLive: false };
+        if (!slot.data) {
+          slot.tried = false;
+          slot.status.textContent = "오프라인";
+        }
+        return;
+      }
       slot.player.live = status;
       slot.player.broadcastId = status.broadcastId || slot.player.broadcastId;
       slot.player.broadcastUrl = status.broadcastUrl || slot.player.broadcastUrl;
@@ -378,10 +399,40 @@ async function refreshCurrentFilterLive(force = false) {
   }
 }
 
+async function prepareCurrentFilterScreens(force = false) {
+  await refreshCurrentFilterLive(force);
+  const liveSlots = slots.filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot));
+  const directSlots = liveSlots.slice(0, FIRST_SMALL_COUNT);
+  const hlsSlots = liveSlots.slice(FIRST_SMALL_COUNT);
+
+  slots.forEach((slot) => {
+    if (!matchesFilter(slot) || isSlotKnownOffline(slot)) {
+      stopSmallPlayback(slot, slot.player.live ? "오프라인" : "대기");
+    }
+  });
+
+  directSlots.forEach((slot) => {
+    stopSmallPlayback(slot, "SOOP 준비");
+    showSoopDirectPreview(slot.index);
+  });
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < hlsSlots.length && !isServerCoolingDown()) {
+      const slot = hlsSlots[cursor++];
+      if (slot.directPreview) restoreSlotVideo(slot);
+      if (!slot.data || !slot.hls) await loadSlot(slot.index, { attachSmall: true });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(BOOTSTRAP_CONCURRENCY, hlsSlots.length) }, worker));
+  refreshSlotVisibilityAndOrder();
+  log(`${filterLabel(currentFilter)} 기본 구성 완료: SOOP 원본 ${directSlots.length}명 · HLS ${hlsSlots.length}명`);
+}
+
 function applyFilter(filter, shouldLoad = false) {
   currentFilter = filter;
   refreshSlotVisibilityAndOrder();
-  if (shouldLoad) refreshCurrentFilterLive(false);
+  if (shouldLoad) prepareCurrentFilterScreens(false);
 }
 
 function createSlot(player) {
@@ -777,7 +828,7 @@ async function loadVisibleUnloaded(limit = Infinity) {
   loadingVisible = true;
   let cursor = 0;
   const targets = slots
-    .filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot) && !slot.data && !slot.tried)
+    .filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot) && !slot.directPreview && !slot.data && !slot.tried)
     .slice(0, limit);
   async function worker() {
     while (cursor < targets.length && !isServerCoolingDown()) {
@@ -791,23 +842,13 @@ async function loadVisibleUnloaded(limit = Infinity) {
 }
 
 async function startVisibleLive() {
-  if (!slots.some((slot) => matchesFilter(slot) && slot.player.live)) {
-    await refreshCurrentFilterLive(false);
-  }
-  const targets = slots
-    .filter((slot) => matchesFilter(slot) && isSlotLive(slot) && !isSlotKnownOffline(slot) && !slot.directPreview)
-    .slice(0, FIRST_SMALL_COUNT);
-  let shown = 0;
-  targets.forEach((slot) => {
-    if (showSoopDirectPreview(slot.index)) shown += 1;
-  });
-  log(shown ? `SOOP 원본 빠른 화면 ${shown}명 표시 완료` : "표시할 LIVE 원본 화면이 아직 없습니다.");
+  await prepareCurrentFilterScreens(false);
 }
 
 async function openSlotMain(index) {
   const slot = slots[index];
   if (!slot) return;
-  await setMain(index);
+  await setProxyMain(index);
 }
 
 async function randomMain() {
@@ -821,7 +862,7 @@ async function randomMain() {
     }
   }
   const slot = candidates[Math.floor(Math.random() * candidates.length)];
-  await setMain(slot.index);
+  await setProxyMain(slot.index);
 }
 
 function stopMainOnly(options = {}) {
@@ -879,7 +920,7 @@ async function refreshLive() {
   slots.forEach((slot) => {
     slot.tried = false;
   });
-  await refreshCurrentFilterLive(true);
+  await prepareCurrentFilterScreens(true);
 }
 
 function handleShared(payload) {
@@ -976,7 +1017,7 @@ function showMode(mode) {
 }
 
 async function init(force = false) {
-  log(`${CCTV_VERSION} 적용됨 · 첫 화면은 목록만, 영상은 SOOP 원본만 사용합니다.`);
+  log(`${CCTV_VERSION} 적용됨 · 기본은 6티어 LIVE만 표시하고, 맨 위 2명은 SOOP 원본 / 나머지는 HLS로 구성합니다.`);
   log("티어표를 불러오는 중");
   let tierPlayers = [];
   try {
@@ -994,7 +1035,8 @@ async function init(force = false) {
   renderSelectors();
   applyFilter(currentFilter);
   log(`티어표 기준 화면 표시 완료: ${players.length}명`);
-  log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · LIVE 조회/영상 시작은 버튼을 누르면 실행됩니다.`);
+  await prepareCurrentFilterScreens(force);
+  log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · 현재 LIVE 기준으로 작은 화면을 구성했습니다.`);
 }
 
 setInterval(() => {
@@ -1019,11 +1061,7 @@ document.getElementById("randomBtn").onclick = randomMain;
 document.getElementById("startSmallBtn").onclick = startVisibleLive;
 document.getElementById("proxyMainBtn").onclick = proxyMain;
 document.getElementById("retryBtn").onclick = () => {
-  slots
-    .filter((slot) => matchesFilter(slot) && isSlotLive(slot))
-    .slice(0, FIRST_SMALL_COUNT)
-    .forEach((slot) => showSoopDirectPreview(slot.index));
-  log("작은 화면 복구는 HLS 재시작 없이 SOOP 원본 화면만 다시 표시합니다.");
+  prepareCurrentFilterScreens(false);
 };
 document.getElementById("refreshBtn").onclick = refreshLive;
 document.getElementById("stopBtn").onclick = stopMainOnly;
