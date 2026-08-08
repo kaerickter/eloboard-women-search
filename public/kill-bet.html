@@ -107,49 +107,15 @@
     }
 
     .kill-title-row {
-      width: min(100%, 1180px);
-      display: grid;
-      grid-template-columns: auto minmax(0, 690px);
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-    }
-
-    .kill-heading-group {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 14px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
-    .timer-settings-panel {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: center;
-      gap: 8px 10px;
-      padding: 10px 12px;
-      border: 2px solid var(--line, #d9dbd3);
-      border-radius: 10px;
-      background: var(--panel);
-      box-shadow: 0 5px 16px rgba(72, 58, 26, .09);
-    }
-
-    .timer-settings-title {
-      grid-row: 1 / span 2;
-      align-self: stretch;
-      display: grid;
-      place-items: center;
-      padding: 0 13px 0 4px;
-      border-right: 1px solid var(--line, #d9dbd3);
-      color: var(--score);
-      font-size: 20px;
-      font-weight: 900;
-      white-space: nowrap;
-    }
-
     .timer-control {
-      min-height: 46px;
+      min-height: 54px;
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -163,11 +129,7 @@
       white-space: nowrap;
     }
 
-    .timer-control strong {
-      min-width: 72px;
-      color: var(--score);
-      font-size: 16px;
-    }
+    .timer-control strong { color: var(--score); }
 
     .timer-control label {
       display: inline-flex;
@@ -176,28 +138,27 @@
     }
 
     .timer-control input {
-      width: 48px;
-      height: 38px;
+      width: 42px;
+      height: 34px;
       min-width: 0;
       padding: 3px;
       border: 1px solid var(--button-edge);
       background: #fff;
       color: var(--score);
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 900;
       text-align: center;
     }
 
     .timer-control button {
-      min-width: 56px;
-      height: 38px;
+      min-width: 48px;
+      height: 34px;
       padding: 0 8px;
       border: 2px solid var(--button-edge);
       border-radius: 7px;
       background: var(--button);
       color: var(--ink);
       font-weight: 900;
-      font-size: 15px;
       cursor: pointer;
     }
 
@@ -327,15 +288,11 @@
       transform: translateX(-6px);
     }
 
-    .one-team-mode .team-grid,
     .two-team-mode .team-grid {
       grid-auto-columns: 310px;
       overflow-x: hidden;
     }
 
-    .one-team-mode .team-column,
-    .one-team-mode .team-label,
-    .one-team-mode .score-panel,
     .two-team-mode .team-column,
     .two-team-mode .team-label,
     .two-team-mode .score-panel {
@@ -343,36 +300,33 @@
       min-width: 0;
     }
 
-    .one-team-mode .score-panel,
     .two-team-mode .score-panel {
       padding-inline: 10px 7px;
     }
 
-    .one-team-mode .counter-row,
     .two-team-mode .counter-row {
       grid-template-columns: minmax(48px, 1fr) 46px 32px 32px 42px 42px;
       gap: 3px;
     }
 
-    .one-team-mode .name-input,
     .two-team-mode .name-input {
       width: 100%;
       min-width: 0;
     }
 
     .mode-section.three-team-mode {
-      width: max-content;
-      max-width: 100%;
-      justify-self: center;
+      width: 100%;
+      max-width: none;
+      justify-self: stretch;
     }
 
     .three-team-mode .team-grid {
-      width: auto;
-      grid-auto-flow: column;
-      grid-auto-columns: 310px;
-      grid-template-columns: none;
-      justify-content: center;
-      gap: 12px;
+      width: 100%;
+      grid-auto-flow: row;
+      grid-auto-columns: auto;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      justify-content: stretch;
+      gap: 10px;
       overflow-x: hidden;
       padding-bottom: 2px;
     }
@@ -380,12 +334,11 @@
     .three-team-mode .team-column,
     .three-team-mode .team-label,
     .three-team-mode .score-panel {
-      width: 310px;
+      width: 100%;
       min-width: 0;
     }
 
     .three-team-mode .score-panel {
-      width: 310px;
       padding-inline: 10px 7px;
     }
 
@@ -679,15 +632,6 @@
     }
 
     @media (max-width: 980px) {
-      .kill-title-row {
-        grid-template-columns: 1fr;
-      }
-
-      .timer-settings-panel {
-        width: min(100%, 690px);
-        justify-self: center;
-      }
-
       .board {
         grid-template-columns: 1fr;
         justify-items: center;
@@ -701,40 +645,14 @@
         justify-content: center;
       }
 
-      .three-team-mode .team-grid {
-        grid-auto-flow: row;
-        grid-auto-columns: auto;
-        grid-template-columns: repeat(2, minmax(0, 310px));
-      }
-
+      .three-team-mode .team-grid,
       .four-team-mode .team-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 620px) {
-      .timer-settings-panel {
-        grid-template-columns: 1fr;
-      }
-
-      .timer-settings-title {
-        grid-row: auto;
-        padding: 0 0 8px;
-        border-right: 0;
-        border-bottom: 1px solid var(--line, #d9dbd3);
-      }
-
-      .timer-control {
-        justify-content: center;
-        flex-wrap: wrap;
-        white-space: normal;
-      }
-
-      .three-team-mode .team-grid {
-        grid-auto-flow: row;
-        grid-template-columns: 310px;
-      }
-
+      .three-team-mode .team-grid,
       .four-team-mode .team-grid {
         grid-template-columns: minmax(0, 1fr);
       }
@@ -775,6 +693,7 @@
         <span>EK</span><strong>ELO KITTEN</strong>
       </a>
       <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab" href="./cctv.html">cctv</a>
       <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
       <a class="site-tab" href="./index.html">전적검색</a>
       <a class="site-tab matchup" href="./matchup.html">상대전적</a>
@@ -793,28 +712,23 @@
 
     <section class="kill-area" aria-label="킬 내기 점수판">
       <div class="kill-title-row">
-        <div class="kill-heading-group">
-          <h1 class="page-title">킬 내기</h1>
-          <label class="chicken-kill-setting">🍗 치킨 킬수
-            <input id="chickenKillValue" type="number" min="0" step="1" value="1" inputmode="numeric" aria-label="치킨 한 개당 킬수">
-          </label>
+        <h1 class="page-title">킬 내기</h1>
+        <label class="chicken-kill-setting">🍗 치킨 킬수
+          <input id="chickenKillValue" type="number" min="0" step="1" value="1" inputmode="numeric" aria-label="치킨 한 개당 킬수">
+        </label>
+        <div class="timer-control" aria-label="스톱워치 설정">
+          <strong>스톱워치</strong>
+          <label>시 <input id="timerHours" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+          <label>분 <input id="timerMinutes" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          <label>초 <input id="timerSeconds" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          <button id="timerStartButton" type="button">시작</button>
+          <button id="timerResetButton" type="button">초기화</button>
         </div>
-        <div class="timer-settings-panel" aria-label="시간 설정">
-          <strong class="timer-settings-title">⏱ 시간 설정</strong>
-          <div class="timer-control" aria-label="스톱워치 설정">
-            <strong>스톱워치</strong>
-            <label>시 <input id="timerHours" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
-            <label>분 <input id="timerMinutes" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
-            <label>초 <input id="timerSeconds" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
-            <button id="timerStartButton" type="button">시작</button>
-            <button id="timerResetButton" type="button">초기화</button>
-          </div>
-          <div class="timer-control" aria-label="종료 시각 설정">
-            <strong>종료 시각</strong>
-            <label>시 <input id="targetHour" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
-            <label>분 <input id="targetMinute" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
-            <button id="targetStartButton" type="button">설정</button>
-          </div>
+        <div class="timer-control" aria-label="종료 시각 설정">
+          <strong>종료 시각</strong>
+          <label>시 <input id="targetHour" type="number" min="0" max="23" value="0" inputmode="numeric"></label>
+          <label>분 <input id="targetMinute" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+          <button id="targetStartButton" type="button">설정</button>
         </div>
       </div>
       <div class="board"></div>
@@ -856,7 +770,6 @@
         section.className = [
           "mode-section",
           mode.wide ? "wide" : "",
-          mode.teams.length === 1 ? "one-team-mode" : "",
           mode.teams.length === 2 ? "two-team-mode" : "",
           mode.teams.length === 3 ? "three-team-mode" : "",
           mode.teams.length === 4 ? "four-team-mode" : "",

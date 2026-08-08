@@ -1,0 +1,138 @@
+html { color-scheme: dark; }
+body.cctv-page {
+  margin: 0;
+  background: #090b10;
+  color: #f5f7fb;
+  font-family: Arial, "Noto Sans KR", sans-serif;
+}
+.cctv-shell {
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: 18px;
+}
+.cctv-hero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 8px 0 14px;
+}
+.cctv-hero h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+.cctv-hero p {
+  margin: 0;
+  color: #9ca7ba;
+  font-size: 13px;
+}
+.cctv-actions,
+.cctv-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cctv-actions button,
+.cctv-filter {
+  border: 1px solid #30384a;
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: #222a39;
+  color: #f5f7fb;
+  font-weight: 800;
+  cursor: pointer;
+}
+.cctv-actions button.primary,
+.cctv-filter.active {
+  border-color: #ffd400;
+  background: #ffd400;
+  color: #111;
+}
+.cctv-panel {
+  border: 1px solid #293244;
+  border-radius: 8px;
+  background: #141925;
+}
+.cctv-filter-panel {
+  padding: 10px;
+  margin-bottom: 14px;
+}
+.cctv-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 720px;
+  gap: 14px;
+  align-items: start;
+}
+.cctv-main {
+  position: sticky;
+  top: 12px;
+  overflow: hidden;
+}
+.cctv-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #293244;
+}
+.cctv-status {
+  color: #9ca7ba;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cctv-player {
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.cctv-player video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+.cctv-meta {
+  min-height: 44px;
+  padding: 9px 12px;
+  border-top: 1px solid #293244;
+  color: #9ca7ba;
+  font-size: 12px;
+}
+.cctv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.cctv-card {
+  overflow: hidden;
+  cursor: pointer;
+}
+.cctv-card.hidden {
+  display: none;
+}
+.cctv-card.active {
+  outline: 2px solid #ffd400;
+}
+.cctv-log {
+  height: 170px;
+  margin-top: 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: 12px Consolas, monospace;
+  color: #c9d1d9;
+  padding: 10px;
+  background: #07090d;
+}
+@media (max-width: 1180px) {
+  .cctv-layout { grid-template-columns: 1fr; }
+  .cctv-main { position: static; }
+}
+@media (max-width: 680px) {
+  .cctv-shell { padding: 12px; }
+  .cctv-grid { grid-template-columns: 1fr; }
+  .cctv-hero { display: block; }
+  .cctv-actions { margin-top: 12px; }
+}
