@@ -6,7 +6,7 @@
     <title>cctv · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260808-cctv">
-    <link rel="stylesheet" href="./cctv.css?v=20260808-cctv">
+    <link rel="stylesheet" href="./cctv.css?v=20260808-cctv4">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
   </head>
   <body class="cctv-page">
@@ -26,14 +26,14 @@
       <a class="site-tab" href="./match-scoreboard.html">점수계산기</a>
       <a class="site-tab roulette" href="./lucky-roulette.html">행운 룰렛</a>
       <a class="site-tab cup-tab" href="./jungman-cup.html">K-중만컵</a>
-      <span class="site-user"><strong>이아킴</strong><em>관리자</em></span>
+      <span class="site-user"><strong>야옹</strong><em>관리자</em></span>
     </nav>
 
     <main class="cctv-shell">
       <header class="cctv-hero">
         <div>
           <h1>cctv</h1>
-          <p>티어표 데이터를 기준으로 6티어, 5티어, 8티어, JSA, 케이대처럼 그룹별 방송을 한 화면에서 봅니다.</p>
+          <p>첫 화면은 6티어입니다. 기본 10명은 쓰지 않고, 티어표에 있는 티어/대학/성별 기준으로 한 번에 방송 대상을 잡습니다.</p>
         </div>
         <div class="cctv-actions">
           <button id="randomBtn" class="primary" type="button">아무나 방송보기</button>
@@ -44,15 +44,57 @@
       </header>
 
       <section class="cctv-panel cctv-filter-panel">
+        <strong class="cctv-panel-title">티어표 기준 빠른 선택</strong>
         <div id="filterbar" class="cctv-filters" aria-label="cctv 필터"></div>
+      </section>
+
+      <section class="cctv-panel cctv-group-maker" aria-label="티어표 기준 설정">
+        <h2>티어표 기준으로 보기</h2>
+        <p>한 명씩 넣는 방식이 아니라, 티어표에 있는 기준을 입력하면 해당 그룹 전체를 한 번에 불러옵니다. 예: 8티어, 4티어, JSA, 케이대, 뉴캐슬대학</p>
+        <div class="cctv-group-row">
+          <select id="groupType">
+            <option value="tier">티어별</option>
+            <option value="university">대학별</option>
+            <option value="university_division">대학 + 여자/남자</option>
+          </select>
+          <input id="groupTier" placeholder="티어 예: 6티어">
+          <input id="groupUniversity" placeholder="대학 예: 뉴캐슬대학">
+          <select id="groupDivision">
+            <option value="women">여자</option>
+            <option value="men">남자</option>
+          </select>
+          <button id="applyGroupBtn" type="button">이 기준으로 보기</button>
+        </div>
+        <div id="groupSummary" class="cctv-group-summary">현재 기준: 6티어</div>
+      </section>
+
+      <section class="cctv-panel cctv-manager" aria-label="방송 아이디 보조 입력">
+        <h2>방송 아이디 보조 입력</h2>
+        <p>티어표에는 있는데 방송 아이디가 자동으로 안 잡히는 사람만 여기서 보조로 넣어주세요. 그룹 선택은 위에서 티어표 기준으로 합니다.</p>
+        <div class="cctv-manager-row">
+          <input id="addName" placeholder="티어표 이름">
+          <input id="addBroadcastId" placeholder="SOOP 아이디">
+          <input id="addTier" placeholder="티어 예: 6티어">
+          <input id="addUniversity" placeholder="대학 예: 뉴캐슬대학">
+          <select id="addDivision">
+            <option value="women">여자</option>
+            <option value="men">남자</option>
+            <option value="">미지정</option>
+          </select>
+          <button id="addParticipantBtn" type="button">아이디 저장</button>
+        </div>
+        <div id="participantList" class="cctv-participants"></div>
       </section>
 
       <div class="cctv-layout">
         <div>
           <section class="cctv-panel cctv-main">
-            <div class="cctv-head"><b id="mainTitle">MAIN - 선택 없음</b><span id="mainStatus" class="cctv-status">대기</span></div>
+            <div class="cctv-head">
+              <b id="mainTitle">MAIN - 선택 없음</b>
+              <span id="mainStatus" class="cctv-status">대기</span>
+            </div>
             <div class="cctv-player"><video id="mainVideo" controls autoplay playsinline></video></div>
-            <div id="mainMeta" class="cctv-meta">방송 중인 작은 화면을 클릭하거나 아무나 방송보기를 누르면 최고화질로 연결됩니다.</div>
+            <div id="mainMeta" class="cctv-meta">방송 중인 작은 화면을 클릭하거나 아무나 방송보기를 누르면 다른 화면에서도 같은 MAIN 방송을 볼 수 있습니다.</div>
           </section>
           <div id="log" class="cctv-panel cctv-log"></div>
         </div>
@@ -60,6 +102,6 @@
       </div>
     </main>
 
-    <script src="./cctv.js?v=20260808-cctv"></script>
+    <script src="./cctv.js?v=20260808-cctv4"></script>
   </body>
 </html>

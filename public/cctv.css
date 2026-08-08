@@ -60,6 +60,91 @@ body.cctv-page {
   padding: 10px;
   margin-bottom: 14px;
 }
+.cctv-panel-title {
+  display: block;
+  margin: 0 0 8px;
+  color: #dbe3f2;
+  font-size: 13px;
+}
+.cctv-manager,
+.cctv-group-maker {
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.cctv-manager h2,
+.cctv-group-maker h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.cctv-manager p,
+.cctv-group-maker p {
+  margin: 0 0 10px;
+  color: #9ca7ba;
+  font-size: 12px;
+}
+.cctv-manager-row,
+.cctv-group-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 140px 1fr 120px auto;
+  gap: 8px;
+}
+.cctv-manager input,
+.cctv-manager select,
+.cctv-group-maker input,
+.cctv-group-maker select {
+  min-width: 0;
+  border: 1px solid #30384a;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: #0d111a;
+  color: #f5f7fb;
+  font: inherit;
+}
+.cctv-manager input::placeholder,
+.cctv-group-maker input::placeholder {
+  color: #657086;
+}
+.cctv-manager button,
+.cctv-group-maker button,
+.cctv-participant-tag {
+  border: 1px solid #30384a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #222a39;
+  color: #f5f7fb;
+  font-weight: 800;
+  cursor: pointer;
+}
+.cctv-manager button,
+.cctv-group-maker button {
+  border-color: #ffd400;
+  background: #ffd400;
+  color: #111;
+}
+.cctv-group-row {
+  grid-template-columns: 150px 1fr 1fr 120px auto;
+}
+.cctv-group-summary {
+  margin-top: 10px;
+  color: #ffd400;
+  font-size: 12px;
+  font-weight: 800;
+}
+.cctv-participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 24px;
+  margin-top: 10px;
+  color: #9ca7ba;
+  font-size: 12px;
+}
+.cctv-participant-tag {
+  padding: 7px 10px;
+  background: #171d2a;
+  color: #dbe3f2;
+  font-size: 12px;
+}
 .cctv-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 720px;
@@ -129,10 +214,14 @@ body.cctv-page {
 @media (max-width: 1180px) {
   .cctv-layout { grid-template-columns: 1fr; }
   .cctv-main { position: static; }
+  .cctv-manager-row,
+  .cctv-group-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 680px) {
   .cctv-shell { padding: 12px; }
   .cctv-grid { grid-template-columns: 1fr; }
   .cctv-hero { display: block; }
   .cctv-actions { margin-top: 12px; }
+  .cctv-manager-row,
+  .cctv-group-row { grid-template-columns: 1fr; }
 }
