@@ -5,7 +5,7 @@ services:
     plan: free
     branch: main
     autoDeployTrigger: commit
-    buildCommand: npm install && (python3 -m pip install --user -U yt-dlp || python -m pip install --user -U yt-dlp)
+    buildCommand: npm install && ((python -m pip install --user -U yt-dlp && python -m yt_dlp --version) || (python3 -m pip install --user -U yt-dlp && python3 -m yt_dlp --version))
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:

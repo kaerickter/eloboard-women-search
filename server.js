@@ -1656,7 +1656,8 @@ async function runYtdlp(args) {
     process.env.YT_DLP_PATH ? { file: process.env.YT_DLP_PATH, args: [] } : null,
     { file: "yt-dlp", args: [] },
     { file: "python3", args: ["-m", "yt_dlp"] },
-    { file: "python", args: ["-m", "yt_dlp"] }
+    { file: "python", args: ["-m", "yt_dlp"] },
+    { file: "py", args: ["-m", "yt_dlp"] }
   ].filter(Boolean);
 
   let lastError = null;
