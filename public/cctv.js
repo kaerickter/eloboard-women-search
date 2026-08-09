@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv34";
+const CCTV_VERSION = "cctv35";
 const BOOTSTRAP_CONCURRENCY = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
@@ -250,16 +250,13 @@ function attach(video, url, label, slot = null, options = {}) {
   });
   hls.on(Hls.Events.ERROR, (_, data) => {
     if (isShuttingDown) return;
-    const isSoftStall = data.type === Hls.ErrorTypes.MEDIA_ERROR && /bufferStalled|bufferSeekOverHole/i.test(data.details || "");
+    const isSoftStall = data.type === Hls.ErrorTypes.MEDIA_ERROR && /bufferStalled|bufferSeekOverHole|bufferNudgeOnStall/i.test(data.details || "");
     if (!data.fatal) {
       if (isSoftStall) {
         softErrorCount += 1;
         if (Date.now() - lastSoftLogAt > 60000 || softErrorCount === 1) {
           lastSoftLogAt = Date.now();
           log(`${label} 일시 멈춤 감지 ${softErrorCount}회`);
-        }
-        if (!slot && softErrorCount >= 8 && typeof options.onUnstable === "function") {
-          options.onUnstable(data, hls);
         }
         return;
       }
@@ -269,7 +266,6 @@ function attach(video, url, label, slot = null, options = {}) {
           lastNetworkLogAt = Date.now();
           log(`${label} 네트워크 지연 감지 · 연결 유지 재시도 중`);
         }
-        if (slot && networkErrorCount >= 3) scheduleSlotReload(slot, "network");
         return;
       }
       log(`${label} 오류: ${data.type} / ${data.details}`);
@@ -277,6 +273,14 @@ function attach(video, url, label, slot = null, options = {}) {
     }
     log(`${label} 오류: ${data.type} / ${data.details} [FATAL]`);
     if (!slot) {
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        try { hls.startLoad(-1); } catch {}
+        return;
+      }
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        try { hls.recoverMediaError(); } catch {}
+        return;
+      }
       if (fatalHandled) return;
       fatalHandled = true;
       try { if (typeof options.onFatal === "function") options.onFatal(data, hls); }
@@ -284,13 +288,9 @@ function attach(video, url, label, slot = null, options = {}) {
       return;
     }
     try {
-      if (data.details === "levelParsingError" && slot) scheduleSlotReload(slot, "playlist");
-      else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) scheduleSlotReload(slot, "network");
-      else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-      else if (slot) scheduleSlotReload(slot, "fatal");
-    } catch {
-      if (slot) scheduleSlotReload(slot, "fatal");
-    }
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+      else hls.startLoad(-1);
+    } catch {}
   });
   return hls;
 }
@@ -1199,9 +1199,12 @@ setInterval(() => {
     const now = slot.video.currentTime || 0;
     if (Math.abs(now - slot.lastTime) < 0.15) {
       slot.stuck += 1;
-      if (slot.stuck >= 7) {
-        slot.stuck = 0;
-        scheduleSlotReload(slot, "stuck");
+      if (slot.stuck >= 15) {
+        slot.stuck = -15;
+        try { slot.hls?.startLoad(-1); } catch {}
+        slot.video.play().catch(() => {});
+        slot.status.textContent = "연결 유지 중";
+        setTimeout(() => { if (slot.data) slot.status.textContent = "LIVE"; }, 1500);
       }
     } else {
       slot.stuck = 0;
