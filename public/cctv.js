@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv33";
+const CCTV_VERSION = "cctv34";
 const BOOTSTRAP_CONCURRENCY = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
@@ -28,6 +28,7 @@ let mainPlayId = 0;
 let cctvServerCooldownUntil = 0;
 let lastCooldownLogAt = 0;
 let hlsLibraryPromise = null;
+let nextRecoveryStartAt = 0;
 const cctvViewerSessionId = typeof globalThis.crypto?.randomUUID === "function"
   ? globalThis.crypto.randomUUID()
   : `cctv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -216,15 +217,24 @@ function attach(video, url, label, slot = null, options = {}) {
   let lastNetworkLogAt = 0;
   const hls = new Hls({
     enableWorker: true,
-    lowLatencyMode: true,
-    liveSyncDurationCount: 2,
-    liveMaxLatencyDurationCount: 5,
-    backBufferLength: 8,
-    maxBufferLength: 10,
-    maxMaxBufferLength: 16,
-    manifestLoadingMaxRetry: 4,
-    levelLoadingMaxRetry: 4,
-    fragLoadingMaxRetry: 4
+    lowLatencyMode: false,
+    liveSyncDurationCount: 4,
+    liveMaxLatencyDurationCount: 10,
+    backBufferLength: 15,
+    maxBufferLength: 30,
+    maxMaxBufferLength: 45,
+    manifestLoadingTimeOut: 20000,
+    levelLoadingTimeOut: 20000,
+    fragLoadingTimeOut: 20000,
+    manifestLoadingMaxRetry: 6,
+    levelLoadingMaxRetry: 6,
+    fragLoadingMaxRetry: 6,
+    manifestLoadingRetryDelay: 1000,
+    levelLoadingRetryDelay: 1000,
+    fragLoadingRetryDelay: 1000,
+    manifestLoadingMaxRetryTimeout: 8000,
+    levelLoadingMaxRetryTimeout: 8000,
+    fragLoadingMaxRetryTimeout: 8000
   });
   hls.loadSource(url);
   hls.attachMedia(video);
@@ -244,12 +254,11 @@ function attach(video, url, label, slot = null, options = {}) {
     if (!data.fatal) {
       if (isSoftStall) {
         softErrorCount += 1;
-        if (Date.now() - lastSoftLogAt > 10000 || softErrorCount === 1 || softErrorCount === 3) {
+        if (Date.now() - lastSoftLogAt > 60000 || softErrorCount === 1) {
           lastSoftLogAt = Date.now();
           log(`${label} 일시 멈춤 감지 ${softErrorCount}회`);
         }
-        try { hls.recoverMediaError(); } catch {}
-        if (!slot && softErrorCount >= 3 && typeof options.onUnstable === "function") {
+        if (!slot && softErrorCount >= 8 && typeof options.onUnstable === "function") {
           options.onUnstable(data, hls);
         }
         return;
@@ -744,7 +753,11 @@ function restoreSlotVideo(slot) {
 function scheduleSlotReload(slot, reason = "error") {
   if (!slot || isShuttingDown || slot.reloadTimer) return;
   const delays = [2000, 5000, 15000, 30000];
-  const delay = delays[Math.min(slot.reloadCount, delays.length - 1)];
+  const baseDelay = delays[Math.min(slot.reloadCount, delays.length - 1)];
+  const earliest = Date.now() + baseDelay + Math.floor(Math.random() * 500);
+  const plannedAt = Math.max(earliest, nextRecoveryStartAt + 1500);
+  nextRecoveryStartAt = plannedAt;
+  const delay = Math.max(0, plannedAt - Date.now());
   slot.reloadCount += 1;
   slot.status.textContent = delay >= 30000 ? "불안정 - 잠시 후 복구" : "복구 대기";
   log(`${slot.player.name} 작은화면 복구 예약: ${Math.round(delay / 1000)}초 후 (${reason})`);
@@ -1181,13 +1194,12 @@ async function init(force = false) {
 }
 
 setInterval(() => {
-  return;
   slots.forEach((slot) => {
     if (!slot.data || !slot.video || slot.video.paused) return;
     const now = slot.video.currentTime || 0;
     if (Math.abs(now - slot.lastTime) < 0.15) {
       slot.stuck += 1;
-      if (slot.stuck >= 5) {
+      if (slot.stuck >= 7) {
         slot.stuck = 0;
         scheduleSlotReload(slot, "stuck");
       }
