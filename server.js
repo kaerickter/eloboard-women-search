@@ -109,9 +109,15 @@ const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 15;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 20;
-const CCTV_STREAM_CACHE_MS = 9 * 60 * 1000;
-const CCTV_STALE_CACHE_MS = 25 * 60 * 1000;
+const CCTV_STREAM_CACHE_MS = 3 * 60 * 1000;
+const CCTV_STALE_CACHE_MS = 30 * 60 * 1000;
 const CCTV_PROXY_TOKEN_MS = 30 * 60 * 1000;
+const CCTV_REMOTE_TIMEOUT_MS = 12 * 1000;
+const CCTV_PLAYLIST_CACHE_MS = 1500;
+const CCTV_SEGMENT_CACHE_MS = 5 * 60 * 1000;
+const CCTV_REMOTE_CACHE_MAX_BYTES = 96 * 1024 * 1024;
+const CCTV_REMOTE_CACHE_MAX_ENTRIES = 800;
+const CCTV_ACTIVE_STREAM_MS = 5 * 60 * 1000;
 const tierAdmin = new TierAdmin();
 const spawnDiaryAdmin = new SpawnDiaryAdmin();
 const playerAnalysisStore = new PlayerAnalysisStore({ pool: tierAdmin.pool });
@@ -1634,6 +1640,10 @@ const cctvStreamCache = new Map();
 const cctvInflight = new Map();
 const cctvProxyTokens = new Map();
 const cctvProxyUrlTokens = new Map();
+const cctvRemoteCache = new Map();
+const cctvRemoteInflight = new Map();
+const cctvActiveStreams = new Map();
+let cctvRemoteCacheBytes = 0;
 
 function safeCctvBj(value) {
   const bj = String(value || "").trim();
@@ -1776,14 +1786,24 @@ function cctvPayload(entry) {
   };
 }
 
-function cctvToken(remoteUrl) {
+function cctvToken(remoteUrl, context = null) {
   const url = new URL(remoteUrl);
   if (!["http:", "https:"].includes(url.protocol)) throw new Error("bad protocol");
   const existingToken = cctvProxyUrlTokens.get(url.href);
   const existing = existingToken ? cctvProxyTokens.get(existingToken) : null;
-  if (existing && existing.expiresAt > Date.now() + 60 * 1000) return "/cctv/proxy/" + existingToken;
+  if (existing && existing.expiresAt > Date.now() + 60 * 1000) {
+    existing.expiresAt = Date.now() + CCTV_PROXY_TOKEN_MS;
+    if (context?.bj) existing.bj = context.bj;
+    if (context?.mode) existing.mode = context.mode;
+    return "/cctv/proxy/" + existingToken;
+  }
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  cctvProxyTokens.set(token, { url: url.href, expiresAt: Date.now() + CCTV_PROXY_TOKEN_MS });
+  cctvProxyTokens.set(token, {
+    url: url.href,
+    expiresAt: Date.now() + CCTV_PROXY_TOKEN_MS,
+    bj: context?.bj || "",
+    mode: context?.mode || ""
+  });
   cctvProxyUrlTokens.set(url.href, token);
   return "/cctv/proxy/" + token;
 }
@@ -1798,54 +1818,166 @@ function cleanupCctvTokens() {
   }
 }
 
-function rewriteCctvM3u8(text, baseUrl) {
+function rewriteCctvM3u8(text, baseUrl, context = null) {
   cleanupCctvTokens();
   return String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/).map((rawLine) => {
     const line = String(rawLine || "").trim();
     if (!line) return "";
     const rewritten = line.replace(/URI="([^"]+)"/g, (_, uri) => {
       try {
-        return 'URI="' + cctvToken(new URL(uri, baseUrl).href) + '"';
+        return 'URI="' + cctvToken(new URL(uri, baseUrl).href, context) + '"';
       } catch {
         return 'URI="' + uri + '"';
       }
     });
     if (rewritten.startsWith("#")) return rewritten;
     try {
-      return cctvToken(new URL(rewritten, baseUrl).href);
+      return cctvToken(new URL(rewritten, baseUrl).href, context);
     } catch {
       return rewritten;
     }
   }).join("\n");
 }
 
-async function fetchCctvRemote(remoteUrl, req) {
-  return fetch(remoteUrl, {
-    redirect: "follow",
-    headers: {
-      "User-Agent": req.headers["user-agent"] || "Mozilla/5.0",
-      "Referer": "https://play.sooplive.com/",
-      "Origin": "https://play.sooplive.com",
-      "Accept": "*/*"
+function markCctvActive(bj, mode) {
+  if (!bj) return;
+  cctvActiveStreams.set(bj, { bj, mode: mode || "low", lastAccess: Date.now() });
+}
+
+function cctvLooksPlaylist(remoteUrl, contentType = "") {
+  let pathname = "";
+  try { pathname = new URL(remoteUrl).pathname.toLowerCase(); } catch {}
+  return String(contentType).toLowerCase().includes("mpegurl") || pathname.includes(".m3u8");
+}
+
+function cctvRemoteKey(remoteUrl, req) {
+  return String(remoteUrl) + "\nrange:" + String(req.headers.range || "");
+}
+
+function removeCctvRemoteCache(key) {
+  const existing = cctvRemoteCache.get(key);
+  if (!existing) return;
+  cctvRemoteCache.delete(key);
+  cctvRemoteCacheBytes = Math.max(0, cctvRemoteCacheBytes - Number(existing.size || 0));
+}
+
+function cleanupCctvRemoteCache() {
+  const now = Date.now();
+  for (const [key, item] of cctvRemoteCache) {
+    if (!item || item.expiresAt <= now) removeCctvRemoteCache(key);
+  }
+  while (cctvRemoteCache.size > CCTV_REMOTE_CACHE_MAX_ENTRIES || cctvRemoteCacheBytes > CCTV_REMOTE_CACHE_MAX_BYTES) {
+    const oldestKey = cctvRemoteCache.keys().next().value;
+    if (!oldestKey) break;
+    removeCctvRemoteCache(oldestKey);
+  }
+}
+
+function getCctvRemoteCache(key) {
+  const item = cctvRemoteCache.get(key);
+  if (!item) return null;
+  if (item.expiresAt <= Date.now()) {
+    removeCctvRemoteCache(key);
+    return null;
+  }
+  cctvRemoteCache.delete(key);
+  cctvRemoteCache.set(key, item);
+  return item;
+}
+
+function setCctvRemoteCache(key, item) {
+  if (!item?.body || item.body.length > 16 * 1024 * 1024) return;
+  removeCctvRemoteCache(key);
+  const stored = { ...item, size: item.body.length };
+  cctvRemoteCache.set(key, stored);
+  cctvRemoteCacheBytes += stored.size;
+  cleanupCctvRemoteCache();
+}
+
+async function fetchCctvRemote(remoteUrl, req, force = false) {
+  const key = cctvRemoteKey(remoteUrl, req);
+  if (!force) {
+    const cached = getCctvRemoteCache(key);
+    if (cached) return cached;
+    const running = cctvRemoteInflight.get(key);
+    if (running) return running;
+  }
+
+  const task = (async () => {
+    let lastError;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), CCTV_REMOTE_TIMEOUT_MS);
+      try {
+        const headers = {
+          "User-Agent": req.headers["user-agent"] || "Mozilla/5.0",
+          "Referer": "https://play.sooplive.com/",
+          "Origin": "https://play.sooplive.com",
+          "Accept": "*/*"
+        };
+        if (req.headers.range) headers.Range = req.headers.range;
+        const response = await fetch(remoteUrl, { redirect: "follow", headers, signal: controller.signal });
+        const contentType = response.headers.get("content-type") || "";
+        const body = Buffer.from(await response.arrayBuffer());
+        const playlist = cctvLooksPlaylist(response.url || remoteUrl, contentType);
+        const result = {
+          ok: response.ok,
+          status: response.status,
+          body,
+          contentType,
+          finalUrl: response.url || remoteUrl,
+          playlist,
+          contentRange: response.headers.get("content-range") || "",
+          acceptRanges: response.headers.get("accept-ranges") || ""
+        };
+        if (response.ok) {
+          const ttl = playlist ? CCTV_PLAYLIST_CACHE_MS : CCTV_SEGMENT_CACHE_MS;
+          setCctvRemoteCache(key, { ...result, expiresAt: Date.now() + ttl });
+          return result;
+        }
+        if (attempt === 1 || (response.status < 500 && response.status !== 429)) return result;
+        lastError = new Error("upstream " + response.status);
+      } catch (error) {
+        lastError = error;
+        if (attempt === 1) throw error;
+      } finally {
+        clearTimeout(timer);
+      }
     }
-  });
+    throw lastError || new Error("cctv upstream failed");
+  })();
+
+  cctvRemoteInflight.set(key, task);
+  try {
+    return await task;
+  } finally {
+    if (cctvRemoteInflight.get(key) === task) cctvRemoteInflight.delete(key);
+  }
 }
 
 async function handleCctvStream(req, res, bj, mode) {
   try {
+    markCctvActive(bj, mode);
     let entry = await getCctvStream(bj, true);
     let upstreamUrl = mode === "low" ? entry.lowUpstream : entry.highUpstream;
     let upstream = await fetchCctvRemote(upstreamUrl, req);
     if (!upstream.ok) {
       entry = await refreshCctvStream(bj);
       upstreamUrl = mode === "low" ? entry.lowUpstream : entry.highUpstream;
-      upstream = await fetchCctvRemote(upstreamUrl, req);
+      upstream = await fetchCctvRemote(upstreamUrl, req, true);
     }
     if (!upstream.ok) return send(res, upstream.status, "upstream " + upstream.status);
-    const text = await upstream.text();
-    return send(res, 200, rewriteCctvM3u8(text, upstream.url || upstreamUrl), "application/vnd.apple.mpegurl; charset=utf-8");
+    const text = upstream.body.toString("utf8");
+    return send(
+      res,
+      200,
+      rewriteCctvM3u8(text, upstream.finalUrl || upstreamUrl, { bj, mode }),
+      "application/vnd.apple.mpegurl; charset=utf-8",
+      { "Cache-Control": "private, max-age=1" }
+    );
   } catch (error) {
-    return send(res, 500, error.message || "cctv stream failed");
+    refreshCctvStream(bj).catch((refreshError) => console.error("cctv recovery failed:", bj, refreshError.message));
+    return send(res, 503, error.message || "cctv stream failed");
   }
 }
 
@@ -1853,26 +1985,57 @@ async function handleCctvProxy(req, res, token) {
   cleanupCctvTokens();
   const item = cctvProxyTokens.get(String(token || ""));
   if (!item) return send(res, 404, "expired token");
+  item.expiresAt = Date.now() + CCTV_PROXY_TOKEN_MS;
+  markCctvActive(item.bj, item.mode);
   try {
     const upstream = await fetchCctvRemote(item.url, req);
-    if (!upstream.ok) return send(res, upstream.status, "upstream " + upstream.status);
-    const contentType = upstream.headers.get("content-type") || "";
-    const looksM3u8 = contentType.includes("mpegurl") || contentType.includes("m3u8") || new URL(item.url).pathname.toLowerCase().includes(".m3u8");
-    if (looksM3u8) {
-      const text = await upstream.text();
-      return send(res, 200, rewriteCctvM3u8(text, upstream.url || item.url), "application/vnd.apple.mpegurl; charset=utf-8");
+    if (!upstream.ok) {
+      if (item.bj) refreshCctvStream(item.bj).catch((error) => console.error("cctv proxy refresh failed:", item.bj, error.message));
+      return send(res, upstream.status, "upstream " + upstream.status);
     }
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    res.writeHead(200, {
-      "Content-Type": contentType || "application/octet-stream",
-      "Cache-Control": "no-store",
+    if (upstream.playlist) {
+      const text = upstream.body.toString("utf8");
+      return send(
+        res,
+        200,
+        rewriteCctvM3u8(text, upstream.finalUrl || item.url, { bj: item.bj, mode: item.mode }),
+        "application/vnd.apple.mpegurl; charset=utf-8",
+        { "Cache-Control": "private, max-age=1" }
+      );
+    }
+    const headers = {
+      "Content-Type": upstream.contentType || "application/octet-stream",
+      "Content-Length": upstream.body.length,
+      "Cache-Control": "public, max-age=300, immutable",
       "Access-Control-Allow-Origin": "*"
-    });
-    return res.end(buffer);
+    };
+    if (upstream.contentRange) headers["Content-Range"] = upstream.contentRange;
+    if (upstream.acceptRanges) headers["Accept-Ranges"] = upstream.acceptRanges;
+    res.writeHead(upstream.status || 200, headers);
+    return res.end(upstream.body);
   } catch (error) {
-    return send(res, 502, error.message || "proxy failed");
+    if (item.bj) refreshCctvStream(item.bj).catch((refreshError) => console.error("cctv proxy recovery failed:", item.bj, refreshError.message));
+    return send(res, 503, error.message || "proxy failed");
   }
 }
+
+const cctvSharedMaintenanceTimer = setInterval(() => {
+  cleanupCctvTokens();
+  cleanupCctvRemoteCache();
+  const now = Date.now();
+  for (const [bj, active] of cctvActiveStreams) {
+    if (!active || now - active.lastAccess > CCTV_ACTIVE_STREAM_MS) {
+      cctvActiveStreams.delete(bj);
+      continue;
+    }
+    const entry = cctvStreamCache.get(bj);
+    if (!entry || now - entry.refreshedAt >= CCTV_STREAM_CACHE_MS) {
+      refreshCctvStream(bj).catch((error) => console.error("cctv active refresh failed:", bj, error.message));
+    }
+  }
+}, 45 * 1000);
+cctvSharedMaintenanceTimer.unref?.();
+
 function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
   const pathname = url.pathname === "/" ? "/tiers.html" : url.pathname;
