@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv31";
+const CCTV_VERSION = "cctv32";
 const BOOTSTRAP_CONCURRENCY = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
@@ -157,7 +157,9 @@ function ensureHlsLibrary() {
 function attach(video, url, label, slot = null, options = {}) {
   let fatalHandled = false;
   let softErrorCount = 0;
+  let networkErrorCount = 0;
   let lastSoftLogAt = 0;
+  let lastNetworkLogAt = 0;
   const hls = new Hls({
     enableWorker: true,
     lowLatencyMode: true,
@@ -173,6 +175,7 @@ function attach(video, url, label, slot = null, options = {}) {
   hls.loadSource(url);
   hls.attachMedia(video);
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    networkErrorCount = 0;
     video.play().catch(() => {});
     log(`${label} 연결 완료`);
     if (slot) {
@@ -197,6 +200,15 @@ function attach(video, url, label, slot = null, options = {}) {
         }
         return;
       }
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        networkErrorCount += 1;
+        if (networkErrorCount === 1 || Date.now() - lastNetworkLogAt > 15000) {
+          lastNetworkLogAt = Date.now();
+          log(`${label} 네트워크 지연 감지 · 연결 유지 재시도 중`);
+        }
+        if (slot && networkErrorCount >= 3) scheduleSlotReload(slot, "network");
+        return;
+      }
       log(`${label} 오류: ${data.type} / ${data.details}`);
       return;
     }
@@ -210,7 +222,7 @@ function attach(video, url, label, slot = null, options = {}) {
     }
     try {
       if (data.details === "levelParsingError" && slot) scheduleSlotReload(slot, "playlist");
-      else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+      else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) scheduleSlotReload(slot, "network");
       else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
       else if (slot) scheduleSlotReload(slot, "fatal");
     } catch {
@@ -676,7 +688,7 @@ function restoreSlotVideo(slot) {
 
 function scheduleSlotReload(slot, reason = "error") {
   if (!slot || isShuttingDown || slot.reloadTimer) return;
-  const delays = [5000, 15000, 30000, 60000];
+  const delays = [2000, 5000, 15000, 30000];
   const delay = delays[Math.min(slot.reloadCount, delays.length - 1)];
   slot.reloadCount += 1;
   slot.status.textContent = delay >= 30000 ? "불안정 - 잠시 후 복구" : "복구 대기";
