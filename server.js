@@ -117,7 +117,8 @@ const CCTV_PLAYLIST_CACHE_MS = 1500;
 const CCTV_SEGMENT_CACHE_MS = 5 * 60 * 1000;
 const CCTV_REMOTE_CACHE_MAX_BYTES = 96 * 1024 * 1024;
 const CCTV_REMOTE_CACHE_MAX_ENTRIES = 800;
-const CCTV_ACTIVE_STREAM_MS = 5 * 60 * 1000;
+const CCTV_ACTIVE_STREAM_MS = 30 * 1000;
+const CCTV_VIEWER_SESSION_MS = 40 * 1000;
 const tierAdmin = new TierAdmin();
 const spawnDiaryAdmin = new SpawnDiaryAdmin();
 const playerAnalysisStore = new PlayerAnalysisStore({ pool: tierAdmin.pool });
@@ -1643,6 +1644,7 @@ const cctvProxyUrlTokens = new Map();
 const cctvRemoteCache = new Map();
 const cctvRemoteInflight = new Map();
 const cctvActiveStreams = new Map();
+const cctvViewerSessions = new Map();
 let cctvRemoteCacheBytes = 0;
 
 function safeCctvBj(value) {
@@ -1844,6 +1846,60 @@ function markCctvActive(bj, mode) {
   cctvActiveStreams.set(bj, { bj, mode: mode || "low", lastAccess: Date.now() });
 }
 
+function safeCctvSessionId(value) {
+  const sessionId = String(value || "").trim();
+  return /^[a-zA-Z0-9_-]{8,100}$/.test(sessionId) ? sessionId : "";
+}
+
+function cleanCctvSessionBroadcastIds(values) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map(safeCctvBj)
+    .filter(Boolean))]
+    .slice(0, 32);
+}
+
+function cleanupCctvViewerSessions() {
+  const now = Date.now();
+  for (const [sessionId, session] of cctvViewerSessions) {
+    if (!session || now - session.lastSeen > CCTV_VIEWER_SESSION_MS) cctvViewerSessions.delete(sessionId);
+  }
+}
+
+function cctvSessionUsesBj(bj) {
+  cleanupCctvViewerSessions();
+  for (const session of cctvViewerSessions.values()) {
+    if (session.broadcastIds.has(bj)) return true;
+  }
+  return false;
+}
+
+function updateCctvViewerSession(sessionId, broadcastIds) {
+  const cleanedSessionId = safeCctvSessionId(sessionId);
+  if (!cleanedSessionId) return null;
+  const ids = cleanCctvSessionBroadcastIds(broadcastIds);
+  const session = {
+    sessionId: cleanedSessionId,
+    broadcastIds: new Set(ids),
+    lastSeen: Date.now()
+  };
+  cctvViewerSessions.set(cleanedSessionId, session);
+  ids.forEach((bj) => markCctvActive(bj, "low"));
+  return session;
+}
+
+function closeCctvViewerSession(sessionId) {
+  const cleanedSessionId = safeCctvSessionId(sessionId);
+  if (!cleanedSessionId) return false;
+  const session = cctvViewerSessions.get(cleanedSessionId);
+  cctvViewerSessions.delete(cleanedSessionId);
+  if (session) {
+    for (const bj of session.broadcastIds) {
+      if (!cctvSessionUsesBj(bj)) cctvActiveStreams.delete(bj);
+    }
+  }
+  return Boolean(session);
+}
+
 function cctvLooksPlaylist(remoteUrl, contentType = "") {
   let pathname = "";
   try { pathname = new URL(remoteUrl).pathname.toLowerCase(); } catch {}
@@ -2022,9 +2078,10 @@ async function handleCctvProxy(req, res, token) {
 const cctvSharedMaintenanceTimer = setInterval(() => {
   cleanupCctvTokens();
   cleanupCctvRemoteCache();
+  cleanupCctvViewerSessions();
   const now = Date.now();
   for (const [bj, active] of cctvActiveStreams) {
-    if (!active || now - active.lastAccess > CCTV_ACTIVE_STREAM_MS) {
+    if (!active || (now - active.lastAccess > CCTV_ACTIVE_STREAM_MS && !cctvSessionUsesBj(bj))) {
       cctvActiveStreams.delete(bj);
       continue;
     }
@@ -2033,7 +2090,7 @@ const cctvSharedMaintenanceTimer = setInterval(() => {
       refreshCctvStream(bj).catch((error) => console.error("cctv active refresh failed:", bj, error.message));
     }
   }
-}, 45 * 1000);
+}, 15 * 1000);
 cctvSharedMaintenanceTimer.unref?.();
 
 function serveStatic(req, res) {
@@ -2081,6 +2138,31 @@ const server = http.createServer(async (req, res) => {
     }), "application/json; charset=utf-8");
   }
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname === "/api/cctv/session" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const session = updateCctvViewerSession(body.sessionId, body.broadcastIds);
+      if (!session) return send(res, 400, JSON.stringify({ ok: false, error: "잘못된 CCTV 접속 정보입니다." }), "application/json; charset=utf-8");
+      const sharedBroadcastIds = [...session.broadcastIds].filter((bj) => cctvUsableStale(cctvStreamCache.get(bj)));
+      return send(res, 200, JSON.stringify({
+        ok: true,
+        sessionId: session.sessionId,
+        sharedBroadcastIds,
+        activeViewers: cctvViewerSessions.size
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 400, JSON.stringify({ ok: false, error: error.message || "CCTV 접속 정보를 저장하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/cctv/session/close" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      closeCctvViewerSession(body.sessionId);
+      return send(res, 200, JSON.stringify({ ok: true }), "application/json; charset=utf-8");
+    } catch {
+      return send(res, 200, JSON.stringify({ ok: true }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname.startsWith("/api/cctv/bootstrap/") && req.method === "GET") {
     const bj = safeCctvBj(decodeURIComponent(url.pathname.split("/").pop() || ""));
     if (!bj) return send(res, 400, JSON.stringify({ ok: false, error: "잘못된 방송 ID입니다." }), "application/json; charset=utf-8");
