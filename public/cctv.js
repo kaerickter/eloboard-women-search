@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv36";
+const CCTV_VERSION = "cctv37";
 const BOOTSTRAP_CONCURRENCY = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
@@ -160,7 +160,10 @@ function soopDirectUrl(player) {
 
 function soopEmbedUrl(player) {
   const id = broadcastIdOf(player);
-  return id ? `https://play.sooplive.com/embed/${encodeURIComponent(id)}` : soopDirectUrl(player);
+  const liveUrl = String(player?.live?.broadcastUrl || player?.broadcastUrl || "");
+  const match = liveUrl.match(/play\.sooplive\.co(?:\.kr|m)\/([a-zA-Z0-9_-]+)\/(\d+)/i);
+  if (match) return `https://play.sooplive.com/${encodeURIComponent(match[1])}/${encodeURIComponent(match[2])}/embed`;
+  return id ? `https://play.sooplive.com/${encodeURIComponent(id)}/embed` : soopDirectUrl(player);
 }
 
 function loadManualParticipants() {
@@ -191,6 +194,8 @@ function cleanManualParticipant(item) {
 
 function destroyHls(hls) {
   if (hls) {
+    if (hls.__cctvResumeTimer) clearTimeout(hls.__cctvResumeTimer);
+    if (hls.__cctvSourceRefreshTimer) clearTimeout(hls.__cctvSourceRefreshTimer);
     try { hls.destroy(); } catch {}
   }
 }
@@ -239,11 +244,24 @@ function attach(video, url, label, slot = null, options = {}) {
   });
   hls.loadSource(url);
   hls.attachMedia(video);
+  const labelSpread = [...label].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const scheduleSourceRefresh = () => {
+    const spread = labelSpread % 30000;
+    hls.__cctvSourceRefreshTimer = setTimeout(() => {
+      hls.__cctvSourceRefreshTimer = null;
+      if (isShuttingDown || !hls.media) return;
+      try { hls.loadSource(cacheBust(url)); } catch {}
+      video.play().catch(() => {});
+      scheduleSourceRefresh();
+    }, (7 * 60 * 1000) + spread);
+  };
+  scheduleSourceRefresh();
   const scheduleResume = () => {
     if (resumeTimer || isShuttingDown) return;
-    const spread = [...label].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 8000;
+    const spread = labelSpread % 8000;
     resumeTimer = setTimeout(() => {
       resumeTimer = null;
+      hls.__cctvResumeTimer = null;
       if (isShuttingDown || !hls.media) return;
       try {
         hls.loadSource(cacheBust(url));
@@ -251,6 +269,7 @@ function attach(video, url, label, slot = null, options = {}) {
       } catch {}
       video.play().catch(() => {});
     }, 5000 + spread);
+    hls.__cctvResumeTimer = resumeTimer;
   };
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
     networkErrorCount = 0;
