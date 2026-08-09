@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv32";
+const CCTV_VERSION = "cctv33";
 const BOOTSTRAP_CONCURRENCY = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
@@ -28,11 +28,65 @@ let mainPlayId = 0;
 let cctvServerCooldownUntil = 0;
 let lastCooldownLogAt = 0;
 let hlsLibraryPromise = null;
+const cctvViewerSessionId = typeof globalThis.crypto?.randomUUID === "function"
+  ? globalThis.crypto.randomUUID()
+  : `cctv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+let cctvSessionTimer = null;
+let sharedSessionLogged = false;
+let cctvSessionClosed = false;
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
   logBox.textContent += `[${time}] ${message}\n`;
   logBox.scrollTop = logBox.scrollHeight;
+}
+
+function activeCctvBroadcastIds() {
+  const ids = slots
+    .filter((slot) => slot?.hls && slot?.data)
+    .map((slot) => broadcastIdOf(slot.player))
+    .filter(Boolean);
+  const mainSlot = slots[activeIndex];
+  if (mainHls && mainSlot) ids.push(broadcastIdOf(mainSlot.player));
+  return [...new Set(ids)];
+}
+
+async function sendCctvSessionHeartbeat() {
+  if (isShuttingDown) return;
+  try {
+    const response = await fetch("/api/cctv/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ sessionId: cctvViewerSessionId, broadcastIds: activeCctvBroadcastIds() }),
+      keepalive: true
+    });
+    if (!response.ok) return;
+    const result = await response.json();
+    if (!sharedSessionLogged && Number(result.activeViewers || 0) > 1) {
+      sharedSessionLogged = true;
+      log(`공동 CCTV 캐시 연결 완료 · 현재 접속 ${result.activeViewers}명`);
+    }
+  } catch {}
+}
+
+function startCctvSession() {
+  cctvSessionClosed = false;
+  if (cctvSessionTimer) clearInterval(cctvSessionTimer);
+  sendCctvSessionHeartbeat();
+  cctvSessionTimer = setInterval(sendCctvSessionHeartbeat, 15000);
+}
+
+function closeCctvSession() {
+  if (cctvSessionClosed) return;
+  cctvSessionClosed = true;
+  if (cctvSessionTimer) {
+    clearInterval(cctvSessionTimer);
+    cctvSessionTimer = null;
+  }
+  const body = JSON.stringify({ sessionId: cctvViewerSessionId });
+  try {
+    navigator.sendBeacon("/api/cctv/session/close", new Blob([body], { type: "application/json" }));
+  } catch {}
 }
 
 function key(value) {
@@ -592,6 +646,7 @@ async function loadSlot(index, options = {}) {
       slot.status.textContent = "MAIN 준비";
     }
     refreshSlotVisibilityAndOrder();
+    sendCctvSessionHeartbeat();
     return true;
   } catch (error) {
     if (/not currently live|currently live|오프라인|offline/i.test(error.message || "")) {
@@ -998,6 +1053,7 @@ function stopAll(finalStop = false) {
 }
 
 function shutdownPlayers() {
+  closeCctvSession();
   try { stopAll(true); } catch {}
   try { if (channel) channel.close(); } catch {}
 }
@@ -1170,4 +1226,5 @@ window.addEventListener("unload", shutdownPlayers);
 if (channel) channel.onmessage = (event) => handleShared(event.data);
 
 renderManualParticipants();
+startCctvSession();
 init().catch((error) => log("초기화 실패: " + error.message));
