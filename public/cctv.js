@@ -1,4 +1,4 @@
-const CCTV_VERSION = "cctv35";
+const CCTV_VERSION = "cctv36";
 const BOOTSTRAP_CONCURRENCY = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
@@ -215,6 +215,7 @@ function attach(video, url, label, slot = null, options = {}) {
   let networkErrorCount = 0;
   let lastSoftLogAt = 0;
   let lastNetworkLogAt = 0;
+  let resumeTimer = null;
   const hls = new Hls({
     enableWorker: true,
     lowLatencyMode: false,
@@ -238,6 +239,19 @@ function attach(video, url, label, slot = null, options = {}) {
   });
   hls.loadSource(url);
   hls.attachMedia(video);
+  const scheduleResume = () => {
+    if (resumeTimer || isShuttingDown) return;
+    const spread = [...label].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 8000;
+    resumeTimer = setTimeout(() => {
+      resumeTimer = null;
+      if (isShuttingDown || !hls.media) return;
+      try {
+        hls.loadSource(cacheBust(url));
+        hls.startLoad(-1);
+      } catch {}
+      video.play().catch(() => {});
+    }, 5000 + spread);
+  };
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
     networkErrorCount = 0;
     video.play().catch(() => {});
@@ -274,7 +288,7 @@ function attach(video, url, label, slot = null, options = {}) {
     log(`${label} 오류: ${data.type} / ${data.details} [FATAL]`);
     if (!slot) {
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-        try { hls.startLoad(-1); } catch {}
+        scheduleResume();
         return;
       }
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -289,7 +303,7 @@ function attach(video, url, label, slot = null, options = {}) {
     }
     try {
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-      else hls.startLoad(-1);
+      else scheduleResume();
     } catch {}
   });
   return hls;
@@ -1194,6 +1208,7 @@ async function init(force = false) {
 }
 
 setInterval(() => {
+  return;
   slots.forEach((slot) => {
     if (!slot.data || !slot.video || slot.video.paused) return;
     const now = slot.video.currentTime || 0;
