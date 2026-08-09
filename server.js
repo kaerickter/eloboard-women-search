@@ -112,10 +112,10 @@ const UPSTREAM_TIMEOUT_MS = 1000 * 20;
 const CCTV_STREAM_CACHE_MS = 3 * 60 * 1000;
 const CCTV_STALE_CACHE_MS = 30 * 60 * 1000;
 const CCTV_PROXY_TOKEN_MS = 30 * 60 * 1000;
-const CCTV_REMOTE_TIMEOUT_MS = 12 * 1000;
+const CCTV_REMOTE_TIMEOUT_MS = 18 * 1000;
 const CCTV_PLAYLIST_CACHE_MS = 1500;
-const CCTV_SEGMENT_CACHE_MS = 5 * 60 * 1000;
-const CCTV_REMOTE_CACHE_MAX_BYTES = 96 * 1024 * 1024;
+const CCTV_SEGMENT_CACHE_MS = 90 * 1000;
+const CCTV_REMOTE_CACHE_MAX_BYTES = 64 * 1024 * 1024;
 const CCTV_REMOTE_CACHE_MAX_ENTRIES = 800;
 const CCTV_ACTIVE_STREAM_MS = 30 * 1000;
 const CCTV_VIEWER_SESSION_MS = 40 * 1000;
@@ -1699,10 +1699,17 @@ function cctvFormats(info) {
       tbr: Number(format.tbr || 0),
       fps: Number(format.fps || 0),
       vcodec: String(format.vcodec || ""),
-      resolution: String(format.resolution || "")
+      resolution: String(format.resolution || ""),
+      upstreamUrl: String(format.url || "")
     }))
     .filter((format) => format.height > 0 && format.vcodec !== "none")
     .sort((a, b) => (a.height - b.height) || (a.tbr - b.tbr));
+}
+
+function cctvPublicMeta(format) {
+  if (!format) return null;
+  const { upstreamUrl, ...meta } = format;
+  return meta;
 }
 
 function cctvLow(formats) {
@@ -1739,16 +1746,18 @@ async function refreshCctvStream(bj) {
     const lowMeta = cctvLow(formats);
     const highMeta = cctvHigh(formats);
     if (!lowMeta && !highMeta) throw new Error("재생 가능한 화질을 찾지 못했습니다.");
+    const selectedLow = lowMeta || highMeta;
+    const selectedHigh = highMeta || lowMeta;
     const [lowUpstream, highUpstream] = await Promise.all([
-      cctvDirectUrl(bj, (lowMeta || highMeta).id, "worst"),
-      cctvDirectUrl(bj, (highMeta || lowMeta).id, "best")
+      selectedLow.upstreamUrl || cctvDirectUrl(bj, selectedLow.id, "worst"),
+      selectedHigh.upstreamUrl || cctvDirectUrl(bj, selectedHigh.id, "best")
     ]);
     const entry = {
       bj,
       title: info.title || bj,
       thumbnail: info.thumbnail || "",
-      lowMeta: lowMeta || highMeta,
-      highMeta: highMeta || lowMeta,
+      lowMeta: cctvPublicMeta(selectedLow),
+      highMeta: cctvPublicMeta(selectedHigh),
       lowUpstream,
       highUpstream,
       refreshedAt: Date.now()
