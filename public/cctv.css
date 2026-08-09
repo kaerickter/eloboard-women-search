@@ -125,6 +125,7 @@ body.cctv-page {
   gap: 8px;
 }
 .cctv-choice-row select,
+.cctv-choice-row input,
 .cctv-choice-row button {
   min-width: 0;
   border: 1px solid #30384a;
@@ -133,6 +134,9 @@ body.cctv-page {
   background: #0d111a;
   color: #f5f7fb;
   font: inherit;
+}
+.cctv-custom-row {
+  grid-template-columns: minmax(220px, 1fr) auto;
 }
 .cctv-choice-row button {
   border-color: #ffd400;

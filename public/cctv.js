@@ -1,8 +1,9 @@
-const CCTV_VERSION = "cctv37";
+const CCTV_VERSION = "cctv38";
 const BOOTSTRAP_CONCURRENCY = 2;
 const SERVER_COOLDOWN_MS = 30000;
 const DEFAULT_FILTER = "tier:6";
-const MANUAL_KEY = "elo-kitten-cctv-manual-participants-v3";
+const CUSTOM_NAMES_KEY = "elo-kitten-cctv-custom-names-v1";
+const LEGACY_MANUAL_KEY = "elo-kitten-cctv-manual-participants-v3";
 const SHARED_KEY = "elo-kitten-cctv-main-v3";
 const channel = null;
 
@@ -35,6 +36,7 @@ const cctvViewerSessionId = typeof globalThis.crypto?.randomUUID === "function"
 let cctvSessionTimer = null;
 let sharedSessionLogged = false;
 let cctvSessionClosed = false;
+let customNames = [];
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -127,6 +129,7 @@ function playerDivisionLabel(player) {
 }
 
 function filterLabel(filter) {
+  if (filter === "custom") return "내 목록";
   if (filter === "all") return "전체";
   const parts = filter.split(":");
   if (parts[0] === "tier") return `${parts[1]}티어`;
@@ -166,30 +169,22 @@ function soopEmbedUrl(player) {
   return id ? `https://play.sooplive.com/${encodeURIComponent(id)}/embed` : soopDirectUrl(player);
 }
 
-function loadManualParticipants() {
+function loadCustomNames() {
   try {
-    const saved = JSON.parse(localStorage.getItem(MANUAL_KEY) || "[]");
-    return Array.isArray(saved) ? saved.map(cleanManualParticipant).filter((item) => item.name && item.broadcastId) : [];
+    const saved = JSON.parse(localStorage.getItem(CUSTOM_NAMES_KEY) || "null");
+    if (Array.isArray(saved)) return [...new Set(saved.map((name) => String(name || "").trim()).filter(Boolean))];
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_MANUAL_KEY) || "[]");
+    return Array.isArray(legacy)
+      ? [...new Set(legacy.map((item) => String(item?.name || "").trim()).filter(Boolean))]
+      : [];
   } catch {
     return [];
   }
 }
 
-function saveManualParticipants(items) {
-  localStorage.setItem(MANUAL_KEY, JSON.stringify(items));
-}
-
-function cleanManualParticipant(item) {
-  const broadcastId = safeBroadcastId(item.broadcastId || item.broadcast_id || item.id);
-  return {
-    name: String(item.name || broadcastId || "").trim(),
-    tier: String(item.tier || "").trim(),
-    university: String(item.university || "").trim(),
-    universities: [String(item.university || "").trim()].filter(Boolean),
-    division: ["women", "men"].includes(item.division) ? item.division : "",
-    broadcastId,
-    customCctv: true
-  };
+function saveCustomNames(items) {
+  customNames = [...new Set(items.map((name) => String(name || "").trim()).filter(Boolean))];
+  localStorage.setItem(CUSTOM_NAMES_KEY, JSON.stringify(customNames));
 }
 
 function destroyHls(hls) {
@@ -409,6 +404,16 @@ function renderSelectors() {
   }
 
   if (filterbar) filterbar.innerHTML = "";
+  const nameOptions = document.getElementById("cctvNameOptions");
+  if (nameOptions) {
+    nameOptions.innerHTML = "";
+    [...players].sort((a, b) => a.name.localeCompare(b.name, "ko")).forEach((player) => {
+      const option = document.createElement("option");
+      option.value = player.name;
+      option.label = playerLabel(player);
+      nameOptions.appendChild(option);
+    });
+  }
 }
 
 function updateUniversityDivisionOptions() {
@@ -428,6 +433,7 @@ function updateUniversityDivisionOptions() {
 
 function matchesFilter(slot) {
   const player = slot.player;
+  if (currentFilter === "custom") return customNames.some((name) => key(name) === key(player.name));
   if (currentFilter === "all") return true;
   const parts = currentFilter.split(":");
   if (parts[0] === "tier") return tierNumber(player.tier) === parts[1];
@@ -1132,47 +1138,48 @@ function mergePlayers(tierPlayers, manualPlayers) {
   return [...merged.values()];
 }
 
-function renderManualParticipants() {
-  const manualPlayers = loadManualParticipants();
+function renderCustomNames() {
+  if (!participantList) return;
   participantList.innerHTML = "";
-  if (!manualPlayers.length) {
-    participantList.textContent = "보조로 저장한 SOOP 아이디가 없습니다.";
+  if (!customNames.length) {
+    participantList.textContent = "아직 추가한 사람이 없습니다.";
     return;
   }
-  manualPlayers.forEach((player) => {
+  customNames.forEach((name) => {
+    const player = players.find((item) => key(item.name) === key(name));
     const tag = document.createElement("button");
     tag.type = "button";
     tag.className = "cctv-participant-tag";
-    tag.textContent = playerLabel(player) + ` · ${player.broadcastId}`;
+    tag.textContent = `${player ? player.name : name} ×`;
+    tag.title = `${name} 목록에서 삭제`;
     tag.onclick = () => {
-      document.getElementById("addName").value = player.name;
-      document.getElementById("addBroadcastId").value = player.broadcastId;
-      document.getElementById("addTier").value = player.tier;
-      document.getElementById("addUniversity").value = player.university;
-      document.getElementById("addDivision").value = player.division;
+      saveCustomNames(customNames.filter((item) => key(item) !== key(name)));
+      renderCustomNames();
+      if (currentFilter === "custom") applyFilter("custom", false);
     };
     participantList.appendChild(tag);
   });
 }
 
 function saveParticipantFromForm() {
-  const item = cleanManualParticipant({
-    name: document.getElementById("addName").value,
-    broadcastId: document.getElementById("addBroadcastId").value,
-    tier: document.getElementById("addTier").value,
-    university: document.getElementById("addUniversity").value,
-    division: document.getElementById("addDivision").value
-  });
-  if (!item.name || !item.broadcastId) {
-    log("티어표 이름과 SOOP 아이디를 입력해 주세요.");
+  const input = document.getElementById("addName");
+  const requestedName = String(input?.value || "").trim();
+  const player = players.find((item) => key(item.name) === key(requestedName));
+  if (!requestedName) {
+    log("추가할 사람의 이름을 입력해 주세요.");
     return;
   }
-  const manualPlayers = loadManualParticipants();
-  const next = manualPlayers.filter((player) => key(player.name) !== key(item.name));
-  next.push(item);
-  saveManualParticipants(next);
-  renderManualParticipants();
-  init(false);
+  if (!player) {
+    log(`티어표에서 '${requestedName}' 이름을 찾지 못했습니다. 표시된 이름과 똑같이 입력해 주세요.`);
+    return;
+  }
+  if (!customNames.some((name) => key(name) === key(player.name))) {
+    saveCustomNames([...customNames, player.name]);
+  }
+  if (input) input.value = "";
+  renderCustomNames();
+  showMode("custom");
+  applyFilter("custom", true);
 }
 
 function applyTierFromForm() {
@@ -1195,13 +1202,23 @@ function applyUniversityFromForm() {
 function showMode(mode) {
   const tierPanel = document.getElementById("tierPanel");
   const universityPanel = document.getElementById("universityPanel");
+  const customPanel = document.getElementById("customPanel");
   const tierModeBtn = document.getElementById("tierModeBtn");
   const universityModeBtn = document.getElementById("universityModeBtn");
+  const customModeBtn = document.getElementById("customModeBtn");
   const isTier = mode === "tier";
+  const isUniversity = mode === "university";
+  const isCustom = mode === "custom";
   tierPanel?.classList.toggle("hidden", !isTier);
-  universityPanel?.classList.toggle("hidden", isTier);
+  universityPanel?.classList.toggle("hidden", !isUniversity);
+  customPanel?.classList.toggle("hidden", !isCustom);
   tierModeBtn?.classList.toggle("active", isTier);
-  universityModeBtn?.classList.toggle("active", !isTier);
+  universityModeBtn?.classList.toggle("active", isUniversity);
+  customModeBtn?.classList.toggle("active", isCustom);
+  if (isCustom) {
+    renderCustomNames();
+    applyFilter("custom", false);
+  }
 }
 
 async function init(force = false) {
@@ -1215,12 +1232,15 @@ async function init(force = false) {
     log("티어표 로딩 실패: " + error.message);
   }
 
-  players = mergePlayers(tierPlayers, loadManualParticipants());
+  players = mergePlayers(tierPlayers, []);
+  customNames = loadCustomNames().filter((name) => players.some((player) => key(player.name) === key(name)));
+  saveCustomNames(customNames);
   grid.innerHTML = "";
   slots.length = 0;
   activeIndex = -1;
   players.forEach(createSlot);
   renderSelectors();
+  renderCustomNames();
   applyFilter(currentFilter);
   log(`티어표 기준 화면 표시 완료: ${players.length}명`);
   log(`cctv 목록 준비 완료: ${filterLabel(currentFilter)} · 사이트 접속 속도를 위해 영상은 자동 시작하지 않습니다. '현재 LIVE 다시 구성'을 눌러 주세요.`);
@@ -1260,6 +1280,10 @@ document.getElementById("applyTierBtn").onclick = applyTierFromForm;
 document.getElementById("applyUniversityBtn").onclick = applyUniversityFromForm;
 document.getElementById("tierModeBtn").onclick = () => showMode("tier");
 document.getElementById("universityModeBtn").onclick = () => showMode("university");
+document.getElementById("customModeBtn").onclick = () => showMode("custom");
+document.getElementById("addName").onkeydown = (event) => {
+  if (event.key === "Enter") saveParticipantFromForm();
+};
 if (universitySelect) universitySelect.onchange = updateUniversityDivisionOptions;
 if (showOfflineToggle) showOfflineToggle.onchange = refreshSlotVisibilityAndOrder;
 showMode("tier");
@@ -1274,6 +1298,6 @@ window.addEventListener("beforeunload", shutdownPlayers);
 window.addEventListener("unload", shutdownPlayers);
 if (channel) channel.onmessage = (event) => handleShared(event.data);
 
-renderManualParticipants();
+renderCustomNames();
 startCctvSession();
 init().catch((error) => log("초기화 실패: " + error.message));
