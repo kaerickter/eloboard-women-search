@@ -2102,7 +2102,7 @@ const cctvSharedMaintenanceTimer = setInterval(() => {
       break;
     }
   }
-}, 15 * 1000);
+}, 5 * 1000);
 cctvSharedMaintenanceTimer.unref?.();
 
 function serveStatic(req, res) {
