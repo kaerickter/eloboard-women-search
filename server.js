@@ -109,7 +109,7 @@ const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 15;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 20;
-const CCTV_STREAM_CACHE_MS = 3 * 60 * 1000;
+const CCTV_STREAM_CACHE_MS = 5 * 60 * 1000;
 const CCTV_STALE_CACHE_MS = 30 * 60 * 1000;
 const CCTV_PROXY_TOKEN_MS = 30 * 60 * 1000;
 const CCTV_REMOTE_TIMEOUT_MS = 18 * 1000;
@@ -1646,6 +1646,7 @@ const cctvRemoteInflight = new Map();
 const cctvActiveStreams = new Map();
 const cctvViewerSessions = new Map();
 let cctvRemoteCacheBytes = 0;
+let cctvMaintenanceRefreshRunning = false;
 
 function safeCctvBj(value) {
   const bj = String(value || "").trim();
@@ -1776,10 +1777,7 @@ async function refreshCctvStream(bj) {
 async function getCctvStream(bj, allowStale = false) {
   const entry = cctvStreamCache.get(bj);
   if (cctvFresh(entry)) return entry;
-  if (allowStale && cctvUsableStale(entry)) {
-    refreshCctvStream(bj).catch((error) => console.error("cctv refresh failed:", bj, error.message));
-    return entry;
-  }
+  if (allowStale && cctvUsableStale(entry)) return entry;
   return refreshCctvStream(bj);
 }
 
@@ -2088,6 +2086,7 @@ const cctvSharedMaintenanceTimer = setInterval(() => {
   cleanupCctvTokens();
   cleanupCctvRemoteCache();
   cleanupCctvViewerSessions();
+  if (cctvMaintenanceRefreshRunning) return;
   const now = Date.now();
   for (const [bj, active] of cctvActiveStreams) {
     if (!active || (now - active.lastAccess > CCTV_ACTIVE_STREAM_MS && !cctvSessionUsesBj(bj))) {
@@ -2096,7 +2095,11 @@ const cctvSharedMaintenanceTimer = setInterval(() => {
     }
     const entry = cctvStreamCache.get(bj);
     if (!entry || now - entry.refreshedAt >= CCTV_STREAM_CACHE_MS) {
-      refreshCctvStream(bj).catch((error) => console.error("cctv active refresh failed:", bj, error.message));
+      cctvMaintenanceRefreshRunning = true;
+      refreshCctvStream(bj)
+        .catch((error) => console.error("cctv active refresh failed:", bj, error.message))
+        .finally(() => { cctvMaintenanceRefreshRunning = false; });
+      break;
     }
   }
 }, 15 * 1000);
