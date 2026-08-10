@@ -85,6 +85,7 @@ const PINNED_SOOP_ALIASES = {
 };
 const PINNED_TIER_DISPLAY_NAMES = {};
 const PORT = Number(process.env.PORT || 5177);
+const CCTV_LOCAL_MODE = process.env.CCTV_LOCAL_MODE === "1";
 const DATABASE_RETRY_MS = 15000;
 const DEFAULT_PAGES = 10;
 const MAX_PAGES = 40;
@@ -2142,6 +2143,12 @@ function lanUrls(port) {
 }
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
+  const isCctvOnlyPath = /^\/cctv(?:\.(?:html|css|js)|\/)/.test(url.pathname) ||
+    url.pathname === "/api/cctv" ||
+    url.pathname.startsWith("/api/cctv/");
+  if (!CCTV_LOCAL_MODE && isCctvOnlyPath) {
+    return send(res, 404, "Not found");
+  }
   if (url.pathname === "/healthz" && req.method === "GET") {
     return send(res, 200, JSON.stringify({
       ok: true,
@@ -2994,15 +3001,23 @@ async function initializeTierAdminStorage() {
   }
 }
 
-setupCollaboration(io).catch((error) => {
-  console.error("Collaboration storage initialization failed; web server remains online:", error.message);
-});
-initializeTierAdminStorage();
+if (!CCTV_LOCAL_MODE) {
+  setupCollaboration(io).catch((error) => {
+    console.error("Collaboration storage initialization failed; web server remains online:", error.message);
+  });
+  initializeTierAdminStorage();
+}
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("ELOBoard board search app: http://localhost:" + PORT);
-  for (const url of lanUrls(PORT)) console.log("LAN: " + url);
-});
+if (CCTV_LOCAL_MODE) {
+  server.listen(PORT, "127.0.0.1", () => {
+    console.log("ELO CCTV local app: http://127.0.0.1:" + PORT + "/cctv.html");
+  });
+} else {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log("ELOBoard board search app: http://localhost:" + PORT);
+    for (const url of lanUrls(PORT)) console.log("LAN: " + url);
+  });
+}
 
 module.exports = { server, io, tierAdmin, spawnDiaryAdmin };
 
