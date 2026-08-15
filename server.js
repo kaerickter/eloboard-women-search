@@ -20,6 +20,7 @@ const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
 const BOARD_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_board";
 const BJ_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_list";
+const WOMEN_RECORD_AJAX_URL = "https://eloboard.com/women/bbs/ajax_women_record.php";
 const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=search_list";
 const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
 const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_list";
@@ -847,6 +848,42 @@ function parseProfileRows(html) {
   }
   return rows;
 }
+function mergeProfileRows(...rowGroups) {
+  const seen = new Set();
+  return rowGroups.flat().filter((row) => {
+    const key = row.url || [row.date, row.opponent, row.map, row.elo, row.format, row.memo].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+}
+async function fetchWomenRecordRows(playerName, profileUrl) {
+  const name = String(playerName || "").trim();
+  if (!name) return [];
+  try {
+    const response = await fetchWithRetry(
+      WOMEN_RECORD_AJAX_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "X-Requested-With": "XMLHttpRequest",
+          "Referer": profileUrl,
+          "User-Agent": "Mozilla/5.0 eloboard-women-search",
+          "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8"
+        },
+        body: new URLSearchParams({ bj_name: name, target_year: "" })
+      },
+      2
+    );
+    if (!response.ok) return [];
+    const html = await response.text();
+    return parseProfileRows(html);
+  } catch (error) {
+    console.warn("Women record AJAX unavailable; keeping profile rows:", error.message);
+    return [];
+  }
+}
 function inferRecent30(rows) {
   if (!rows.length) return null;
   const latest = rows.map((row) => new Date(row.date + "T00:00:00")).filter((date) => !Number.isNaN(date.getTime())).sort((a, b) => b - a)[0];
@@ -929,6 +966,9 @@ async function loadProfile(wrId, force = false) {
       if (!profile || String(profile.wrId) !== cacheKey || !String(profile.name || "").trim()) {
         throw new Error("profile " + wrId + " response validation failed");
       }
+      const womenRows = await fetchWomenRecordRows(profile.name, profile.url);
+      profile.matches = mergeProfileRows(womenRows, profile.matches);
+      profile.recent30 = inferRecent30(profile.matches);
       profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
       return profile;
     } catch (error) {
