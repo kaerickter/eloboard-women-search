@@ -1,0 +1,643 @@
+{
+  "updatedAt": "2026-08-17T17:45:53.676Z",
+  "source": "Google Sheets gid=65916286",
+  "players": [
+    {
+      "tier": "갓",
+      "realName": "김민철",
+      "broadcastName": "철벽김민철",
+      "broadcastId": "minchul",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "김성대",
+      "broadcastName": "Action김성대",
+      "broadcastId": "tjdeosks",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "김택용",
+      "broadcastName": "Bisu김택용",
+      "broadcastId": "rlaxordyd",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "도재욱",
+      "broadcastName": "Best도재욱",
+      "broadcastId": "wodnrdldia",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "박상현",
+      "broadcastName": "짭제다",
+      "broadcastId": "thakzkf",
+      "displayName": "짭제"
+    },
+    {
+      "tier": "갓",
+      "realName": "박성균",
+      "broadcastName": "높이의성균",
+      "broadcastId": "peros777",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "변현제",
+      "broadcastName": "Mini변현제",
+      "broadcastId": "bye1013",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "윤찬희",
+      "broadcastName": "스타급몽군",
+      "broadcastId": "cksgmldbs",
+      "displayName": "몽군"
+    },
+    {
+      "tier": "갓",
+      "realName": "이영호",
+      "broadcastName": "FlaSh.이영호",
+      "broadcastId": "byflash",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "임홍규",
+      "broadcastName": "홍구",
+      "broadcastId": "dpfgc3",
+      "displayName": "홍구"
+    },
+    {
+      "tier": "갓",
+      "realName": "장윤철",
+      "broadcastName": "snow장윤철",
+      "broadcastId": "tmsh401",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "정영재",
+      "broadcastName": "JyJ정영재",
+      "broadcastId": "neverdieyj",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "조기석",
+      "broadcastName": "Sharp조기석",
+      "broadcastId": "sharpragu",
+      "displayName": ""
+    },
+    {
+      "tier": "갓",
+      "realName": "최호선",
+      "broadcastName": "호선킹",
+      "broadcastId": "ghtjs3833",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "구성훈",
+      "broadcastName": "잉어킹구성훈",
+      "broadcastId": "rladuddo99",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "김경모",
+      "broadcastName": "깨모다",
+      "broadcastId": "kkmkhh1234",
+      "displayName": "깨모다"
+    },
+    {
+      "tier": "킹",
+      "realName": "김윤중",
+      "broadcastName": "JuM.윤중2",
+      "broadcastId": "jk890202",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "김윤환",
+      "broadcastName": "Calm_김윤환",
+      "broadcastId": "brainzerg7",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "김태영",
+      "broadcastName": "4s.사테",
+      "broadcastId": "hoonykkk",
+      "displayName": "사테"
+    },
+    {
+      "tier": "킹",
+      "realName": "박준오",
+      "broadcastName": "DS★준오",
+      "broadcastId": "h78ert",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "방태수",
+      "broadcastName": "방태수z",
+      "broadcastId": "bts150",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "신상문",
+      "broadcastName": "신상문☆☆",
+      "broadcastId": "palko1",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "어윤수",
+      "broadcastName": "어윤수soO",
+      "broadcastId": "djdbstn",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "원선재",
+      "broadcastName": "Motive원선재",
+      "broadcastId": "zealot0846",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "유승곤",
+      "broadcastName": "Scan유승곤",
+      "broadcastId": "scan1014",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "윤수철",
+      "broadcastName": "산적왕윤수철",
+      "broadcastId": "snfjdro369",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "윤용태",
+      "broadcastName": "free윤용태",
+      "broadcastId": "dbsdydx",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "이영한",
+      "broadcastName": "태풍이영한",
+      "broadcastId": "lyh8808",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "이예훈",
+      "broadcastName": "Sacsri이예훈",
+      "broadcastId": "gnsl418",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "임진묵",
+      "broadcastName": "Organ.임진묵",
+      "broadcastId": "organ333",
+      "displayName": ""
+    },
+    {
+      "tier": "킹",
+      "realName": "홍덕",
+      "broadcastName": "긍정갑_홍덕",
+      "broadcastId": "hongduck9737",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "강민기",
+      "broadcastName": "쿨지지.",
+      "broadcastId": "khy12088wsss",
+      "displayName": "쿨지지"
+    },
+    {
+      "tier": "잭",
+      "realName": "고석현",
+      "broadcastName": "HyuN.고석현",
+      "broadcastId": "understay",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "권혁진",
+      "broadcastName": "[BJ]권혁진",
+      "broadcastId": "rnjsgurwls15",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "김범수",
+      "broadcastName": "김범수P",
+      "broadcastId": "bumsoo552",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "김병수",
+      "broadcastName": "아트유김병수",
+      "broadcastId": "dgh9641",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "김성민",
+      "broadcastName": "구라미스",
+      "broadcastId": "ksmo54",
+      "displayName": "구라미스"
+    },
+    {
+      "tier": "잭",
+      "realName": "김수식",
+      "broadcastName": "믹교수김수식",
+      "broadcastId": "kss33325",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "김영진",
+      "broadcastName": "Skey김영진",
+      "broadcastId": "shyshy123",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "김준혁",
+      "broadcastName": "얍삽e",
+      "broadcastId": "wnsgur2da",
+      "displayName": "얍삽"
+    },
+    {
+      "tier": "잭",
+      "realName": "김호성",
+      "broadcastName": "만두호성",
+      "broadcastId": "rlarnfk24",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "민찬기",
+      "broadcastName": "#민찬기",
+      "broadcastId": "ckmin706",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "박수범",
+      "broadcastName": "박수범.UP",
+      "broadcastId": "jihoon002",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "배성흠",
+      "broadcastName": "Hm배성흠",
+      "broadcastId": "goodzerg",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "배호연",
+      "broadcastName": "배호딱",
+      "broadcastId": "bhy95",
+      "displayName": "배호딱"
+    },
+    {
+      "tier": "잭",
+      "realName": "선우도현",
+      "broadcastName": "선우도현",
+      "broadcastId": "dohyeon97",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "이광용",
+      "broadcastName": "프발",
+      "broadcastId": "lky6407",
+      "displayName": "프발"
+    },
+    {
+      "tier": "잭",
+      "realName": "이성은",
+      "broadcastName": "흑운장TV",
+      "broadcastId": "firebathero",
+      "displayName": "흑운장"
+    },
+    {
+      "tier": "잭",
+      "realName": "이창우",
+      "broadcastName": "Saber이창우",
+      "broadcastId": "jackpot",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "장민철",
+      "broadcastName": "왜냐맨장민철",
+      "broadcastId": "jmc06170",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "정경두",
+      "broadcastName": "정경두",
+      "broadcastId": "paralyze92",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "정민기",
+      "broadcastName": "정민기",
+      "broadcastId": "jop4745",
+      "displayName": ""
+    },
+    {
+      "tier": "잭",
+      "realName": "지동원",
+      "broadcastName": "SS_지동원",
+      "broadcastId": "rondobba",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "김건욱",
+      "broadcastName": "건욱이.",
+      "broadcastId": "killkg2",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "김대한",
+      "broadcastName": "김대한.",
+      "broadcastId": "daehan7224",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "김동민",
+      "broadcastName": "액션구드론",
+      "broadcastId": "dmk1212",
+      "displayName": "액션구드론"
+    },
+    {
+      "tier": "조커",
+      "realName": "김민우",
+      "broadcastName": "Invade김민우",
+      "broadcastId": "vhrtmspt",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "김상곤",
+      "broadcastName": "SsaL김상곤",
+      "broadcastId": "byspire",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "김영주",
+      "broadcastName": "달그락영주",
+      "broadcastId": "ndudska620",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "김학수",
+      "broadcastName": "김학수",
+      "broadcastId": "skygkrtn",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "박정일",
+      "broadcastName": "짭호형2↑",
+      "broadcastId": "wjddlf4695",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "박준혁",
+      "broadcastName": "박준혁o",
+      "broadcastId": "jhyhlli123",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "박현재",
+      "broadcastName": "기뉴다",
+      "broadcastId": "arinbbidol",
+      "displayName": "기뉴다"
+    },
+    {
+      "tier": "조커",
+      "realName": "이예준",
+      "broadcastName": "철구형2↑",
+      "broadcastId": "y1026",
+      "displayName": "철구"
+    },
+    {
+      "tier": "조커",
+      "realName": "전상욱",
+      "broadcastName": "Midas전상욱",
+      "broadcastId": "isangwk",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "전흥식",
+      "broadcastName": "BJ킁식",
+      "broadcastId": "zealotmaru",
+      "displayName": "킁식"
+    },
+    {
+      "tier": "조커",
+      "realName": "최재성",
+      "broadcastName": "최재성",
+      "broadcastId": "byromantic",
+      "displayName": ""
+    },
+    {
+      "tier": "조커",
+      "realName": "허유진",
+      "broadcastName": "허유ㅎㅅㅎ",
+      "broadcastId": "daegalheo",
+      "displayName": "허유"
+    },
+    {
+      "tier": "스페이드",
+      "realName": "강민",
+      "broadcastName": "NalrA_강민",
+      "broadcastId": "nalra82",
+      "displayName": ""
+    },
+    {
+      "tier": "스페이드",
+      "realName": "박성준",
+      "broadcastName": "투신박성준♡",
+      "broadcastId": "julyzerg",
+      "displayName": ""
+    },
+    {
+      "tier": "스페이드",
+      "realName": "박종승",
+      "broadcastName": "빡죠스",
+      "broadcastId": "askl021",
+      "displayName": "빡죠스"
+    },
+    {
+      "tier": "스페이드",
+      "realName": "유규민",
+      "broadcastName": "초난강입니다",
+      "broadcastId": "dbrbals",
+      "displayName": "초난강"
+    },
+    {
+      "tier": "스페이드",
+      "realName": "유민",
+      "broadcastName": "Fleta유민",
+      "broadcastId": "minyoo3972",
+      "displayName": ""
+    },
+    {
+      "tier": "스페이드",
+      "realName": "이윤열",
+      "broadcastName": "NaDa★이윤열",
+      "broadcastId": "nada11200",
+      "displayName": ""
+    },
+    {
+      "tier": "스페이드",
+      "realName": "장영근",
+      "broadcastName": "그냥난수다",
+      "broadcastId": "wkddudrms15",
+      "displayName": "난수"
+    },
+    {
+      "tier": "스페이드",
+      "realName": "저그맨박성준",
+      "broadcastName": "저그맨박성준",
+      "broadcastId": "jun10280",
+      "displayName": ""
+    },
+    {
+      "tier": "스페이드",
+      "realName": "전태규",
+      "broadcastName": "전태규",
+      "broadcastId": "70jeontaekyu",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "김기덕",
+      "broadcastName": "alen김기덕",
+      "broadcastId": "qndnd12",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "김명운",
+      "broadcastName": "Queen명운",
+      "broadcastId": "kimmyungwun",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "김정우",
+      "broadcastName": "effort김정우",
+      "broadcastId": "momo130",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "김지성",
+      "broadcastName": "RoyaL김지성",
+      "broadcastId": "ho1godme",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "박재현",
+      "broadcastName": "쿰신",
+      "broadcastId": "parkjaehyeon",
+      "displayName": "쿰신"
+    },
+    {
+      "tier": "FA",
+      "realName": "서문지훈",
+      "broadcastName": "서문지훈",
+      "broadcastId": "jh3697",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "송병구",
+      "broadcastName": "Stork송병구",
+      "broadcastId": "koreasbg",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "유영진",
+      "broadcastName": "Rush.유영진",
+      "broadcastId": "yoo376",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "윤진규",
+      "broadcastName": "윤진규",
+      "broadcastId": "mwhdgus",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "이영웅",
+      "broadcastName": "herO`영웅",
+      "broadcastId": "rfvtgb778",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "이재호",
+      "broadcastName": "Light이재호",
+      "broadcastId": "scv6256",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "이제동",
+      "broadcastName": "JD_이제동",
+      "broadcastId": "jaedong23",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "조일장",
+      "broadcastName": "HERO_조일장",
+      "broadcastId": "byhero",
+      "displayName": ""
+    },
+    {
+      "tier": "FA",
+      "realName": "황병영",
+      "broadcastName": "By.황병영",
+      "broadcastId": "hby0724",
+      "displayName": ""
+    }
+  ]
+}
