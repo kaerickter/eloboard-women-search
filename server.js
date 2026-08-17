@@ -31,6 +31,7 @@ const SOOP_LIVE_SEARCH_API = "https://sch.sooplive.co.kr/api.php";
 const SOOP_VOTE_API = "https://chapi.sooplive.co.kr/api/ititit/title/202619457/comment";
 const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
+const MEN_BROADCAST_MAP_FILE = path.join(ROOT, "data", "men-player-broadcast-map.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const MEN_TIER_FALLBACK_FILE = path.join(ROOT, "data", "men-tier-fallback.json");
 const SCOREBOARD_STATE_FILE = path.join(ROOT, "data", "scoreboard-state.json");
@@ -106,6 +107,7 @@ let liveNameCache = new Map();
 let liveStatusPromises = new Map();
 let channelRegistry = {};
 let channelAliases = {};
+let menBroadcastMapRows = [];
 let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const LIVE_CACHE_MS = 1000 * 15;
@@ -360,6 +362,15 @@ try {
 channelAliases = { ...channelAliases, ...PINNED_SOOP_ALIASES };
 
 try {
+  const savedMenBroadcastMap = JSON.parse(fs.readFileSync(MEN_BROADCAST_MAP_FILE, "utf8"));
+  menBroadcastMapRows = Array.isArray(savedMenBroadcastMap?.players)
+    ? savedMenBroadcastMap.players
+    : [];
+} catch {
+  menBroadcastMapRows = [];
+}
+
+try {
   const savedTierRoster = JSON.parse(fs.readFileSync(TIER_ROSTER_FILE, "utf8"));
   if (Array.isArray(savedTierRoster?.players) && savedTierRoster.players.length) {
     tierRosterCache = {
@@ -556,22 +567,38 @@ function normalizeSoopName(name) {
     .replace(/^(?:bj|af|soop)+/i, "")
     .replace(/[^0-9a-z가-힣]/gi, "");
 }
+function menBroadcastRecord(name) {
+  const key = normalizeSoopName(name);
+  if (!key) return null;
+  return menBroadcastMapRows.find((row) => [row.realName, row.broadcastName, row.displayName]
+    .some((value) => normalizeSoopName(value) === key)) || null;
+}
+function tierDisplayName(name) {
+  const row = menBroadcastRecord(name);
+  return String(row?.displayName || "").trim() || String(name || "");
+}
 function manualSoopAlias(name) {
   return channelAliases[normalizePlayerName(name)] || null;
 }
 function pinnedBroadcastIdFor(name) {
+  const menRecord = menBroadcastRecord(name);
   return String(
     manualSoopAlias(name)?.broadcastId ||
     tierAdmin.getOverride(name)?.broadcastId ||
+    menRecord?.broadcastId ||
     ""
   );
 }
 function allowedSoopNames(name) {
   const alias = manualSoopAlias(name);
+  const menRecord = menBroadcastRecord(name);
   return [...new Set([
     name,
     alias?.searchName,
-    ...(Array.isArray(alias?.stationNames) ? alias.stationNames : [])
+    ...(Array.isArray(alias?.stationNames) ? alias.stationNames : []),
+    menRecord?.realName,
+    menRecord?.broadcastName,
+    menRecord?.displayName
   ].map(normalizeSoopName).filter(Boolean))];
 }
 function koreaDateKey(timestamp = Date.now()) {
@@ -1349,8 +1376,17 @@ function addTierProfileAssets(players) {
   return (players || []).map((player) => ({ ...player, ...tierProfileAssets(player) }));
 }
 
+function applyMenTierDisplayNames(players) {
+  return (players || []).map((player) => {
+    if (player.division !== "men") return player;
+    const displayName = tierDisplayName(player.name);
+    if (!displayName || displayName === player.name) return player;
+    return { ...player, realName: player.name, name: displayName };
+  });
+}
+
 function addTierCctvSources(players) {
-  return addTierProfileAssets(players).map((player) => {
+  return addTierProfileAssets(applyMenTierDisplayNames(players)).map((player) => {
     const directChannel = soopChannelFromHtml([
       player.broadcastId,
       player.broadcastUrl,
@@ -2733,9 +2769,10 @@ const server = http.createServer(async (req, res) => {
       if (!force && url.searchParams.get("wait") === "1" && tierRosterPromise) {
         players = await tierRosterPromise;
       }
+      const visiblePlayers = addTierCctvSources(tierAdmin.applyOverrides(players));
       return send(res, 200, JSON.stringify({
-        players: addTierCctvSources(tierAdmin.applyOverrides(players)),
-        liveStatuses: sharedLiveStatuses(players.map((player) => player.name)),
+        players: visiblePlayers,
+        liveStatuses: sharedLiveStatuses(visiblePlayers.map((player) => player.name)),
         source: UNIVERSITY_LIST_URL,
         updatedAt: new Date(tierRosterCache?.cacheTime || Date.now()).toISOString(),
         refreshing: Boolean(tierRosterPromise)
