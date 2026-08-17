@@ -1358,8 +1358,20 @@ function scheduleChannelRegistrySave() {
   }, 300);
 }
 
+function soopProfileImageUrl(broadcastId) {
+  const id = String(broadcastId || "").trim();
+  if (!/^[a-z0-9_-]{2,}$/i.test(id)) return "";
+  const folder = id.slice(0, 2).toLowerCase();
+  return "https://profile.img.sooplive.co.kr/LOGO/" + encodeURIComponent(folder) + "/" + encodeURIComponent(id) + "/" + encodeURIComponent(id) + ".jpg";
+}
+
 function tierProfileAssets(player) {
   if (player?.customPlayer) return {};
+  const menRecord = player?.division === "men" ? menBroadcastRecord(player.name) : null;
+  if (menRecord?.broadcastId) {
+    const profileImage = soopProfileImageUrl(menRecord.broadcastId);
+    if (profileImage) return { tierStaticImage: profileImage, tierAnimatedImage: "" };
+  }
   const key = normalizePlayerName(player?.name);
   const pinnedId = pinnedBroadcastIdFor(player?.name).trim();
   const registeredId = String(channelRegistry[key] || "").trim();
