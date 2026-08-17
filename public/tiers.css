@@ -228,12 +228,21 @@ h1 {
 .university-filter-panel {
   position: sticky;
   top: 150px;
-  max-height: calc(100vh - 162px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* 대학 목록 안에 이중 스크롤바가 생기지 않도록 페이지 흐름에 맡깁니다. */
+  max-height: none;
+  overflow: visible;
   min-width: 0;
   padding: 0 4px 4px 20px;
   border-left: 1px solid var(--theme-line);
+}
+
+@media (min-width: 1101px) and (min-height: 850px) {
+  .university-filter-buttons { gap: 6px; }
+  .university-filter-button {
+    min-height: 40px;
+    padding-inline: 11px;
+    font-size: 13px;
+  }
 }
 
 .university-filter-heading {
