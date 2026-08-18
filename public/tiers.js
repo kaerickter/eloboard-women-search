@@ -153,8 +153,9 @@ function avatar(player) {
   const initial = Array.from(player.name || "?")[0] || "?";
   const fallbackUrl = photoUrl(player.image);
   const isIakkang = keyOf(player.name) === "이아깽";
+  const broadcastProfileUrl = "https://profile.img.sooplive.co.kr/LOGO/2a/2ahgo1203/2ahgo1203.jpg";
   const staticUrl = isIakkang
-    ? (fallbackUrl || photoUrl(player.tierStaticImage))
+    ? broadcastProfileUrl
     : (photoUrl(player.tierStaticImage) || fallbackUrl);
   const animatedUrl = isIakkang ? "" : photoUrl(player.tierAnimatedImage);
   const image = staticUrl
