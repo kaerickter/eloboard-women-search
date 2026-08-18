@@ -2214,7 +2214,8 @@ function serveStatic(req, res) {
     const isTierProfile = file.startsWith(path.join(PUBLIC, "tier-profiles") + path.sep);
     res.writeHead(200, {
       "Content-Type": type,
-      "Cache-Control": isTierProfile ? "public, max-age=86400" : "no-store",
+      // 기존 프로필 이미지는 고정하므로 1년 동안 브라우저/CDN 캐시를 사용합니다.
+      "Cache-Control": isTierProfile ? "public, max-age=31536000, immutable" : "no-store",
       "Access-Control-Allow-Origin": "*"
     });
     res.end(data);
