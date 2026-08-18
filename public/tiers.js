@@ -182,6 +182,17 @@ function refreshPhotoSources() {
   syncProfileAnimations();
 }
 
+function applyRosterPhotoVersion(updatedAt) {
+  const timestamp = Date.parse(String(updatedAt || ""));
+  if (!Number.isFinite(timestamp)) return;
+  const nextVersion = Math.max(
+    Math.floor(Date.now() / PHOTO_CACHE_WINDOW_MS),
+    Math.floor(timestamp / PHOTO_CACHE_WINDOW_MS)
+  );
+  if (nextVersion === photoCacheVersion) return;
+  photoCacheVersion = nextVersion;
+}
+
 function popover(live) {
   if (!live?.isLive) return "";
   const thumbnailUrl = safeExternalUrl(live.thumbnail);
@@ -913,6 +924,7 @@ async function loadRoster(force = false) {
     const response = await fetch("/api/tiers" + (force ? "?refresh=1" : ""));
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "티어 명단을 불러오지 못했습니다.");
+    applyRosterPhotoVersion(data.updatedAt);
     state.players = Array.isArray(data.players) ? data.players : [];
     saveTierRoster();
     keepRosterLiveStatuses();
@@ -948,6 +960,7 @@ async function syncDailyRoster() {
     const response = await fetch("/api/tiers?wait=1");
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.players) || !data.players.length) return;
+    applyRosterPhotoVersion(data.updatedAt);
     state.players = data.players;
     saveTierRoster();
     keepRosterLiveStatuses();
