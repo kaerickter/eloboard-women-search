@@ -45,8 +45,6 @@ const LIVE_SHARED_SYNC_MS = 1000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
 const TIER_ROSTER_CACHE_KEY = "tier-board-roster-v1";
 const TIER_VIEW_STATE_KEY = "tier-board-view-state-v1";
-// 사진 URL은 5분 단위로만 갱신해 브라우저 캐시를 활용하면서 변경을 반영합니다.
-const PHOTO_CACHE_WINDOW_MS = 5 * 60 * 1000;
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
@@ -65,7 +63,6 @@ let tierAdminSuggestionIndex = -1;
 let tierAdminDrag = null;
 let tierAdminStorage = { mode: "unknown", durable: false, message: "" };
 let initialTierScrollPending = true;
-let photoCacheVersion = Math.floor(Date.now() / PHOTO_CACHE_WINDOW_MS);
 
 const state = {
   players: [],
@@ -155,8 +152,11 @@ function formatViewers(value) {
 function avatar(player) {
   const initial = Array.from(player.name || "?")[0] || "?";
   const fallbackUrl = photoUrl(player.image);
-  const staticUrl = photoUrl(player.tierStaticImage) || fallbackUrl;
-  const animatedUrl = photoUrl(player.tierAnimatedImage);
+  const isIakkang = keyOf(player.name) === "이아깽";
+  const staticUrl = isIakkang
+    ? (fallbackUrl || photoUrl(player.tierStaticImage))
+    : (photoUrl(player.tierStaticImage) || fallbackUrl);
+  const animatedUrl = isIakkang ? "" : photoUrl(player.tierAnimatedImage);
   const image = staticUrl
     ? '<img class="player-photo" src="' + escapeHtml(staticUrl) + '" alt="" loading="lazy" decoding="async" fetchpriority="low"' +
       ' data-static-src="' + escapeHtml(staticUrl) + '"' +
@@ -164,33 +164,6 @@ function avatar(player) {
       ' data-fallback-src="' + escapeHtml(fallbackUrl) + '">'
     : "";
   return '<span class="player-avatar">' + escapeHtml(initial) + image + "</span>";
-}
-
-function refreshPhotoSources() {
-  const nextVersion = Math.floor(Date.now() / PHOTO_CACHE_WINDOW_MS);
-  if (nextVersion === photoCacheVersion) return;
-  photoCacheVersion = nextVersion;
-  board.querySelectorAll(".player-photo").forEach((image) => {
-    image.dataset.staticSrc = photoUrl(image.dataset.staticSrc);
-    image.dataset.animatedSrc = photoUrl(image.dataset.animatedSrc);
-    image.dataset.fallbackSrc = photoUrl(image.dataset.fallbackSrc);
-    const target = image.classList.contains("is-animated")
-      ? image.dataset.animatedSrc || image.dataset.staticSrc
-      : image.dataset.staticSrc || image.dataset.fallbackSrc;
-    if (target) image.src = target;
-  });
-  syncProfileAnimations();
-}
-
-function applyRosterPhotoVersion(updatedAt) {
-  const timestamp = Date.parse(String(updatedAt || ""));
-  if (!Number.isFinite(timestamp)) return;
-  const nextVersion = Math.max(
-    Math.floor(Date.now() / PHOTO_CACHE_WINDOW_MS),
-    Math.floor(timestamp / PHOTO_CACHE_WINDOW_MS)
-  );
-  if (nextVersion === photoCacheVersion) return;
-  photoCacheVersion = nextVersion;
 }
 
 function popover(live) {
@@ -924,7 +897,6 @@ async function loadRoster(force = false) {
     const response = await fetch("/api/tiers" + (force ? "?refresh=1" : ""));
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "티어 명단을 불러오지 못했습니다.");
-    applyRosterPhotoVersion(data.updatedAt);
     state.players = Array.isArray(data.players) ? data.players : [];
     saveTierRoster();
     keepRosterLiveStatuses();
@@ -960,7 +932,6 @@ async function syncDailyRoster() {
     const response = await fetch("/api/tiers?wait=1");
     const data = await response.json();
     if (!response.ok || !Array.isArray(data.players) || !data.players.length) return;
-    applyRosterPhotoVersion(data.updatedAt);
     state.players = data.players;
     saveTierRoster();
     keepRosterLiveStatuses();
@@ -1039,14 +1010,7 @@ function subscribeLiveStatuses() {
 
 function photoUrl(value) {
   const safe = safeExternalUrl(value);
-  if (!safe) return "";
-  try {
-    const url = new URL(safe);
-    url.searchParams.set("tier_photo", String(photoCacheVersion));
-    return url.href;
-  } catch {
-    return safe;
-  }
+  return safe;
 }
 
 function scheduleSharedLiveSync() {
@@ -1388,8 +1352,6 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
-// 서버에 명단을 재수집하지 않고, 열려 있는 화면의 사진 캐시 키만 주기적으로 갱신합니다.
-window.setInterval(refreshPhotoSources, 60 * 1000);
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".tier-admin-player-search")) hideTierAdminSuggestions();
   if (state.openCard && !state.openCard.contains(event.target)) closeOpenCard();
