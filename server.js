@@ -20,6 +20,7 @@ const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
 const BOARD_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_board";
 const BJ_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_list";
+const MEN_BJ_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=bj_list";
 const WOMEN_RECORD_AJAX_URL = "https://eloboard.com/women/bbs/ajax_women_record.php";
 const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=search_list";
 const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
@@ -94,6 +95,8 @@ const MAX_PAGES = 40;
 let cache = new Map();
 let dataPromises = new Map();
 let playerIndexCache = null;
+let menPlayerIndexCache = null;
+const menDirectSearchCache = new Map();
 let playerIndexPromise = null;
 let profileCache = new Map();
 let profilePromises = new Map();
@@ -691,6 +694,9 @@ async function loadData(pageLimit, force = false) {
 function playerUrl(wrId) {
   return BJ_LIST_URL + "&wr_id=" + encodeURIComponent(wrId);
 }
+function menPlayerUrl(wrId) {
+  return MEN_BJ_LIST_URL + "&wr_id=" + encodeURIComponent(wrId);
+}
 function addPlayer(map, name, wrId, url, source) {
   if (!name || !wrId) return;
   const key = wrId;
@@ -725,6 +731,91 @@ function parseBjListPlayers(html) {
   }
   return [...players.values()];
 }
+function parseMenBjListPlayers(html) {
+  const players = new Map();
+  const links = html.match(/<a\b[^>]*href=["'][^"']*bo_table=bj_list[^"']*wr_id=\d+[^"']*["'][^>]*>[\s\S]*?<\/a>/gi) || [];
+  for (const linkHtml of links) {
+    const hrefMatch = linkHtml.match(/href=["']([^"']+)["']/i);
+    const strongText = linkHtml.match(/<strong\b[^>]*>([\s\S]*?)<\/strong>/i)?.[1] || "";
+    const rawText = cleanText(strongText || linkHtml).replace(/\s+[\d,.]+(?:\s*)$/, "");
+    const name = normalizeBjListPlayerText(rawText).replace(/([TZP])$/i, "").trim();
+    const href = hrefMatch ? hrefMatch[1].replace(/&amp;/g, "&") : "";
+    const wrId = wrIdFromUrl(href);
+    if (!wrId || !name || name.length > 40) continue;
+    addPlayer(players, name, wrId, href, "men_bj_list");
+  }
+  return [...players.values()];
+}
+async function fetchMenBjListPage(page) {
+  const url = page > 1 ? MEN_BJ_LIST_URL + "&page=" + page : MEN_BJ_LIST_URL;
+  const response = await fetchWithRetry(url, { headers: { "User-Agent": "Mozilla/5.0 elo-kitten men-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" } });
+  if (!response.ok) throw new Error("men BJ list page " + page + " response error: " + response.status);
+  return response.text();
+}
+async function loadMenPlayerIndex(force = false) {
+  if (!force && menPlayerIndexCache && Date.now() - menPlayerIndexCache.cacheTime < CACHE_MS * 10) return menPlayerIndexCache.players;
+  const firstHtml = await fetchMenBjListPage(1);
+  const maxPages = Math.min(parsePageCount(firstHtml) || 1, 30);
+  const remaining = Array.from({ length: Math.max(maxPages - 1, 0) }, (_, index) => index + 2);
+  const htmlPages = [firstHtml, ...(await mapConcurrent(remaining, 6, fetchMenBjListPage))];
+  const players = new Map();
+  for (const html of htmlPages) for (const player of parseMenBjListPlayers(html)) addPlayer(players, player.name, player.wrId, player.url, player.source);
+  const data = [...players.values()];
+  if (!data.length) throw new Error("남자 선수 목록을 찾지 못했습니다.");
+  menPlayerIndexCache = { cacheTime: Date.now(), players: data };
+  return data;
+}
+async function searchMenPlayerCandidates(name, force = false) {
+  return findPlayers(name, [], await loadMenPlayerIndex(force)).map((player) => ({ ...player, division: "men" }));
+}
+
+// 남성전적 메뉴와 같은 게시판 검색을 사용해 한 페이지에서만 선수를 찾습니다.
+// 전체 남자 선수 목록(여러 페이지)을 매번 내려받지 않아 검색 지연을 줄입니다.
+async function searchMenPlayerDirect(name) {
+  const query = String(name || "").trim();
+  if (!query) return [];
+  const cacheKey = normalizeName(query);
+  const cached = menDirectSearchCache.get(cacheKey);
+  if (cached && Date.now() - cached.cacheTime < CACHE_MS * 10) return cached.players;
+  const searchUrl = MEN_BJ_LIST_URL + "&sfl=wr_subject&stx=" + encodeURIComponent(query);
+  const response = await fetchWithRetry(searchUrl, {
+    headers: { "User-Agent": "Mozilla/5.0 elo-kitten men-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" }
+  }, 1);
+  if (!response.ok) throw new Error("men player search response error: " + response.status);
+  const html = await response.text();
+  const players = new Map();
+  for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']*bo_table=bj_list[^"']*wr_id=(\d+)[^"']*)["'][^>]*>[\s\S]*?<strong\b[^>]*>([\s\S]*?)<\/strong>[\s\S]*?<\/a>/gi)) {
+    const href = match[1].replace(/&amp;/g, "&");
+    const raw = cleanText(match[3]).replace(/\s+[\d,.]+\s*$/, "");
+    const playerName = normalizeBjListPlayerText(raw).replace(/([TZP])$/i, "").trim();
+    if (!playerName || !match[2]) continue;
+    addPlayer(players, playerName, match[2], href, "men_bj_list");
+  }
+  const result = findPlayers(query, [], [...players.values()]).map((player) => ({ ...player, division: "men" }));
+  if (result.length) menDirectSearchCache.set(cacheKey, { cacheTime: Date.now(), players: result });
+  return result;
+}
+
+async function searchAllPlayerCandidates(name, force = false) {
+  let womenPlayers = [];
+  try {
+    womenPlayers = await searchPlayerCandidates(name);
+  } catch (error) {
+    if (!force) console.warn("Women player search failed; trying men search:", error.message);
+  }
+  if (womenPlayers.length) return womenPlayers;
+  let direct = [];
+  try {
+    direct = await searchMenPlayerDirect(name);
+  } catch (error) {
+    const cached = menDirectSearchCache.get(normalizeName(name));
+    if (cached?.players?.length) return cached.players;
+    throw error;
+  }
+  if (direct.length) return direct;
+  return searchMenPlayerCandidates(name, force);
+}
+
 async function searchPlayerCandidates(name) {
   const searchUrl = BJ_LIST_URL + "&sfl=wr_subject&stx=" + encodeURIComponent(name);
   const response = await fetchWithRetry(searchUrl, {
@@ -844,7 +935,7 @@ function parseRaceTotals(plainText) {
   }
   return groups;
 }
-function parseProfileRows(html) {
+function parseProfileRows(html, baseUrl = BOARD_URL) {
   const rows = [];
   const rowMatches = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
   for (const rowHtml of rowMatches) {
@@ -864,13 +955,13 @@ function parseProfileRows(html) {
       opponent,
       opponentRace,
       opponentId: opponentLink ? wrIdFromUrl(opponentLink[1]) : "",
-      opponentUrl: opponentLink ? absoluteUrl(opponentLink[1].replace(/&amp;/g, "&")) : "",
+      opponentUrl: opponentLink ? new URL(opponentLink[1].replace(/&amp;/g, "&"), baseUrl).href : "",
       map: cleanText(cells[2]),
       elo: Number(cleanText(cells[3]).replace(/[,]/g, "")),
       eloText: cleanText(cells[3]),
       format: cleanText(cells[4]),
       memo: cleanText(cells[5]),
-      url: dateLink ? absoluteUrl(dateLink[1].replace(/&amp;/g, "&")) : ""
+      url: dateLink ? new URL(dateLink[1].replace(/&amp;/g, "&"), baseUrl).href : ""
     });
   }
   return rows;
@@ -927,7 +1018,7 @@ function inferRecent30(rows) {
   }
   return { wins, losses, games: wins + losses };
 }
-function parseProfile(html, wrId) {
+function parseProfile(html, wrId, profileUrlOverride = "", baseUrl = BOARD_URL) {
   const lines = textLines(html);
   const plainText = lines.join("\n");
   const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i);
@@ -942,7 +1033,7 @@ function parseProfile(html, wrId) {
   const race = raceMatch
     ? ({ terran: "테란", zerg: "저그", protoss: "프로토스" })[raceMatch[1].toLowerCase()]
     : "";
-  const profileRows = parseProfileRows(html);
+  const profileRows = parseProfileRows(html, baseUrl);
   const mostMatches = [];
   for (const match of html.matchAll(/href=["']([^"']*bo_table=bj_list[^"']*wr_id=\d+[^"']*)["'][^>]*>([^<]*?\((\d+)승\s*(\d+)패\))<\/a>/g)) {
     mostMatches.push({ name: cleanText(match[2]).replace(/\(.*/, ""), wins: Number(match[3]), losses: Number(match[4]), wrId: wrIdFromUrl(match[1]), url: absoluteUrl(match[1].replace(/&amp;/g, "&")) });
@@ -960,7 +1051,7 @@ function parseProfile(html, wrId) {
     wrId: String(wrId),
     name,
     race,
-    url: playerUrl(wrId),
+    url: profileUrlOverride || playerUrl(wrId),
     image: profileImageFromHtml(html),
     broadcastId: soop?.broadcastId || "",
     broadcastUrl: soop?.broadcastUrl || "",
@@ -1010,6 +1101,44 @@ async function loadProfile(wrId, force = false) {
     profilePromises.delete(cacheKey);
   }
 }
+async function loadMenProfile(wrId, force = false) {
+  if (!wrId) return null;
+  const cacheKey = "men:" + String(wrId);
+  const cached = profileCache.get(cacheKey);
+  if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
+  if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
+  const promise = (async () => {
+    try {
+      const url = menPlayerUrl(wrId);
+      const response = await fetchWithRetry(url, {
+        headers: { "User-Agent": "Mozilla/5.0 elo-kitten men-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" }
+      }, 1);
+      if (!response.ok) throw new Error("men profile " + wrId + " response error: " + response.status);
+      const profile = parseProfile(await response.text(), wrId, url, MEN_BJ_LIST_URL);
+      if (!profile || String(profile.wrId) !== String(wrId) || !String(profile.name || "").trim()) {
+        throw new Error("men profile " + wrId + " response validation failed");
+      }
+      profile.division = "men";
+      profile.source = MEN_BJ_LIST_URL;
+      profile.women = null;
+      profile.mixed = null;
+      profile.matches = mergeProfileRows(profile.matches);
+      profile.recent30 = inferRecent30(profile.matches);
+      profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
+      return profile;
+    } catch (error) {
+      if (cached?.profile) return { ...cached.profile, stale: true };
+      throw error;
+    }
+  })();
+  profilePromises.set(cacheKey, promise);
+  try {
+    return await promise;
+  } finally {
+    profilePromises.delete(cacheKey);
+  }
+}
+
 function summarize(matches, query) {
   const key = normalizeName(query);
   const filtered = key ? matches.filter((m) => normalizeName(m.winner).includes(key) || normalizeName(m.loser).includes(key)) : matches;
@@ -3019,7 +3148,9 @@ const server = http.createServer(async (req, res) => {
       }
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
-        const profile = await loadProfile(requestedWrId, force);
+        const profile = url.searchParams.get("division") === "men"
+          ? await loadMenProfile(requestedWrId, force)
+          : await loadProfile(requestedWrId, force);
         const autoDiarySync = await syncSpawnDiaryNow(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
@@ -3033,9 +3164,16 @@ const server = http.createServer(async (req, res) => {
           resultState: profile ? "found" : "empty"
         }, null, 2), "application/json; charset=utf-8");
       }
-      const dataPromise = loadData(url.searchParams.get("pages"), force);
+      // 남성전적은 별도 게시판을 사용하므로 여성 게시판을 읽지 못해도 검색을 계속합니다.
+      const dataPromise = loadData(url.searchParams.get("pages"), force).catch((error) => {
+        if (query) {
+          console.warn("Women board unavailable; continuing with player search:", error.message);
+          return { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [] };
+        }
+        throw error;
+      });
       const indexPromise = query
-        ? searchPlayerCandidates(query).then((players) => players.length ? players : loadPlayerIndex(force))
+        ? searchAllPlayerCandidates(query, force).then((players) => players.length ? players : loadPlayerIndex(force))
         : Promise.resolve([]);
       const [data, indexedPlayers] = await Promise.all([dataPromise, indexPromise]);
       const result = summarize(data.matches, query);
@@ -3044,11 +3182,13 @@ const server = http.createServer(async (req, res) => {
       if (query) {
         players = findPlayers(query, data.matches, indexedPlayers);
         if (!players.length && !force) {
-          players = findPlayers(query, data.matches, await loadPlayerIndex(true));
+          players = await searchAllPlayerCandidates(query, true);
         }
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
         if (selected?.wrId) {
-          profile = await loadProfile(selected.wrId, force);
+          profile = selected.division === "men" || /\/men\//i.test(String(selected.url || ""))
+            ? await loadMenProfile(selected.wrId, force)
+            : await loadProfile(selected.wrId, force);
         }
       }
       const autoDiarySync = await syncSpawnDiaryNow(query, profile);
