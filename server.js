@@ -1111,7 +1111,7 @@ async function loadProfile(wrId, force = false) {
     profilePromises.delete(cacheKey);
   }
 }
-async function loadMenProfile(wrId, force = false) {
+async function loadMenProfile(wrId, force = false, playerName = "") {
   if (!wrId) return null;
   const cacheKey = "men:" + String(wrId);
   const cached = profileCache.get(cacheKey);
@@ -1120,6 +1120,10 @@ async function loadMenProfile(wrId, force = false) {
   const promise = (async () => {
     try {
       const url = menPlayerUrl(wrId);
+      const allRowsPromise = playerName ? fetchMenAllRows(playerName).catch((error) => {
+        console.warn("Men all-period rows unavailable:", error.message);
+        return [];
+      }) : Promise.resolve([]);
       const response = await fetchWithRetry(url, {
         headers: { "User-Agent": "Mozilla/5.0 elo-kitten men-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" }
       }, 1);
@@ -1139,7 +1143,14 @@ async function loadMenProfile(wrId, force = false) {
       }
       profile.women = null;
       profile.mixed = null;
-      profile.matches = mergeProfileRows(profile.matches);
+      // 남성 프로필 본문은 최근 경기만 포함하므로, 남성전적 검색 결과에서 전체 기간 행을 추가합니다.
+      try {
+        const allRows = await (playerName ? allRowsPromise : fetchMenAllRows(profile.name));
+        profile.matches = mergeProfileRows(profile.matches, allRows);
+      } catch (error) {
+        console.warn("Men all-period rows unavailable; keeping profile rows:", error.message);
+        profile.matches = mergeProfileRows(profile.matches);
+      }
       profile.recent30 = inferRecent30(profile.matches);
       profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
       return profile;
@@ -1349,6 +1360,12 @@ async function fetchMenRecords(filters) {
   const response = await fetch(MEN_SEARCH_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "Mozilla/5.0 elo-kitten men records" }, body });
   if (!response.ok) throw new Error("남성전적 응답 오류: " + response.status);
   return parseMenRecord(await response.text(), filters);
+}
+async function fetchMenAllRows(playerName) {
+  const body = new URLSearchParams({ wr_1: "", wr_2: "", wr_3: playerName || " ", wr_4: " ", wr_5: "", wr_6: "", wr_subject: " ", sear: "", b_id: "eloboard" });
+  const response = await fetch(MEN_SEARCH_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "Mozilla/5.0 elo-kitten men records" }, body });
+  if (!response.ok) throw new Error("남성 전체전적 응답 오류: " + response.status);
+  return parseProfileRows(await response.text(), MEN_BJ_LIST_URL);
 }
 
 function parseUniversities(html) {
@@ -3166,7 +3183,7 @@ const server = http.createServer(async (req, res) => {
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
         const profile = url.searchParams.get("division") === "men"
-          ? await loadMenProfile(requestedWrId, force)
+          ? await loadMenProfile(requestedWrId, force, query)
           : await loadProfile(requestedWrId, force);
         const autoDiarySync = await syncSpawnDiaryNow(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
@@ -3204,7 +3221,7 @@ const server = http.createServer(async (req, res) => {
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
         if (selected?.wrId) {
           profile = selected.division === "men" || /\/men\//i.test(String(selected.url || ""))
-            ? await loadMenProfile(selected.wrId, force)
+            ? await loadMenProfile(selected.wrId, force, selected.name)
             : await loadProfile(selected.wrId, force);
         }
       }
