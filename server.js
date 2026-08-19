@@ -935,6 +935,16 @@ function parseRaceTotals(plainText) {
   }
   return groups;
 }
+function parseMenSummary(html) {
+  const result = { total: null, raceTotals: { women: {}, mixed: {}, combined: {} } };
+  for (const match of html.matchAll(/<th\b[^>]*>\s*(총전적|Terran|Zerg|Protoss)\s*<\/th>\s*<td\b[^>]*>\s*([\d,]+)전\s*([\d,]+)승\s*([\d,]+)패\s*\(([\d.]+)%\)/gi)) {
+    const label = match[1].toLowerCase();
+    const record = { games: Number(match[2].replace(/,/g, "")), wins: Number(match[3].replace(/,/g, "")), losses: Number(match[4].replace(/,/g, "")), rate: Number(match[5]) };
+    if (label === "총전적".toLowerCase()) result.total = { label: "총전적", ...record };
+    else result.raceTotals.combined[{ terran: "T", zerg: "Z", protoss: "P" }[label]] = record;
+  }
+  return result;
+}
 function parseProfileRows(html, baseUrl = BOARD_URL) {
   const rows = [];
   const rowMatches = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
@@ -1114,12 +1124,19 @@ async function loadMenProfile(wrId, force = false) {
         headers: { "User-Agent": "Mozilla/5.0 elo-kitten men-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" }
       }, 1);
       if (!response.ok) throw new Error("men profile " + wrId + " response error: " + response.status);
-      const profile = parseProfile(await response.text(), wrId, url, MEN_BJ_LIST_URL);
+      const html = await response.text();
+      const profile = parseProfile(html, wrId, url, MEN_BJ_LIST_URL);
       if (!profile || String(profile.wrId) !== String(wrId) || !String(profile.name || "").trim()) {
         throw new Error("men profile " + wrId + " response validation failed");
       }
       profile.division = "men";
       profile.source = MEN_BJ_LIST_URL;
+      const menSummary = parseMenSummary(html);
+      if (menSummary.total) profile.total = menSummary.total;
+      for (const race of ["T", "Z", "P"]) {
+        const overall = menSummary.raceTotals.combined[race];
+        if (overall) profile.raceTotals.combined[race] = overall;
+      }
       profile.women = null;
       profile.mixed = null;
       profile.matches = mergeProfileRows(profile.matches);
