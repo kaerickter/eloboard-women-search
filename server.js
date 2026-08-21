@@ -810,10 +810,16 @@ async function searchAllPlayerCandidates(name, force = false) {
   } catch (error) {
     const cached = menDirectSearchCache.get(normalizeName(name));
     if (cached?.players?.length) return cached.players;
-    throw error;
+    console.warn("Men player search unavailable:", error.message);
+    return [];
   }
   if (direct.length) return direct;
-  return searchMenPlayerCandidates(name, force);
+  try {
+    return await searchMenPlayerCandidates(name, force);
+  } catch (error) {
+    console.warn("Men player index unavailable:", error.message);
+    return [];
+  }
 }
 
 async function searchPlayerCandidates(name) {
@@ -1743,7 +1749,9 @@ async function querySoopLiveStatus(name, force = false) {
       profileImage: String(data?.profile_image || "")
     };
     liveStatusCache.set(channel.broadcastId, { cacheTime: Date.now(), status });
-    if (!status.isLive && force) {
+    // 방송국 상태 API가 오프라인으로 캐시되어도 검색 API에서 실제 방송을 다시 확인합니다.
+    // SOOP 쪽 상태 응답이 지연되는 경우 티어표에서 LIVE가 사라지는 문제를 막습니다.
+    if (!status.isLive) {
       const searchedStatus = await searchSoopLiveStatus(name);
       if (searchedStatus) return searchedStatus;
     }
