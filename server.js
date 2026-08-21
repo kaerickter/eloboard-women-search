@@ -100,6 +100,8 @@ const menDirectSearchCache = new Map();
 let playerIndexPromise = null;
 let profileCache = new Map();
 let profilePromises = new Map();
+const profileSnapshotMemory = new Map();
+let profileSnapshotSchemaPromise = null;
 let universityCache = null;
 let universityRosterCache = new Map();
 let tierRosterCache = null;
@@ -113,6 +115,8 @@ let channelAliases = {};
 let menBroadcastMapRows = [];
 let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
+const PROFILE_SNAPSHOT_LIMIT = 120;
+const PROFILE_SNAPSHOT_MATCH_LIMIT = 250;
 const LIVE_CACHE_MS = 1000 * 15;
 const CHANNEL_CACHE_MS = 1000 * 60 * 60 * 24;
 const UPSTREAM_TIMEOUT_MS = 1000 * 20;
@@ -564,6 +568,91 @@ async function syncSpawnDiaryNow(query, profile) {
 }
 function normalizePlayerName(name) {
   return normalizeName(name).replace(/[tzp]$/i, "");
+}
+function compactProfileSnapshot(profile) {
+  if (!profile || !profile.name || !profile.wrId) return null;
+  return {
+    ...profile,
+    matches: Array.isArray(profile.matches) ? profile.matches.slice(0, PROFILE_SNAPSHOT_MATCH_LIMIT) : [],
+    cachedAt: new Date().toISOString()
+  };
+}
+async function ensureProfileSnapshotStorage() {
+  if (!tierAdmin.pool) return false;
+  if (!profileSnapshotSchemaPromise) {
+    profileSnapshotSchemaPromise = tierAdmin.pool.query(`
+      CREATE TABLE IF NOT EXISTS player_profile_snapshots (
+        cache_key TEXT PRIMARY KEY,
+        player_key TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        division TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS player_profile_snapshots_player_key_idx
+        ON player_profile_snapshots (player_key, fetched_at DESC);
+    `).then(() => true).catch((error) => {
+      profileSnapshotSchemaPromise = null;
+      console.warn("Profile snapshot storage unavailable:", error.message);
+      return false;
+    });
+  }
+  return profileSnapshotSchemaPromise;
+}
+async function rememberProfileSnapshot(profile) {
+  const snapshot = compactProfileSnapshot(profile);
+  if (!snapshot) return;
+  const playerKey = normalizePlayerName(snapshot.name);
+  const division = snapshot.division === "men" ? "men" : "women";
+  const cacheKey = division + ":" + snapshot.wrId;
+  profileSnapshotMemory.set(playerKey, snapshot);
+  if (!await ensureProfileSnapshotStorage()) return;
+  try {
+    await tierAdmin.pool.query(
+      `INSERT INTO player_profile_snapshots (cache_key, player_key, player_name, division, payload, fetched_at)
+       VALUES ($1, $2, $3, $4, $5::jsonb, NOW())
+       ON CONFLICT (cache_key) DO UPDATE SET
+         player_key = EXCLUDED.player_key,
+         player_name = EXCLUDED.player_name,
+         division = EXCLUDED.division,
+         payload = EXCLUDED.payload,
+         fetched_at = NOW()`,
+      [cacheKey, playerKey, snapshot.name, division, JSON.stringify(snapshot)]
+    );
+    await tierAdmin.pool.query(
+      `DELETE FROM player_profile_snapshots
+       WHERE cache_key IN (
+         SELECT cache_key FROM player_profile_snapshots
+         ORDER BY fetched_at DESC OFFSET $1
+       )`,
+      [PROFILE_SNAPSHOT_LIMIT]
+    );
+  } catch (error) {
+    console.warn("Profile snapshot save skipped:", error.message);
+  }
+}
+async function cachedProfileForName(name) {
+  const key = normalizePlayerName(name);
+  if (!key) return null;
+  const memory = profileSnapshotMemory.get(key);
+  if (memory) return { ...memory, stale: true, cached: true };
+  if (!await ensureProfileSnapshotStorage()) return null;
+  try {
+    const result = await tierAdmin.pool.query(
+      `SELECT payload, fetched_at FROM player_profile_snapshots
+       WHERE player_key = $1
+       ORDER BY fetched_at DESC LIMIT 1`,
+      [key]
+    );
+    const row = result.rows[0];
+    if (!row?.payload || typeof row.payload !== "object") return null;
+    const profile = { ...row.payload, cachedAt: row.fetched_at, stale: true, cached: true };
+    profileSnapshotMemory.set(key, profile);
+    return profile;
+  } catch (error) {
+    console.warn("Profile snapshot read skipped:", error.message);
+    return null;
+  }
 }
 function normalizeSoopName(name) {
   return normalizePlayerName(name)
@@ -1104,6 +1193,7 @@ async function loadProfile(wrId, force = false) {
       profile.matches = mergeProfileRows(womenRows, profile.matches);
       profile.recent30 = inferRecent30(profile.matches);
       profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
+      void rememberProfileSnapshot(profile);
       return profile;
     } catch (error) {
       if (cached?.profile) return { ...cached.profile, stale: true };
@@ -1159,6 +1249,7 @@ async function loadMenProfile(wrId, force = false, playerName = "") {
       }
       profile.recent30 = inferRecent30(profile.matches);
       profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
+      void rememberProfileSnapshot(profile);
       return profile;
     } catch (error) {
       if (cached?.profile) return { ...cached.profile, stale: true };
@@ -3217,7 +3308,7 @@ const server = http.createServer(async (req, res) => {
         throw error;
       });
       const indexPromise = query
-        ? searchAllPlayerCandidates(query, force).then((players) => players.length ? players : loadPlayerIndex(force))
+        ? searchAllPlayerCandidates(query, force)
         : Promise.resolve([]);
       const [data, indexedPlayers] = await Promise.all([dataPromise, indexPromise]);
       const result = summarize(data.matches, query);
@@ -3234,17 +3325,45 @@ const server = http.createServer(async (req, res) => {
             ? await loadMenProfile(selected.wrId, force, selected.name)
             : await loadProfile(selected.wrId, force);
         }
+        if (!profile) {
+          const cachedProfile = await cachedProfileForName(query);
+          if (cachedProfile) {
+            profile = cachedProfile;
+            players = [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "saved-profile" }];
+          }
+        }
       }
       const autoDiarySync = await syncSpawnDiaryNow(query, profile);
       return send(res, 200, JSON.stringify({
         ...data,
         ...result,
-        players,
-        profile,
-        autoDiarySync,
-        resultState: query ? (profile ? "found" : "empty") : "found"
+          players,
+          profile,
+          autoDiarySync,
+          cached: Boolean(profile?.cached),
+          cacheNotice: profile?.cached
+            ? "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다. 자동 재시도는 하지 않습니다."
+            : "",
+          resultState: query ? (profile ? "found" : "empty") : "found"
       }, null, 2), "application/json; charset=utf-8");
     } catch (error) {
+      const query = String(url.searchParams.get("name") || "").trim();
+      const cachedProfile = await cachedProfileForName(query);
+      if (cachedProfile) {
+        return send(res, 200, JSON.stringify({
+          source: BOARD_URL,
+          fetchedAt: new Date().toISOString(),
+          pagesLoaded: 0,
+          requestedPages: 0,
+          siteMaxPages: 0,
+          matches: [],
+          players: [{ name: cachedProfile.name, wrId: cachedProfile.wrId, url: cachedProfile.url, source: "saved-profile" }],
+          profile: cachedProfile,
+          cached: true,
+          cacheNotice: "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다. 자동 재시도는 하지 않습니다.",
+          resultState: "found"
+        }, null, 2), "application/json; charset=utf-8");
+      }
       return send(res, 502, JSON.stringify({ error: error.message }, null, 2), "application/json; charset=utf-8");
     }
   }
