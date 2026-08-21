@@ -599,9 +599,27 @@ async function ensureProfileSnapshotStorage() {
   }
   return profileSnapshotSchemaPromise;
 }
+function isSnapshotTierEligible(profile) {
+  const division = profile?.division === "men" ? "men" : "women";
+  const key = normalizePlayerName(profile?.name);
+  if (!key) return false;
+  const menRecord = division === "men" ? menBroadcastRecord(profile.name) : null;
+  const candidateKeys = new Set([
+    key,
+    normalizePlayerName(menRecord?.realName),
+    normalizePlayerName(menRecord?.displayName),
+    normalizePlayerName(menRecord?.broadcastName)
+  ].filter(Boolean));
+  const roster = tierAdmin.applyOverrides(tierRosterCache?.players || []);
+  return roster.some((player) =>
+    player.division === division &&
+    ["5", "6", "7"].includes(String(player.tier || "")) &&
+    candidateKeys.has(normalizePlayerName(player.name))
+  );
+}
 async function rememberProfileSnapshot(profile) {
   const snapshot = compactProfileSnapshot(profile);
-  if (!snapshot) return;
+  if (!snapshot || !isSnapshotTierEligible(snapshot)) return;
   const playerKey = normalizePlayerName(snapshot.name);
   const division = snapshot.division === "men" ? "men" : "women";
   const cacheKey = division + ":" + snapshot.wrId;
