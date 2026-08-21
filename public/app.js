@@ -707,6 +707,10 @@ async function load(name = "", refresh = false) {
   if (name && (!data.profile || data.resultState === "empty")) {
     setSearchState("empty", TXT.noResult);
   } else {
+    if (data.cacheNotice) {
+      setSearchState("success", data.cacheNotice);
+      return;
+    }
     const successMessage = data.profileOnly
       ? when + " " + TXT.basis + " \u00b7 " + (data.profile?.name || name) + " \ud504\ub85c\ud544 \uc804\uc801\uc744 \uc77d\uc5c8\uc2b5\ub2c8\ub2e4."
       : when + " " + TXT.basis + " \u00b7 " + TXT.pagesFrom + " " + data.pagesLoaded + TXT.pagesUnit + " " + data.matches.length + TXT.readUnit;
