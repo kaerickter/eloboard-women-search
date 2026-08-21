@@ -2976,8 +2976,10 @@ const server = http.createServer(async (req, res) => {
         .map((name) => String(name || ""))
         .map((name) => name.trim())
         .filter(Boolean))];
-      if (!names.length || names.length > 200) {
-        return send(res, 400, JSON.stringify({ error: "방송 상태는 선수 1~200명까지 조회할 수 있습니다." }), "application/json; charset=utf-8");
+      // 현재 티어표 전체 명단이 200명을 넘습니다. 전체 명단 조회가 400으로 막혀
+      // LIVE 배지가 전부 사라지는 일을 막기 위해 티어표 규모까지 허용합니다.
+      if (!names.length || names.length > 350) {
+        return send(res, 400, JSON.stringify({ error: "방송 상태는 선수 1~350명까지 조회할 수 있습니다." }), "application/json; charset=utf-8");
       }
       const prioritizedNames = [...names].sort((nameA, nameB) => {
         return Number(Boolean(manualSoopAlias(nameB))) - Number(Boolean(manualSoopAlias(nameA)));
