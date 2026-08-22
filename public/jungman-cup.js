@@ -236,6 +236,14 @@ function formatGroupDate(value) {
 function individualStandings() {
   const players = new Map();
   let completedGames = 0;
+  // 현재 대진표에 남아 있는 경기만 집계합니다.
+  // 날짜·대학을 수정해 생긴 이전 대진의 기록은 개인성적에 섞이지 않습니다.
+  const activeMatchKeys = new Set();
+  GROUPS.forEach((group) => {
+    (state.fixtures?.[group] || []).forEach((fixture) => {
+      if (fixture?.home && fixture?.away) activeMatchKeys.add(matchKey(group, fixture.home, fixture.away));
+    });
+  });
   const addGame = (name, won) => {
     const key = String(name || "").trim();
     if (!players.has(key)) players.set(key, { name: key, wins: 0, games: 0 });
@@ -244,8 +252,12 @@ function individualStandings() {
     if (won) player.wins += 1;
   };
 
-  Object.values(state.matches || {}).forEach((match) => {
-    (match.games || []).forEach((game) => {
+  Object.entries(state.matches || {}).forEach(([key, match]) => {
+    if (!activeMatchKeys.has(key)) return;
+    const score = matchScore(match);
+    (match.games || []).forEach((game, index) => {
+      // 5승이 결정된 이후의 세트는 기록이 남아 있어도 집계하지 않습니다.
+      if (index >= score.clinchedAt) return;
       const home = String(game.homePlayer || "").trim();
       const away = String(game.awayPlayer || "").trim();
       if (!home || !away || !["home", "away"].includes(game.winner)) return;
