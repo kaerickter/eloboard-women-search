@@ -84,6 +84,11 @@ const PINNED_SOOP_ALIASES = {
     broadcastId: "dlaguswl501",
     searchName: "임조이1111",
     stationNames: ["임조이1111", "Imzoe"]
+  },
+  "유이": {
+    broadcastId: "chchchshai",
+    searchName: "유이",
+    stationNames: ["유이"]
   }
 };
 const PINNED_TIER_DISPLAY_NAMES = {};
@@ -1842,8 +1847,9 @@ async function querySoopLiveStatus(name, force = false) {
       channelCache.delete(key);
       liveStatusCache.delete(channel.broadcastId);
       scheduleChannelRegistrySave();
-      const searchedStatus = await searchSoopLiveStatus(name);
-      return searchedStatus || { name, available: false, isLive: false };
+      // 이미 연결된 방송국이 다른 사람으로 확인된 경우, 이름이 비슷한 방송을
+      // 다시 검색해 LIVE로 표시하지 않습니다.
+      return { name, available: false, isLive: false };
     }
     const status = {
       available: true,
@@ -1858,16 +1864,9 @@ async function querySoopLiveStatus(name, force = false) {
       profileImage: String(data?.profile_image || "")
     };
     liveStatusCache.set(channel.broadcastId, { cacheTime: Date.now(), status });
-    // 방송국 상태 API가 오프라인으로 캐시되어도 검색 API에서 실제 방송을 다시 확인합니다.
-    // SOOP 쪽 상태 응답이 지연되는 경우 티어표에서 LIVE가 사라지는 문제를 막습니다.
-    if (!status.isLive) {
-      const searchedStatus = await searchSoopLiveStatus(name);
-      if (searchedStatus) return searchedStatus;
-    }
     return { name, ...status };
   } catch {
-    const searchedStatus = await searchSoopLiveStatus(name);
-    if (searchedStatus) return searchedStatus;
+    // 등록된 방송국 상태를 확인하지 못했을 때도 이름 유사 검색 결과를 사용하지 않습니다.
     return {
       name,
       available: false,
