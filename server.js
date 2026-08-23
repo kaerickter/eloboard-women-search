@@ -1661,6 +1661,13 @@ function tierProfileAssets(player) {
   const broadcastId = pinnedId || registeredId;
   if (!/^[a-z0-9_-]+$/i.test(broadcastId)) return {};
   const encodedId = encodeURIComponent(broadcastId);
+  const staticPath = path.join(PUBLIC, "tier-profiles", encodedId + "-static.webp");
+  // 고정 이미지가 없는 선수는 ELOBoard 원본 대신 SOOP 프로필을 직접 표시합니다.
+  // 브라우저가 이미지를 직접 받아 서버 저장공간과 전송량은 늘지 않습니다.
+  if (!fs.existsSync(staticPath)) {
+    const profileImage = soopProfileImageUrl(broadcastId);
+    return profileImage ? { tierStaticImage: profileImage, tierAnimatedImage: "" } : {};
+  }
   return {
     tierStaticImage: "/tier-profiles/" + encodedId + "-static.webp",
     tierAnimatedImage: "/tier-profiles/" + encodedId + "-animated.webp"
@@ -2993,6 +3000,7 @@ const server = http.createServer(async (req, res) => {
         tier: body.tier,
         promotionLight: body.promotionLight === true,
         isCustom: true,
+        isHidden: false,
         race: body.race,
         broadcastId: channelFromUrl?.broadcastId || body.broadcastId
       });
