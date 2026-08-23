@@ -1319,6 +1319,19 @@ h1 {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
 
+.tier-admin-actions .tier-admin-delete {
+  margin-left: auto;
+  border-color: rgba(177, 64, 76, .42);
+  background: rgba(177, 64, 76, .10);
+  color: #9e3040;
+}
+
+.tier-admin-actions .tier-admin-delete:hover,
+.tier-admin-actions .tier-admin-delete:focus-visible {
+  border-color: #b1404c;
+  background: rgba(177, 64, 76, .16);
+}
+
 /* 티어표 전용 선택 상태: 공통 메뉴 스타일과 분리합니다. */
 #divisionFilters > button.division-filter-button {
   border: 1px solid transparent !important;

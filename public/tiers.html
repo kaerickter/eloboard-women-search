@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>티어표 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./tiers.css?v=20260803-selection-state-v2">
+    <link rel="stylesheet" href="./tiers.css?v=20260823-player-delete">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   </head>
   <body class="tiers-page">
@@ -213,6 +213,7 @@
           <div class="tier-admin-actions">
             <button id="tierAdminMakeFa" type="button">FA로 변경</button>
             <button id="tierAdminRevert" type="button">모든 변경 원본으로 되돌리기</button>
+            <button id="tierAdminDelete" class="tier-admin-delete" type="button">선수 삭제</button>
             <button id="tierAdminLogout" type="button">로그아웃</button>
           </div>
         </section>
@@ -220,6 +221,6 @@
       </dialog>
     </main>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="./tiers.js?v=20260807-shared-live-second"></script>
+    <script src="./tiers.js?v=20260823-player-delete"></script>
   </body>
 </html>

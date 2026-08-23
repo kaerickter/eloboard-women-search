@@ -38,6 +38,7 @@ const tierAdminUniversityOptions = document.getElementById("tierAdminUniversityO
 const tierAdminAdd = document.getElementById("tierAdminAdd");
 const tierAdminMakeFa = document.getElementById("tierAdminMakeFa");
 const tierAdminRevert = document.getElementById("tierAdminRevert");
+const tierAdminDelete = document.getElementById("tierAdminDelete");
 const tierAdminLogout = document.getElementById("tierAdminLogout");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
@@ -513,7 +514,8 @@ function setTierAdminControlsDisabled(disabled) {
     tierAdminUniversity,
     tierAdminAdd,
     tierAdminMakeFa,
-    tierAdminRevert
+    tierAdminRevert,
+    tierAdminDelete
   ].forEach((control) => { control.disabled = disabled; });
   tierAdminPlayerSuggestions.querySelectorAll("button").forEach((button) => {
     button.disabled = disabled;
@@ -1009,6 +1011,38 @@ function subscribeLiveStatuses() {
   });
 }
 
+async function deleteTierAdminPlayer() {
+  const player = adminSelectedPlayer();
+  if (!player || tierAdminSaving) return;
+  if (!window.confirm(player.name + " 선수를 티어표에서 삭제할까요?\n삭제 후에는 이 목록에 표시되지 않습니다.")) return;
+  const playerName = player.name;
+  tierAdminSaving = true;
+  setTierAdminControlsDisabled(true);
+  tierAdminStatus.textContent = playerName + " 선수를 티어표에서 삭제하고 있습니다.";
+  try {
+    const response = await fetch("/api/admin/tier-players", {
+      method: "DELETE",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-CSRF-Token": tierAdminCsrf
+      },
+      body: JSON.stringify({ playerName })
+    });
+    const data = await readAdminResponse(response);
+    updateTierAdminStorage(data.storage);
+    await loadRoster(false);
+    tierAdminSelectedName = "";
+    renderTierAdminEditor();
+    tierAdminStatus.textContent = savedAdminMessage(playerName + " 선수를 티어표에서 삭제했습니다.");
+  } catch (error) {
+    tierAdminStatus.textContent = error.message;
+  } finally {
+    tierAdminSaving = false;
+    if (!tierAdminManager.hidden) setTierAdminControlsDisabled(false);
+  }
+}
+
 function photoUrl(value) {
   const safe = safeExternalUrl(value);
   return safe;
@@ -1326,6 +1360,7 @@ tierAdminMakeFa.addEventListener("click", () => {
   if (player) saveTierAdminMemberships([], player.name + " 선수를 FA로 변경했습니다.");
 });
 tierAdminRevert.addEventListener("click", revertTierAdminMembership);
+tierAdminDelete.addEventListener("click", deleteTierAdminPlayer);
 tierAdminLogout.addEventListener("click", async () => {
   try {
     const response = await fetch("/api/admin/logout", {
