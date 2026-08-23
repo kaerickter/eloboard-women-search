@@ -8,11 +8,7 @@ const state = {
   selectedYear: "",
   selectedMonth: "",
   requestId: 0,
-  activeController: null,
-  analysisProfile: null,
-  analysis: null,
-  analysisRequestId: 0,
-  analysisAdminCsrf: ""
+  activeController: null
 };
 
 function saveSearchSession() {
@@ -33,6 +29,8 @@ function restoreSearchSession() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(SEARCH_SESSION_KEY) || "null");
     if (!saved || typeof saved !== "object") return false;
+    // 이아깽은 저장된 전적을 매번 서버에서 바로 읽어야 새 시트 반영분도 즉시 보입니다.
+    if (cleanName(saved.name) === cleanName(DEFAULT_NAME)) return false;
     validateSearchResponse(saved.data);
     $("nameInput").value = String(saved.name || DEFAULT_NAME);
     state.query = $("nameInput").value.trim();
@@ -128,150 +126,6 @@ async function requestJson(url, options = {}) {
   }
   if (!response.ok) throw new Error(data.error || "요청을 처리하지 못했습니다.");
   return data;
-}
-
-function analysisValue(value) {
-  if (Array.isArray(value)) return value.length ? value.join(" · ") : "데이터 부족";
-  if (value == null || value === "") return "데이터 부족";
-  return String(value);
-}
-
-function resetAnalysisPanel() {
-  state.analysisProfile = null;
-  state.analysis = null;
-  $("analysisPanel").hidden = true;
-  $("analysisResult").hidden = true;
-  $("analysisResult").innerHTML = "";
-}
-
-function prepareAnalysis(profile) {
-  if (!profile?.wrId) return resetAnalysisPanel();
-  const samePlayer = String(state.analysisProfile?.wrId || "") === String(profile.wrId);
-  state.analysisProfile = { name: profile.name, wrId: String(profile.wrId) };
-  $("analysisPanel").hidden = false;
-  $("analysisButton").disabled = false;
-  if (!samePlayer) {
-    state.analysis = null;
-    $("analysisResult").hidden = true;
-    $("analysisResult").innerHTML = "";
-    $("analysisUpdatedAt").textContent = "분석 버튼을 누르면 최신 전적으로 계산합니다.";
-    $("analysisStatus").dataset.state = "empty";
-    $("analysisStatus").textContent = profile.name + " 선수의 경기력 분석을 준비했습니다.";
-    $("communitySummaryInput").value = "";
-  }
-}
-
-function renderPlayerAnalysis(analysis) {
-  const rows = [
-    ["선수명", analysis.playerName],
-    ["종합 등급", analysis.overallGrade, "analysis-grade"],
-    ["플레이 스타일", analysis.playStyle],
-    ["강점", analysis.strengths],
-    ["약점", analysis.weaknesses],
-    ["상대 경쟁력", analysis.opponentCompetitiveness],
-    ["최근 흐름", analysis.recentTrend],
-    ["커뮤니티 평가", analysis.communitySummary],
-    ["성장 가능성", analysis.growthPotential == null ? "데이터 부족" : analysis.growthPotential + " / 5"],
-    ["한 줄 평가", analysis.oneLineSummary]
-  ];
-  $("analysisResult").innerHTML = '<dl class="analysis-list">' + rows.map((row) =>
-    '<div class="analysis-row ' + (row[2] || "") + '"><dt>' + escapeHtml(row[0]) + '</dt><dd>' +
-      escapeHtml(analysisValue(row[1])) + '</dd></div>'
-  ).join("") + "</dl>";
-  $("analysisResult").hidden = false;
-  $("analysisStatus").dataset.state = "success";
-  $("analysisStatus").textContent = "전적 데이터와 저장된 커뮤니티 평가로 계산했습니다.";
-  $("analysisUpdatedAt").textContent = "갱신 " + new Date(analysis.calculatedAt).toLocaleString("ko-KR");
-  $("communitySummaryInput").value = analysis.communitySummary === "데이터 부족" ? "" : analysis.communitySummary;
-}
-
-async function loadPlayerAnalysis(refresh = false) {
-  const profile = state.analysisProfile;
-  if (!profile?.wrId) return;
-  const requestId = state.analysisRequestId + 1;
-  state.analysisRequestId = requestId;
-  $("analysisButton").disabled = true;
-  $("analysisStatus").dataset.state = "loading";
-  $("analysisStatus").textContent = "ELOBoard 전적을 분석하는 중입니다.";
-  try {
-    const params = new URLSearchParams({ wr_id: profile.wrId });
-    if (refresh) params.set("refresh", "1");
-    const analysis = await requestJson("/api/player-analysis?" + params.toString());
-    if (requestId !== state.analysisRequestId) return;
-    state.analysis = analysis;
-    renderPlayerAnalysis(analysis);
-  } catch (error) {
-    if (requestId !== state.analysisRequestId) return;
-    $("analysisStatus").dataset.state = "error";
-    $("analysisStatus").textContent = error.message || "선수 경기력 분석에 실패했습니다.";
-    $("analysisResult").hidden = true;
-  } finally {
-    if (requestId === state.analysisRequestId) $("analysisButton").disabled = false;
-  }
-}
-
-async function refreshAnalysisAdminStatus() {
-  try {
-    const status = await requestJson("/api/admin/status");
-    state.analysisAdminCsrf = status.csrf || "";
-    $("analysisLoginRow").hidden = Boolean(status.authenticated);
-    $("analysisEditor").hidden = !status.authenticated;
-    $("analysisAdminStatus").dataset.state = status.authenticated ? "success" : "";
-    $("analysisAdminStatus").textContent = status.authenticated
-      ? status.storage?.message || "관리자 입력이 가능합니다."
-      : (status.configured ? "관리자 로그인이 필요합니다." : "관리자 비밀번호가 설정되지 않았습니다.");
-  } catch (error) {
-    $("analysisAdminStatus").dataset.state = "error";
-    $("analysisAdminStatus").textContent = error.message;
-  }
-}
-
-async function loginAnalysisAdmin() {
-  const password = $("analysisAdminPassword").value;
-  $("analysisLoginButton").disabled = true;
-  try {
-    const result = await requestJson("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password })
-    });
-    state.analysisAdminCsrf = result.csrf || "";
-    $("analysisAdminPassword").value = "";
-    await refreshAnalysisAdminStatus();
-  } catch (error) {
-    $("analysisAdminStatus").dataset.state = "error";
-    $("analysisAdminStatus").textContent = error.message;
-  } finally {
-    $("analysisLoginButton").disabled = false;
-  }
-}
-
-async function saveCommunitySummary() {
-  const profile = state.analysisProfile;
-  if (!profile?.wrId) return;
-  $("communitySaveButton").disabled = true;
-  try {
-    const result = await requestJson("/api/player-analysis/community", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": state.analysisAdminCsrf
-      },
-      body: JSON.stringify({
-        wrId: profile.wrId,
-        communitySummary: $("communitySummaryInput").value
-      })
-    });
-    state.analysis = result.analysis;
-    renderPlayerAnalysis(result.analysis);
-    $("analysisAdminStatus").dataset.state = "success";
-    $("analysisAdminStatus").textContent = "커뮤니티 평가를 저장했습니다.";
-  } catch (error) {
-    $("analysisAdminStatus").dataset.state = "error";
-    $("analysisAdminStatus").textContent = error.message;
-  } finally {
-    $("communitySaveButton").disabled = false;
-  }
 }
 
 function autoDiaryStatusSuffix(sync) {
@@ -479,7 +333,6 @@ function resetResultPanels(message, className = "") {
   $("profileLink").innerHTML = "";
   $("playerChoices").innerHTML = "";
   $("profile").innerHTML = '<div class="empty ' + escapeHtml(className) + '">' + escapeHtml(message) + '</div>';
-  resetAnalysisPanel();
 }
 
 function setSelectOptions(select, values, suffix) {
@@ -618,7 +471,6 @@ function renderProfile(data) {
     } else {
       $("profile").innerHTML = '<div class="empty">' + TXT.noProfile + '</div>';
     }
-    resetAnalysisPanel();
     return;
   }
 
@@ -672,21 +524,20 @@ function renderProfile(data) {
 
   const iakkangControls = cleanName(profile.name) === cleanName(DEFAULT_NAME) ? iakkangImportMarkup(profile.importedRecordStatus) : '';
   $("profile").innerHTML = '<div class="profile-title"><div class="profile-identity">' + avatarMarkup(profile.name, profile.image) + '<div><strong>' + escapeHtml(profile.name) + '</strong><span>wr_id=' + profile.wrId + '</span></div></div></div>' +
-    '<div class="profile-cards">' + cards.map((card) => '<div class="profile-card"><span>' + card[0] + '</span><strong>' + card[1] + '</strong><small>' + card[2] + '</small></div>').join("") + '</div>' +
     iakkangControls +
+    '<div class="profile-cards">' + cards.map((card) => '<div class="profile-card"><span>' + card[0] + '</span><strong>' + card[1] + '</strong><small>' + card[2] + '</small></div>').join("") + '</div>' +
     most +
     '<div class="profile-section profile-period-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
   bindImageFallbacks($("profile"));
   bindIakkangRecordButtons();
-  prepareAnalysis(profile);
+  renderIakkangMatchupPanel(profile);
 }
 
 function iakkangImportMarkup(status = {}) {
-  return '<div class="record-import"><div><strong>저장 전적 관리</strong><small id="iakkangImportInfo">수술대 최초 저장본 ' + Number(status.sourceGames || 0) + '건 · 구글시트 추가 ' + Number(status.sheetGames || 0) + '건</small></div><div class="record-import-actions"><button id="importSsustarRecords" class="ghost" type="button">수술대 전체 전적 최초 저장</button><button id="importSheetRecords" type="button">전적 가져오기</button></div></div>';
+  return '<div class="record-import record-import-primary"><div><strong>저장 전적 관리</strong><small id="iakkangImportInfo">수술대 저장본 ' + Number(status.sourceGames || 0) + '건 · 구글시트 추가 ' + Number(status.sheetGames || 0) + '건</small></div><div class="record-import-actions"><button id="importSheetRecords" type="button">전적 가져오기</button></div></div>';
 }
 
 function bindIakkangRecordButtons() {
-  const ssuButton = $("importSsustarRecords");
   const sheetButton = $("importSheetRecords");
   const runImport = async (button, endpoint) => {
     if (!button) return;
@@ -704,8 +555,38 @@ function bindIakkangRecordButtons() {
       button.textContent = originalLabel;
     }
   };
-  if (ssuButton) ssuButton.addEventListener("click", () => runImport(ssuButton, "/api/iakkang-records/import-ssustar"));
   if (sheetButton) sheetButton.addEventListener("click", () => runImport(sheetButton, "/api/iakkang-records/import-sheet"));
+}
+
+function renderIakkangMatchupPanel(profile) {
+  const panel = $("iakkangMatchupPanel");
+  const input = $("iakkangOpponentInput");
+  const result = $("iakkangMatchupResult");
+  if (!panel || !input || !result) return;
+  const isIakkang = cleanName(profile?.name) === cleanName(DEFAULT_NAME);
+  panel.hidden = !isIakkang;
+  if (!isIakkang) return;
+  const render = () => {
+    const query = cleanName(input.value);
+    if (!query) {
+      result.innerHTML = '상대 이름을 입력하면 저장된 이아깽 전적을 표시합니다.';
+      return;
+    }
+    const rows = (profile.matches || []).filter((match) => cleanName(match.opponent).includes(query));
+    const wins = rows.filter((match) => Number(match.elo) > 0).length;
+    const losses = rows.filter((match) => Number(match.elo) < 0).length;
+    const rate = rows.length ? Math.round((wins / rows.length) * 1000) / 10 : 0;
+    if (!rows.length) {
+      result.innerHTML = '<div class="empty">저장된 전적에서 해당 상대를 찾지 못했습니다.</div>';
+      return;
+    }
+    const race = rows.find((match) => match.opponentRace)?.opponentRace || "";
+    result.innerHTML = '<div class="iakkang-matchup-summary"><strong>' + escapeHtml(rows[0].opponent) + (race ? ' (' + escapeHtml(race) + ')' : '') + '</strong><b>' + rows.length + '전 ' + wins + '승 ' + losses + '패 · ' + rate + '%</b></div>' +
+      '<div class="iakkang-matchup-list">' + rows.slice(0, 30).map((match) => '<div><span>' + escapeHtml(match.date) + '</span><span class="' + (Number(match.elo) > 0 ? 'delta-plus' : 'delta-minus') + '">' + (Number(match.elo) > 0 ? '승' : '패') + '</span><strong>' + escapeHtml(match.map || '-') + '</strong><small>' + escapeHtml(match.format || '-') + '</small></div>').join("") + '</div>';
+  };
+  input.value = "";
+  input.oninput = render;
+  render();
 }
 
 function render(data) {
@@ -777,15 +658,6 @@ async function search(refresh = false) {
 
 $("searchButton").addEventListener("click", () => search(false));
 $("refreshButton").addEventListener("click", () => search(true));
-$("analysisButton").addEventListener("click", () => loadPlayerAnalysis(true));
-$("analysisLoginButton").addEventListener("click", loginAnalysisAdmin);
-$("communitySaveButton").addEventListener("click", saveCommunitySummary);
-document.querySelector(".analysis-admin").addEventListener("toggle", (event) => {
-  if (event.target.open) refreshAnalysisAdminStatus();
-});
-$("analysisAdminPassword").addEventListener("keydown", (event) => {
-  if (event.key === "Enter") loginAnalysisAdmin();
-});
 $("nameInput").addEventListener("keydown", (event) => { if (event.key === "Enter") search(false); });
 $("yearSelect").addEventListener("change", (event) => {
   state.selectedYear = event.target.value;
