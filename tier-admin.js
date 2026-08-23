@@ -215,6 +215,7 @@ class TierAdmin {
       }
       if (override.isHidden) continue;
       const universities = [...override.universities];
+      const broadcastId = override.broadcastId || player.broadcastId;
       result.push({
         ...player,
         university: universities[0] || "연합팀",
@@ -222,7 +223,11 @@ class TierAdmin {
         tier: override.tier || player.tier,
         promotionLight: Boolean(override.promotionLight),
         race: override.race || player.race,
-        broadcastId: override.broadcastId || player.broadcastId,
+        broadcastId,
+        // 관리자가 입력한 방송국 ID는 기존 ELOBoard 프로필 주소보다 우선합니다.
+        profileUrl: override.broadcastId
+          ? "https://play.sooplive.co.kr/" + encodeURIComponent(override.broadcastId)
+          : player.profileUrl,
         customPlayer: Boolean(override.isCustom),
         universityOverride: true,
         tierOverride: Boolean(override.tier)
