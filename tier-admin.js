@@ -133,6 +133,7 @@ class TierAdmin {
           tier TEXT,
           promotion_light BOOLEAN NOT NULL DEFAULT FALSE,
           is_custom BOOLEAN NOT NULL DEFAULT FALSE,
+          is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
           race TEXT,
           broadcast_id TEXT,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -144,12 +145,15 @@ class TierAdmin {
         await this.pool.query(
           "ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS is_custom BOOLEAN NOT NULL DEFAULT FALSE"
         );
+        await this.pool.query(
+          "ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN NOT NULL DEFAULT FALSE"
+        );
         await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS race TEXT");
         await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS broadcast_id TEXT");
         await initializeSpawnDiaryAutoSyncSchema(this.pool);
         const result = await this.pool.query(
           `SELECT player_key, player_name, universities, tier, promotion_light,
-            is_custom, race, broadcast_id, updated_at
+            is_custom, is_hidden, race, broadcast_id, updated_at
            FROM tier_university_overrides`
         );
         this.overrides.clear();
@@ -160,6 +164,7 @@ class TierAdmin {
             tier: normalizeTier(row.tier) || null,
             promotionLight: Boolean(row.promotion_light),
             isCustom: Boolean(row.is_custom),
+            isHidden: Boolean(row.is_hidden),
             race: normalizeRace(row.race) || null,
             broadcastId: normalizeBroadcastId(row.broadcast_id) || null,
             updatedAt: row.updated_at
@@ -186,6 +191,7 @@ class TierAdmin {
           tier: normalizeTier(value.tier) || null,
           promotionLight: Boolean(value.promotionLight),
           isCustom: Boolean(value.isCustom),
+          isHidden: Boolean(value.isHidden),
           race: normalizeRace(value.race) || null,
           broadcastId: normalizeBroadcastId(value.broadcastId) || null,
           updatedAt: value.updatedAt || null
@@ -199,12 +205,17 @@ class TierAdmin {
 
   applyOverrides(players) {
     const seen = new Set();
-    const result = (Array.isArray(players) ? players : []).map((player) => {
+    const result = [];
+    for (const player of (Array.isArray(players) ? players : [])) {
       seen.add(playerKey(player.name));
       const override = this.overrides.get(playerKey(player.name));
-      if (!override) return player;
+      if (!override) {
+        result.push(player);
+        continue;
+      }
+      if (override.isHidden) continue;
       const universities = [...override.universities];
-      return {
+      result.push({
         ...player,
         university: universities[0] || "연합팀",
         universities,
@@ -215,10 +226,10 @@ class TierAdmin {
         customPlayer: Boolean(override.isCustom),
         universityOverride: true,
         tierOverride: Boolean(override.tier)
-      };
-    });
+      });
+    }
     for (const [key, override] of this.overrides) {
-      if (!override.isCustom || seen.has(key)) continue;
+      if (!override.isCustom || override.isHidden || seen.has(key)) continue;
       const universities = [...override.universities];
       result.push({
         name: override.playerName,
@@ -275,6 +286,7 @@ class TierAdmin {
     }
     const current = this.overrides.get(key);
     const isCustom = payload.isCustom == null ? Boolean(current?.isCustom) : Boolean(payload.isCustom);
+    const isHidden = payload.isHidden == null ? Boolean(current?.isHidden) : Boolean(payload.isHidden);
     const race = normalizeRace(payload.race ?? current?.race);
     const broadcastId = normalizeBroadcastId(payload.broadcastId ?? current?.broadcastId);
     if (isCustom && !tier) throw new Error("새 선수의 티어를 선택해 주세요.");
@@ -288,6 +300,7 @@ class TierAdmin {
       tier,
       promotionLight: tier === "FA" ? false : Boolean(payload.promotionLight),
       isCustom,
+      isHidden,
       race: race || null,
       broadcastId: broadcastId || null,
       updatedAt: new Date().toISOString()
@@ -296,15 +309,16 @@ class TierAdmin {
       const result = await this.pool.query(
         `INSERT INTO tier_university_overrides(
            player_key, player_name, universities, tier, promotion_light,
-           is_custom, race, broadcast_id, updated_at
+           is_custom, is_hidden, race, broadcast_id, updated_at
          )
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          ON CONFLICT(player_key) DO UPDATE SET
            player_name=EXCLUDED.player_name,
            universities=EXCLUDED.universities,
            tier=EXCLUDED.tier,
            promotion_light=EXCLUDED.promotion_light,
            is_custom=EXCLUDED.is_custom,
+           is_hidden=EXCLUDED.is_hidden,
            race=EXCLUDED.race,
            broadcast_id=EXCLUDED.broadcast_id,
            updated_at=EXCLUDED.updated_at
@@ -316,6 +330,7 @@ class TierAdmin {
           item.tier,
           item.promotionLight,
           item.isCustom,
+          item.isHidden,
           item.race,
           item.broadcastId,
           item.updatedAt

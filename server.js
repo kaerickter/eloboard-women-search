@@ -3011,6 +3011,44 @@ const server = http.createServer(async (req, res) => {
       }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/admin/tier-players" && req.method === "DELETE") {
+    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+      return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const body = await readJsonBody(req);
+      const playerName = String(body.playerName || "").replace(/\s+/g, " ").trim().slice(0, 40);
+      const sourcePlayers = await loadTierRoster(false);
+      const currentPlayer = tierAdmin.applyOverrides(sourcePlayers).find((player) =>
+        normalizeName(player.name) === normalizeName(playerName));
+      if (!currentPlayer) {
+        return send(res, 404, JSON.stringify({ error: "현재 티어 명단에서 선수를 찾지 못했습니다." }), "application/json; charset=utf-8");
+      }
+      if (currentPlayer.customPlayer) {
+        await tierAdmin.deleteOverride(playerName);
+      } else {
+        await tierAdmin.setOverride(playerName, {
+          universities: currentPlayer.universities,
+          tier: currentPlayer.tier,
+          promotionLight: Boolean(currentPlayer.promotionLight),
+          isCustom: false,
+          isHidden: true,
+          race: currentPlayer.race,
+          broadcastId: currentPlayer.broadcastId
+        });
+      }
+      return send(res, 200, JSON.stringify({
+        ok: true,
+        deleted: true,
+        storage: tierAdmin.storageStatus
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, error.statusCode || 400, JSON.stringify({
+        error: error.message || "선수를 삭제하지 못했습니다.",
+        code: error.code || ""
+      }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/tier-memberships" && (req.method === "PUT" || req.method === "DELETE")) {
     if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
       return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
