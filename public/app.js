@@ -612,7 +612,12 @@ function renderProfile(data) {
   const profile = data.profile;
   if (!state.query.trim() || !profile) {
     $("profileLink").innerHTML = "";
-    $("profile").innerHTML = '<div class="empty">' + TXT.noProfile + '</div>';
+    if (cleanName(state.query) === cleanName(DEFAULT_NAME)) {
+      $("profile").innerHTML = '<div class="empty">수술대 최초 전적을 저장하면 ELOBoard 연결 없이 이아깽 전적을 표시합니다.</div>' + iakkangImportMarkup();
+      bindIakkangRecordButtons();
+    } else {
+      $("profile").innerHTML = '<div class="empty">' + TXT.noProfile + '</div>';
+    }
     resetAnalysisPanel();
     return;
   }
@@ -665,12 +670,42 @@ function renderProfile(data) {
 
   const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>ELO</span><span>경기방식</span><span>메모</span></div>';
 
+  const iakkangControls = cleanName(profile.name) === cleanName(DEFAULT_NAME) ? iakkangImportMarkup(profile.importedRecordStatus) : '';
   $("profile").innerHTML = '<div class="profile-title"><div class="profile-identity">' + avatarMarkup(profile.name, profile.image) + '<div><strong>' + escapeHtml(profile.name) + '</strong><span>wr_id=' + profile.wrId + '</span></div></div></div>' +
     '<div class="profile-cards">' + cards.map((card) => '<div class="profile-card"><span>' + card[0] + '</span><strong>' + card[1] + '</strong><small>' + card[2] + '</small></div>').join("") + '</div>' +
+    iakkangControls +
     most +
     '<div class="profile-section profile-period-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
   bindImageFallbacks($("profile"));
+  bindIakkangRecordButtons();
   prepareAnalysis(profile);
+}
+
+function iakkangImportMarkup(status = {}) {
+  return '<div class="record-import"><div><strong>저장 전적 관리</strong><small id="iakkangImportInfo">수술대 최초 저장본 ' + Number(status.sourceGames || 0) + '건 · 구글시트 추가 ' + Number(status.sheetGames || 0) + '건</small></div><div class="record-import-actions"><button id="importSsustarRecords" class="ghost" type="button">수술대 전체 전적 최초 저장</button><button id="importSheetRecords" type="button">전적 가져오기</button></div></div>';
+}
+
+function bindIakkangRecordButtons() {
+  const ssuButton = $("importSsustarRecords");
+  const sheetButton = $("importSheetRecords");
+  const runImport = async (button, endpoint) => {
+    if (!button) return;
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "가져오는 중...";
+    try {
+      const result = await requestJson(endpoint, { method: "POST" });
+      setSearchState("success", result.message || "전적을 저장했습니다.");
+      await search(false);
+    } catch (error) {
+      setSearchState("error", error.message || "전적을 가져오지 못했습니다.");
+    } finally {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  };
+  if (ssuButton) ssuButton.addEventListener("click", () => runImport(ssuButton, "/api/iakkang-records/import-ssustar"));
+  if (sheetButton) sheetButton.addEventListener("click", () => runImport(sheetButton, "/api/iakkang-records/import-sheet"));
 }
 
 function render(data) {
