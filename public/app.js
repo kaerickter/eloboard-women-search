@@ -29,8 +29,6 @@ function restoreSearchSession() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(SEARCH_SESSION_KEY) || "null");
     if (!saved || typeof saved !== "object") return false;
-    // 이아깽은 저장된 전적을 매번 서버에서 바로 읽어야 새 시트 반영분도 즉시 보입니다.
-    if (cleanName(saved.name) === cleanName(DEFAULT_NAME)) return false;
     validateSearchResponse(saved.data);
     $("nameInput").value = String(saved.name || DEFAULT_NAME);
     state.query = $("nameInput").value.trim();
@@ -38,7 +36,10 @@ function restoreSearchSession() {
     state.selectedYear = String(saved.selectedYear || "");
     state.selectedMonth = String(saved.selectedMonth || "");
     render(saved.data);
-    setSearchState("success", "이전에 보던 검색 결과를 복원했습니다.");
+    const isIakkang = cleanName(saved.name) === cleanName(DEFAULT_NAME);
+    setSearchState("success", isIakkang ? "저장된 이아깽 전적을 바로 표시했습니다." : "이전에 보던 검색 결과를 복원했습니다.");
+    // 기존 화면은 즉시 유지하고, 이아깽만 뒤에서 저장소의 최신본을 조용히 확인합니다.
+    if (isIakkang) setTimeout(() => { load(DEFAULT_NAME, false, true).catch(() => {}); }, 0);
     return true;
   } catch {
     return false;
@@ -595,15 +596,17 @@ function render(data) {
   renderProfile(data);
 }
 
-async function load(name = "", refresh = false) {
+async function load(name = "", refresh = false, silent = false) {
   if (state.activeController) state.activeController.abort();
   const controller = new AbortController();
   state.activeController = controller;
   const requestId = state.requestId + 1;
   state.requestId = requestId;
   const pages = 10;
-  setSearchState("loading", refresh ? TXT.refreshing : TXT.loading);
-  resetResultPanels("검색 결과를 확인하고 있습니다.", "search-loading");
+  if (!silent) {
+    setSearchState("loading", refresh ? TXT.refreshing : TXT.loading);
+    resetResultPanels("검색 결과를 확인하고 있습니다.", "search-loading");
+  }
   const params = new URLSearchParams({ pages: String(pages) });
   if (name) params.set("name", name);
   if (refresh) params.set("refresh", "1");
