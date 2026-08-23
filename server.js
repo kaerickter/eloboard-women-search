@@ -22,6 +22,9 @@ const BOARD_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_board";
 const BJ_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_list";
 const MEN_BJ_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=bj_list";
 const WOMEN_RECORD_AJAX_URL = "https://eloboard.com/women/bbs/ajax_women_record.php";
+const SSUSTAR_Iakkang_GAMES_URL = "https://ssustar.iwinv.net/recent_games_embed.php?player=%EC%9D%B4%EC%95%84%EA%B9%BD_T_780";
+const IAKKANG_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/11PQGexmMtcaOJlcfyAKg6tLsDDjbijMK_6crKta2RFM/export?format=csv&gid=540473952";
+const IAKKANG_WR_ID = "780";
 const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=search_list";
 const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
 const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_list";
@@ -107,6 +110,9 @@ let profileCache = new Map();
 let profilePromises = new Map();
 const profileSnapshotMemory = new Map();
 let profileSnapshotSchemaPromise = null;
+let iakkangRecordStoreReady = false;
+let iakkangRecordStorePromise = null;
+let iakkangRecordMemory = null;
 let universityCache = null;
 let universityRosterCache = new Map();
 let tierRosterCache = null;
@@ -1103,6 +1109,232 @@ function mergeProfileRows(...rowGroups) {
     return true;
   }).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 }
+
+// 이아깽은 ELOBoard 차단 기간에도 수술대의 최초 저장본과 관리 시트의 새 행만 사용합니다.
+// 저장은 한 줄(JSON)이라 경기 수가 늘어도 DB 연결/조회 횟수는 매우 작습니다.
+const IAKKANG_BASELINE = {
+  total: { games: 1657, wins: 890, losses: 767 },
+  women: { games: 1590, wins: 858, losses: 732 },
+  mixed: { games: 67, wins: 32, losses: 35 },
+  raceTotals: {
+    women: {
+      Z: { games: 868, wins: 465, losses: 403 },
+      P: { games: 685, wins: 373, losses: 312 },
+      T: { games: 37, wins: 20, losses: 17 }
+    },
+    mixed: {
+      Z: { games: 1, wins: 1, losses: 0 },
+      P: { games: 64, wins: 31, losses: 33 },
+      T: { games: 2, wins: 0, losses: 2 }
+    }
+  }
+};
+
+function recordRate(record) {
+  const games = Number(record?.games || 0);
+  const wins = Number(record?.wins || 0);
+  const losses = Number(record?.losses || 0);
+  return { games, wins, losses, rate: games ? Math.round((wins / games) * 1000) / 10 : 0 };
+}
+
+function cloneRecord(record) {
+  return { games: Number(record?.games || 0), wins: Number(record?.wins || 0), losses: Number(record?.losses || 0) };
+}
+
+function addRecord(record, elo) {
+  record.games += 1;
+  if (Number(elo) > 0) record.wins += 1;
+  else if (Number(elo) < 0) record.losses += 1;
+}
+
+function iakkangMatchKey(row) {
+  return [
+    String(row?.date || "").slice(0, 10),
+    normalizeName(row?.opponent),
+    String(row?.opponentRace || "").toUpperCase(),
+    String(row?.map || "").trim().toLowerCase(),
+    Number(row?.elo) > 0 ? "W" : "L",
+    String(row?.format || "").trim().toLowerCase(),
+    String(row?.memo || "").trim().toLowerCase(),
+    String(row?.eloText || "").trim()
+  ].join("|");
+}
+
+function parseSsuIakkangRows(html) {
+  const rows = [];
+  for (const rowHtml of String(html || "").match(/<tr\b[\s\S]*?<\/tr>/gi) || []) {
+    const cells = [...rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map((item) => cleanText(item[1]));
+    if (cells.length < 6 || !/^\d{4}-\d{2}-\d{2}$/.test(cells[0])) continue;
+    const opponentMatch = cells[1].match(/^(.*?)(?:\s*\(([TPZ])\))?$/i);
+    const result = cells[3] === "승" ? 1 : cells[3] === "패" ? -1 : 0;
+    if (!opponentMatch?.[1] || !result) continue;
+    rows.push({
+      date: cells[0],
+      opponent: opponentMatch[1].trim(),
+      opponentRace: String(opponentMatch[2] || "").toUpperCase(),
+      opponentId: "",
+      opponentUrl: "",
+      map: cells[2],
+      elo: result,
+      eloText: cells[3],
+      format: cells[4],
+      memo: cells[5],
+      url: "ssustar:" + cells.join("|"),
+      source: "ssustar"
+    });
+  }
+  return mergeProfileRows(rows);
+}
+
+function parseCsvRows(text) {
+  const output = [];
+  let row = [], value = "", quoted = false;
+  for (let index = 0; index < String(text || "").length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') { value += '"'; index += 1; continue; }
+    if (char === '"') { quoted = !quoted; continue; }
+    if (char === "," && !quoted) { row.push(value); value = ""; continue; }
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(value); value = "";
+      if (row.some((cell) => String(cell).trim())) output.push(row);
+      row = [];
+      continue;
+    }
+    value += char;
+  }
+  row.push(value);
+  if (row.some((cell) => String(cell).trim())) output.push(row);
+  const headers = (output.shift() || []).map((item) => String(item).trim());
+  return output.map((cells) => Object.fromEntries(headers.map((header, index) => [header, String(cells[index] || "").trim()])));
+}
+
+function csvPlayer(value) {
+  const raw = String(value || "").replace(/\s+/g, " ").trim();
+  const race = raw.match(/(?:\s|\()([TPZ])\)?$/i)?.[1]?.toUpperCase() || "";
+  return { name: raw.replace(/\s*\(?[TPZ]\)?\s*$/i, "").trim(), race };
+}
+
+function parseIakkangSheetRows(csv) {
+  const rows = [];
+  for (const item of parseCsvRows(csv)) {
+    const date = String(item["날짜"] || "").match(/^\d{4}-\d{2}-\d{2}/)?.[0] || "";
+    const winner = csvPlayer(item["승자"]);
+    const loser = csvPlayer(item["패자"]);
+    const iakkangWon = normalizeName(winner.name) === normalizeName("이아깽");
+    const iakkangLost = normalizeName(loser.name) === normalizeName("이아깽");
+    if (!date || (!iakkangWon && !iakkangLost)) continue;
+    const opponent = iakkangWon ? loser : winner;
+    const eloValue = Math.abs(Number(String(item["ELO"] || "").replace(/[^0-9.]/g, ""))) || 1;
+    const elo = iakkangWon ? eloValue : -eloValue;
+    rows.push({
+      date,
+      opponent: opponent.name,
+      opponentRace: opponent.race,
+      opponentId: "",
+      opponentUrl: "",
+      map: String(item["맵"] || "").trim(),
+      elo,
+      eloText: (elo > 0 ? "+" : "-") + eloValue.toFixed(1),
+      format: String(item["경기방식"] || "").trim(),
+      memo: String(item["메모"] || "").trim(),
+      url: "sheet:" + [date, winner.name, loser.name, item["맵"], item["경기방식"], item["메모"], item["ELO"]].join("|"),
+      source: "sheet"
+    });
+  }
+  return rows;
+}
+
+async function ensureIakkangRecordStore() {
+  if (!tierAdmin.pool) throw new Error("전적 저장소가 연결되지 않았습니다.");
+  if (!iakkangRecordStorePromise && !iakkangRecordStoreReady) {
+    iakkangRecordStorePromise = tierAdmin.pool.query(`
+      CREATE TABLE IF NOT EXISTS imported_player_records (
+        player_key TEXT PRIMARY KEY,
+        payload JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `).then(() => { iakkangRecordStoreReady = true; }).finally(() => { iakkangRecordStorePromise = null; });
+  }
+  await iakkangRecordStorePromise;
+}
+
+async function loadIakkangRecordState() {
+  if (iakkangRecordMemory) return iakkangRecordMemory;
+  if (!tierAdmin.pool) return null;
+  await ensureIakkangRecordStore();
+  const result = await tierAdmin.pool.query("SELECT payload FROM imported_player_records WHERE player_key=$1", ["iakkang"]);
+  const payload = result.rows[0]?.payload;
+  if (!payload || !Array.isArray(payload.matches)) return null;
+  iakkangRecordMemory = payload;
+  return payload;
+}
+
+async function saveIakkangRecordState(state) {
+  await ensureIakkangRecordStore();
+  const payload = { ...state, matches: mergeProfileRows(state.matches || []), updatedAt: new Date().toISOString() };
+  await tierAdmin.pool.query(`
+    INSERT INTO imported_player_records (player_key, payload, updated_at) VALUES ($1, $2::jsonb, NOW())
+    ON CONFLICT (player_key) DO UPDATE SET payload=EXCLUDED.payload, updated_at=NOW()
+  `, ["iakkang", JSON.stringify(payload)]);
+  iakkangRecordMemory = payload;
+  profileCache.delete(IAKKANG_WR_ID);
+  return payload;
+}
+
+function iakkangProfileFromState(state) {
+  if (!state?.matches?.length) return null;
+  const total = cloneRecord(IAKKANG_BASELINE.total);
+  const women = cloneRecord(IAKKANG_BASELINE.women);
+  const mixed = cloneRecord(IAKKANG_BASELINE.mixed);
+  const raceTotals = { women: {}, mixed: {}, combined: {} };
+  for (const division of ["women", "mixed"]) {
+    for (const race of ["T", "Z", "P"]) raceTotals[division][race] = cloneRecord(IAKKANG_BASELINE.raceTotals[division][race]);
+  }
+  // 시트의 새 행만 기준 수치에 더합니다. 수술대 최초 저장본은 사진의 누적 전적에 이미 포함되어 있습니다.
+  for (const row of state.matches.filter((item) => item.source === "sheet")) {
+    const division = "women";
+    const race = ["T", "Z", "P"].includes(String(row.opponentRace || "").toUpperCase()) ? String(row.opponentRace).toUpperCase() : "";
+    addRecord(total, row.elo); addRecord(women, row.elo);
+    if (race) addRecord(raceTotals[division][race], row.elo);
+  }
+  for (const race of ["T", "Z", "P"]) {
+    const womenRace = raceTotals.women[race];
+    const mixedRace = raceTotals.mixed[race];
+    raceTotals.combined[race] = {
+      games: womenRace.games + mixedRace.games,
+      wins: womenRace.wins + mixedRace.wins,
+      losses: womenRace.losses + mixedRace.losses
+    };
+  }
+  const matches = mergeProfileRows(state.matches);
+  return {
+    wrId: IAKKANG_WR_ID,
+    name: "이아깽",
+    race: "테란",
+    url: "https://eloboard.com/women/bbs/board.php?bo_table=bj_list&wr_id=780",
+    image: "https://profile.img.sooplive.co.kr/LOGO/2a/2ahgo1203/2ahgo1203.jpg",
+    broadcastId: "2ahgo1203",
+    broadcastUrl: "https://play.sooplive.co.kr/2ahgo1203",
+    info: { source: "수술대 최초 저장본 + 구글시트 새 전적" },
+    total: recordRate(total), women: recordRate(women), mixed: recordRate(mixed),
+    raceTotals: Object.fromEntries(Object.entries(raceTotals).map(([key, value]) => [key, Object.fromEntries(Object.entries(value).map(([race, record]) => [race, recordRate(record)]))])),
+    recent30: inferRecent30(matches),
+    mostMatches: [],
+    matches,
+    importedRecordStatus: {
+      ssuImportedAt: state.ssuImportedAt || "",
+      sheetImportedAt: state.sheetImportedAt || "",
+      sourceGames: state.matches.filter((item) => item.source === "ssustar").length,
+      sheetGames: state.matches.filter((item) => item.source === "sheet").length
+    }
+  };
+}
+
+async function loadStoredIakkangProfile() {
+  return iakkangProfileFromState(await loadIakkangRecordState());
+}
 async function fetchWomenRecordRows(playerName, profileUrl) {
   const name = String(playerName || "").trim();
   if (!name) return [];
@@ -1196,6 +1428,10 @@ function parseProfile(html, wrId, profileUrlOverride = "", baseUrl = BOARD_URL) 
 }
 async function loadProfile(wrId, force = false) {
   if (!wrId) return null;
+  if (String(wrId) === IAKKANG_WR_ID) {
+    const imported = await loadStoredIakkangProfile();
+    if (imported) return imported;
+  }
   const cacheKey = String(wrId);
   const cached = profileCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
@@ -3337,6 +3573,45 @@ const server = http.createServer(async (req, res) => {
       }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/iakkang-records/import-ssustar" && req.method === "POST") {
+    if (!requestIsSameOrigin(req)) return send(res, 403, JSON.stringify({ error: "같은 사이트 화면에서만 전적을 저장할 수 있습니다." }), "application/json; charset=utf-8");
+    try {
+      tierAdmin.assertWritableStorage();
+      const current = await loadIakkangRecordState();
+      const existingSourceGames = current?.matches?.filter((item) => item.source === "ssustar").length || 0;
+      if (existingSourceGames) return send(res, 200, JSON.stringify({ ok: true, skipped: true, imported: 0, total: existingSourceGames, message: "수술대 최초 저장본이 이미 있습니다." }), "application/json; charset=utf-8");
+      const response = await fetchWithRetry(SSUSTAR_Iakkang_GAMES_URL, { headers: { "User-Agent": "Mozilla/5.0 eloboard-women-search", "Accept-Language": "ko-KR,ko;q=0.9" } }, 1);
+      if (!response.ok) throw new Error("수술대 전적 요청 오류: " + response.status);
+      const sourceRows = parseSsuIakkangRows(await response.text());
+      if (sourceRows.length < 100) throw new Error("수술대 전적을 충분히 읽지 못했습니다. 저장하지 않았습니다.");
+      const saved = await saveIakkangRecordState({ matches: mergeProfileRows(sourceRows, current?.matches || []), ssuImportedAt: new Date().toISOString(), sheetImportedAt: current?.sheetImportedAt || "" });
+      return send(res, 200, JSON.stringify({ ok: true, imported: sourceRows.length, total: saved.matches.length, message: "수술대 이아깽 전체 전적을 최초 저장했습니다." }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, error.statusCode || 502, JSON.stringify({ error: error.message || "수술대 전적을 저장하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/iakkang-records/import-sheet" && req.method === "POST") {
+    if (!requestIsSameOrigin(req)) return send(res, 403, JSON.stringify({ error: "같은 사이트 화면에서만 전적을 가져올 수 있습니다." }), "application/json; charset=utf-8");
+    try {
+      tierAdmin.assertWritableStorage();
+      const current = await loadIakkangRecordState();
+      if (!current?.matches?.some((item) => item.source === "ssustar")) return send(res, 409, JSON.stringify({ error: "먼저 수술대 전체 전적을 최초 저장해 주세요." }), "application/json; charset=utf-8");
+      const response = await fetchWithRetry(IAKKANG_SHEET_CSV_URL, { headers: { "Accept": "text/csv" } }, 1);
+      if (!response.ok) throw new Error("구글시트 전적 요청 오류: " + response.status);
+      const candidates = parseIakkangSheetRows(await response.text());
+      const known = new Set(current.matches.map(iakkangMatchKey));
+      const added = candidates.filter((row) => {
+        const key = iakkangMatchKey(row);
+        if (known.has(key)) return false;
+        known.add(key);
+        return true;
+      });
+      const saved = await saveIakkangRecordState({ ...current, matches: [...current.matches, ...added], sheetImportedAt: new Date().toISOString() });
+      return send(res, 200, JSON.stringify({ ok: true, imported: added.length, checked: candidates.length, total: saved.matches.length, message: added.length ? added.length + "건의 새 전적을 추가했습니다." : "새로 추가할 이아깽 전적이 없습니다." }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, error.statusCode || 502, JSON.stringify({ error: error.message || "구글시트 전적을 가져오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/data") {
     try {
       const force = url.searchParams.get("refresh") === "1";
@@ -3346,7 +3621,9 @@ const server = http.createServer(async (req, res) => {
       }
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
-        const profile = url.searchParams.get("division") === "men"
+        const profile = String(requestedWrId) === IAKKANG_WR_ID
+          ? await loadStoredIakkangProfile()
+          : url.searchParams.get("division") === "men"
           ? await loadMenProfile(requestedWrId, force, query)
           : await loadProfile(requestedWrId, force);
         const autoDiarySync = await syncSpawnDiaryNow(query, profile);
@@ -3361,6 +3638,20 @@ const server = http.createServer(async (req, res) => {
           autoDiarySync,
           resultState: profile ? "found" : "empty"
         }, null, 2), "application/json; charset=utf-8");
+      }
+      // 이아깽 저장 전적은 새로고침·직접 검색에서도 ELOBoard에 다시 요청하지 않습니다.
+      if (normalizeName(query) === normalizeName("이아깽")) {
+        const profile = await loadStoredIakkangProfile();
+        if (profile) {
+          const autoDiarySync = await syncSpawnDiaryNow(query, profile);
+          return send(res, 200, JSON.stringify({
+            source: "ssustar.iwinv.net + Google Sheets",
+            fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [],
+            ...summarize([], query),
+            players: [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "saved-iakkang-records" }],
+            profile, autoDiarySync, resultState: "found"
+          }, null, 2), "application/json; charset=utf-8");
+        }
       }
       // 남성전적은 별도 게시판을 사용하므로 여성 게시판을 읽지 못해도 검색을 계속합니다.
       const dataPromise = loadData(url.searchParams.get("pages"), force).catch((error) => {
