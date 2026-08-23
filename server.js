@@ -1200,8 +1200,10 @@ function parseProfile(html, wrId, profileUrlOverride = "", baseUrl = BOARD_URL) 
 async function loadProfile(wrId, force = false, options = {}) {
   if (!wrId) return null;
   const profilePageOnly = options.profilePageOnly === true;
-  const cacheKey = String(wrId) + (profilePageOnly ? ":profile-page" : "");
+  const profileWrId = String(wrId);
+  const cacheKey = profileWrId + (profilePageOnly ? ":profile-page" : "");
   const cached = profileCache.get(cacheKey);
+  const standardCached = profilePageOnly ? profileCache.get(profileWrId) : null;
   if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
   const promise = (async () => {
@@ -1213,7 +1215,7 @@ async function loadProfile(wrId, force = false, options = {}) {
       );
       if (!response.ok) throw new Error("profile " + wrId + " response error: " + response.status);
       const profile = parseProfile(await response.text(), wrId);
-      if (!profile || String(profile.wrId) !== cacheKey || !String(profile.name || "").trim()) {
+      if (!profile || String(profile.wrId) !== profileWrId || !String(profile.name || "").trim()) {
         throw new Error("profile " + wrId + " response validation failed");
       }
       if (!profilePageOnly) {
@@ -1226,6 +1228,7 @@ async function loadProfile(wrId, force = false, options = {}) {
       return profile;
     } catch (error) {
       if (cached?.profile) return { ...cached.profile, stale: true };
+      if (standardCached?.profile) return { ...standardCached.profile, stale: true, cached: true };
       throw error;
     }
   })();
@@ -3438,7 +3441,10 @@ const server = http.createServer(async (req, res) => {
           resultState: "found"
         }, null, 2), "application/json; charset=utf-8");
       }
-      return send(res, 502, JSON.stringify({ error: error.message }, null, 2), "application/json; charset=utf-8");
+      const message = /response error:\s*403/i.test(String(error?.message || ""))
+        ? "ELOBoard가 현재 서버 전적 요청을 차단하고 있습니다. 저장된 정상 전적도 없어 표시할 수 없습니다."
+        : (error.message || "전적을 불러오지 못했습니다.");
+      return send(res, 502, JSON.stringify({ error: message }, null, 2), "application/json; charset=utf-8");
     }
   }
   serveStatic(req, res);
