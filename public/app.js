@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_NAME = "\uc774\uc544\uae7d";
 const DEFAULT_WR_ID = "780";
+// ELOBoard 연결이 정상화되면 false로 바꾸면 기존 다중 선수 검색으로 되돌아갑니다.
+const TEMPORARY_SINGLE_PLAYER_MODE = true;
 const SEARCH_SESSION_KEY = "record-search-session-v2";
 const state = {
   query: "",
@@ -763,7 +765,15 @@ $("monthSelect").addEventListener("change", (event) => {
   render(state.data);
   saveSearchSession();
 });
-if (!restoreSearchSession()) {
+if (TEMPORARY_SINGLE_PLAYER_MODE) {
+  $("nameInput").value = DEFAULT_NAME;
+  $("nameInput").readOnly = true;
+  $("nameInput").setAttribute("aria-readonly", "true");
+  $("nameInput").title = "현재는 이아깽 선수 전적만 임시로 조회합니다.";
+  $("searchButton").textContent = "이아깽 전적 검색";
+  $("refreshButton").textContent = "이아깽 전적 새로고침";
+  search(false);
+} else if (!restoreSearchSession()) {
   if (!$("nameInput").value.trim()) $("nameInput").value = DEFAULT_NAME;
   search(false);
 }
