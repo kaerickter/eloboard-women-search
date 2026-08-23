@@ -20,6 +20,9 @@ const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
 const BOARD_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_board";
 const BJ_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_list";
+// ELOBoard 연결이 정상화될 때까지 전적검색은 이아깽 프로필 한 명만 사용합니다.
+const TEMPORARY_RECORD_PLAYER_NAME = "이아깽";
+const TEMPORARY_RECORD_WR_ID = "780";
 const MEN_BJ_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=bj_list";
 const WOMEN_RECORD_AJAX_URL = "https://eloboard.com/women/bbs/ajax_women_record.php";
 const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=search_list";
@@ -1194,9 +1197,10 @@ function parseProfile(html, wrId, profileUrlOverride = "", baseUrl = BOARD_URL) 
     matches: profileRows
   };
 }
-async function loadProfile(wrId, force = false) {
+async function loadProfile(wrId, force = false, options = {}) {
   if (!wrId) return null;
-  const cacheKey = String(wrId);
+  const profilePageOnly = options.profilePageOnly === true;
+  const cacheKey = String(wrId) + (profilePageOnly ? ":profile-page" : "");
   const cached = profileCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
@@ -1212,8 +1216,10 @@ async function loadProfile(wrId, force = false) {
       if (!profile || String(profile.wrId) !== cacheKey || !String(profile.name || "").trim()) {
         throw new Error("profile " + wrId + " response validation failed");
       }
-      const womenRows = await fetchWomenRecordRows(profile.name, profile.url);
-      profile.matches = mergeProfileRows(womenRows, profile.matches);
+      if (!profilePageOnly) {
+        const womenRows = await fetchWomenRecordRows(profile.name, profile.url);
+        profile.matches = mergeProfileRows(womenRows, profile.matches);
+      }
       profile.recent30 = inferRecent30(profile.matches);
       profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
       void rememberProfileSnapshot(profile);
@@ -3333,14 +3339,27 @@ const server = http.createServer(async (req, res) => {
     try {
       const force = url.searchParams.get("refresh") === "1";
       const query = String(url.searchParams.get("name") || "").trim();
+      const temporaryPlayerKey = normalizePlayerName(TEMPORARY_RECORD_PLAYER_NAME);
+      if (query && normalizePlayerName(query) !== temporaryPlayerKey) {
+        return send(res, 503, JSON.stringify({
+          error: "현재 전적검색은 임시로 이아깽 선수만 사용할 수 있습니다."
+        }), "application/json; charset=utf-8");
+      }
       if (query.length > 40) {
         return send(res, 400, JSON.stringify({ error: "선수 이름은 40자 이내로 입력해 주세요." }), "application/json; charset=utf-8");
       }
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
+        if (String(requestedWrId) !== TEMPORARY_RECORD_WR_ID ||
+          url.searchParams.get("division") === "men" ||
+          (query && normalizePlayerName(query) !== temporaryPlayerKey)) {
+          return send(res, 503, JSON.stringify({
+            error: "현재 전적검색은 이아깽 선수의 지정된 프로필만 사용할 수 있습니다."
+          }), "application/json; charset=utf-8");
+        }
         const profile = url.searchParams.get("division") === "men"
           ? await loadMenProfile(requestedWrId, force, query)
-          : await loadProfile(requestedWrId, force);
+          : await loadProfile(TEMPORARY_RECORD_WR_ID, force, { profilePageOnly: true });
         const autoDiarySync = await syncSpawnDiaryNow(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
