@@ -1107,7 +1107,12 @@ function mergeProfileRows(...rowGroups) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  }).sort((a, b) => {
+    const dateOrder = String(b.date || "").localeCompare(String(a.date || ""));
+    if (dateOrder) return dateOrder;
+    // 구글시트 행은 같은 날짜의 기존 최초 저장본보다 항상 최신으로 표시합니다.
+    return Number(b.source === "sheet") - Number(a.source === "sheet");
+  });
 }
 
 // 이아깽은 ELOBoard 차단 기간에도 수술대의 최초 저장본과 관리 시트의 새 행만 사용합니다.
@@ -3606,7 +3611,8 @@ const server = http.createServer(async (req, res) => {
         known.add(key);
         return true;
       });
-      const saved = await saveIakkangRecordState({ ...current, matches: [...current.matches, ...added], sheetImportedAt: new Date().toISOString() });
+      // 같은 날짜의 전적은 방금 시트에서 가져온 행이 가장 최신이므로 앞에 둡니다.
+      const saved = await saveIakkangRecordState({ ...current, matches: [...added, ...current.matches], sheetImportedAt: new Date().toISOString() });
       return send(res, 200, JSON.stringify({ ok: true, imported: added.length, checked: candidates.length, total: saved.matches.length, message: added.length ? added.length + "건의 새 전적을 추가했습니다." : "새로 추가할 이아깽 전적이 없습니다." }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, error.statusCode || 502, JSON.stringify({ error: error.message || "구글시트 전적을 가져오지 못했습니다." }), "application/json; charset=utf-8");
