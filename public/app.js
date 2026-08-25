@@ -535,7 +535,7 @@ function renderProfile(data) {
 }
 
 function iakkangImportMarkup(status = {}) {
-  return '<div class="record-import record-import-primary"><div><strong>저장 전적 관리</strong><small id="iakkangImportInfo">수술대 저장본 ' + Number(status.sourceGames || 0) + '건 · 구글시트 추가 ' + Number(status.sheetGames || 0) + '건</small></div><div class="record-import-actions"><button id="importSheetRecords" type="button">전적 가져오기</button></div></div>';
+  return '<div class="record-import record-import-primary"><div class="record-import-actions"><button id="importSheetRecords" type="button">전적 가져오기</button></div></div>';
 }
 
 function bindIakkangRecordButtons() {
@@ -573,12 +573,18 @@ function renderIakkangMatchupPanel(profile) {
       result.innerHTML = '상대 이름을 입력하면 저장된 이아깽 전적을 표시합니다.';
       return;
     }
-    const rows = (profile.matches || []).filter((match) => cleanName(match.opponent).includes(query));
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 3);
+    cutoff.setHours(0, 0, 0, 0);
+    const rows = (profile.matches || []).filter((match) => {
+      const matchDate = new Date(String(match.date || "") + "T00:00:00");
+      return matchDate >= cutoff && cleanName(match.opponent).includes(query);
+    });
     const wins = rows.filter((match) => Number(match.elo) > 0).length;
     const losses = rows.filter((match) => Number(match.elo) < 0).length;
     const rate = rows.length ? Math.round((wins / rows.length) * 1000) / 10 : 0;
     if (!rows.length) {
-      result.innerHTML = '<div class="empty">저장된 전적에서 해당 상대를 찾지 못했습니다.</div>';
+      result.innerHTML = '<div class="empty">최근 3개월 저장 전적에서 해당 상대를 찾지 못했습니다.</div>';
       return;
     }
     const race = rows.find((match) => match.opponentRace)?.opponentRace || "";
