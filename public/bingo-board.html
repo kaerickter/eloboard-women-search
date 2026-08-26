@@ -972,6 +972,82 @@
       background: linear-gradient(180deg, #fff 0%, #fffaf4 100%) !important;
       box-shadow: 0 10px 18px rgba(116, 83, 63, .18), inset 0 -7px 0 rgba(185, 120, 54, .17), inset 0 1px 0 rgba(255, 255, 255, .96) !important;
     }
+
+    .mode-layout {
+      display: grid;
+      gap: 12px;
+    }
+
+    .mode-group {
+      display: grid;
+      gap: 6px;
+    }
+
+    .mode-group-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .size-segmented {
+      grid-template-columns: 1fr 1fr;
+      width: min(100%, 180px);
+    }
+
+    .territory-mode-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) 68px;
+      gap: 4px;
+      align-items: stretch;
+      width: 100%;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #eef1f5;
+    }
+
+    .territory-mode-row button {
+      min-width: 0;
+      min-height: 36px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .territory-mode-row button.mode-active {
+      color: #fff;
+      background: linear-gradient(135deg, var(--team-1), var(--team-2));
+      box-shadow: 0 3px 10px rgba(49, 78, 135, .24);
+    }
+
+    .inline-bingo-score {
+      display: grid;
+      grid-template-columns: 1fr;
+      align-content: center;
+      gap: 1px;
+      min-width: 0;
+      padding: 2px 4px;
+      color: #4e596d;
+      font-size: 10px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .inline-bingo-score input {
+      width: 100%;
+      min-width: 0;
+      height: 22px;
+      border: 1px solid #cbd4e2;
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 900;
+      text-align: center;
+    }
     .broadcast .preview-cell.checked {
       border-color: #07593c !important;
       color: #fff !important;
@@ -1223,11 +1299,22 @@
 
       <section class="section">
         <div class="label">판 크기 / 모드</div>
-        <div class="segmented" role="group" aria-label="빙고판 크기 선택">
-          <button type="button" class="active" data-size="4">4x4</button>
-          <button type="button" data-size="5">5x5</button>
-          <button type="button" data-mode="territory">땅따먹기</button>
-          <button type="button" data-mode="score-territory">점수 땅따먹기</button>
+        <div class="mode-layout">
+          <div class="mode-group">
+            <div class="mode-group-title">판 크기</div>
+            <div class="segmented size-segmented" role="group" aria-label="빙고판 크기 선택">
+              <button type="button" class="active" data-size="4">4x4</button>
+              <button type="button" data-size="5">5x5</button>
+            </div>
+          </div>
+          <div class="mode-group">
+            <div class="mode-group-title">게임 모드</div>
+            <div class="territory-mode-row" role="group" aria-label="땅따먹기 모드 선택">
+              <button type="button" data-mode="territory">땅따먹기</button>
+              <button type="button" data-mode="score-territory">점수 땅따먹기</button>
+              <label class="inline-bingo-score" id="scoreBingoSetting" for="territoryBingoPoints" hidden>빙고 점수<input id="territoryBingoPoints" type="number" min="0" max="100" step="1" value="3" inputmode="numeric" aria-label="빙고 한 줄당 점수"></label>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1248,11 +1335,6 @@
           <input id="team2Name" type="text" value="2팀" maxlength="16" aria-label="2팀 팀명">
           <input id="team2Color" type="color" value="#3b82f6">
         </div>
-        <label class="team-color-row score-bingo-setting" id="scoreBingoSetting" for="territoryBingoPoints" hidden>
-          <span>빙고 점수</span>
-          <input id="territoryBingoPoints" type="number" min="0" max="100" step="1" value="3" inputmode="numeric" aria-label="빙고 한 줄당 점수">
-          <small>점</small>
-        </label>
         <p class="territory-guide">팀을 고른 뒤 숫자를 누르면 점령합니다. 상대 팀이 같은 칸을 누르면 그 팀 색으로 바뀌며, 자기 칸을 다시 누르면 점령이 해제됩니다.</p>
       </section>
 
@@ -1494,6 +1576,9 @@
       const team1Highlighted = new Set(team1Lines.flat());
       const team2Highlighted = new Set(team2Lines.flat());
       const grid = `repeat(${state.size}, minmax(0, 1fr))`;
+
+      timerDisplay.hidden = isScoreTerritory || !timerVisible;
+      bingoHeading.hidden = isScoreTerritory || timerVisible;
 
       bingoTitleText.textContent = state.title;
       bingoChickenCount.textContent = state.chickenCount;
