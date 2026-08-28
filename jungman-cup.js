@@ -5,6 +5,18 @@ const UNIVERSITIES = [
 const GROUPS = ["A", "B", "C", "D"];
 const STORAGE_KEY = "jungman-cup-preview-v2";
 const PREVIOUS_STORAGE_KEY = "jungman-cup-preview-v1";
+const SHARED_STATE_API = "/api/jungman-cup-state";
+const KNOCKOUT_PROMOTION_DATE = "2026-09-03";
+const MATCH_TIER_OVERRIDES = new Map([
+  ["아리송이", "7"],
+  ["막내현진", "7"],
+  ["냥수디", "7"],
+  ["밍또얌", "8"],
+  ["헤요이", "8"],
+  ["진땅콩", "8"],
+  ["또아", "9"],
+  ["봄덕이", "9"]
+]);
 
 const groupGrid = document.getElementById("groupGrid");
 const matchPanel = document.getElementById("matchPanel");
@@ -21,10 +33,78 @@ const cupStatsClose = document.getElementById("cupStatsClose");
 const cupStatsSummary = document.getElementById("cupStatsSummary");
 const cupStatsRows = document.getElementById("cupStatsRows");
 const cupStatsEmpty = document.getElementById("cupStatsEmpty");
+const cupHero = document.querySelector(".cup-hero");
+const cupLayout = document.querySelector(".cup-layout");
+const knockoutBracket = document.getElementById("knockoutBracket");
+const knockoutRounds = document.getElementById("knockoutRounds");
+const knockoutStatus = document.getElementById("knockoutStatus");
 
 const authenticated = true;
 let selectedMatch = null;
 let state = readState();
+let tierRoster = [];
+let tierRosterStatus = "loading";
+let sharedVersion = 0;
+let sharedSaveTimer = null;
+let sharedSaveInFlight = false;
+
+function belongsToUniversity(player, university) {
+  return String(player?.university || "") === university ||
+    (Array.isArray(player?.universities) && player.universities.includes(university));
+}
+
+function matchTierFor(player) {
+  return MATCH_TIER_OVERRIDES.get(String(player?.name || "").trim()) || String(player?.tier || "");
+}
+
+function fixturePairings(home, away) {
+  if (tierRosterStatus === "loading") return { status: "loading", tiers: [] };
+  if (tierRosterStatus === "error") return { status: "error", tiers: [] };
+
+  const rosterFor = (university) => tierRoster.filter((player) => {
+    const tier = matchTierFor(player);
+    const eligibleTier = (player?.division === "women" && /^\d+$/.test(tier)) ||
+      (player?.division === "men" && ["갓", "킹"].includes(tier));
+    return eligibleTier && belongsToUniversity(player, university);
+  }).map((player) => ({ ...player, matchTier: matchTierFor(player) }));
+  const homePlayers = rosterFor(home);
+  const awayPlayers = rosterFor(away);
+  const tierNumbers = [...new Set(homePlayers.map((player) => player.matchTier))]
+    .filter((tier) => awayPlayers.some((player) => player.matchTier === tier))
+    .sort((a, b) => {
+      const tierOrder = { "갓": -2, "킹": -1 };
+      const aOrder = tierOrder[a] ?? Number(a);
+      const bOrder = tierOrder[b] ?? Number(b);
+      return aOrder - bOrder;
+    });
+
+  return {
+    status: "ready",
+    tiers: tierNumbers.map((tier) => {
+      const left = homePlayers.filter((player) => player.matchTier === tier);
+      const right = awayPlayers.filter((player) => player.matchTier === tier);
+      return {
+        tier,
+        pairs: left.flatMap((homePlayer) => right.map((awayPlayer) => ({
+          home: homePlayer.name,
+          away: awayPlayer.name
+        })))
+      };
+    })
+  };
+}
+
+async function loadTierRoster() {
+  try {
+    const response = await fetch("/api/tiers");
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.players)) throw new Error("선수 명단 오류");
+    tierRoster = data.players;
+    tierRosterStatus = "ready";
+  } catch {
+    tierRosterStatus = "error";
+  }
+}
 
 function emptyFixtures() {
   return Object.fromEntries(GROUPS.map((group) => [
@@ -48,8 +128,88 @@ function readState() {
   }
 }
 
-function saveState() {
+function saveLocalState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function hasSavedContent(value = state) {
+  const hasFixture = Object.values(value.fixtures || {}).some((fixtures) =>
+    Object.values(fixtures || {}).some((fixture) => fixture?.date || fixture?.home || fixture?.away)
+  );
+  const hasGame = Object.values(value.matches || {}).some((match) =>
+    Object.values(match?.games || {}).some((game) => game?.homePlayer || game?.awayPlayer || game?.mapName || game?.winner)
+  );
+  return hasFixture || hasGame;
+}
+
+async function pushSharedState() {
+  if (sharedSaveInFlight) {
+    clearTimeout(sharedSaveTimer);
+    sharedSaveTimer = setTimeout(pushSharedState, 300);
+    return false;
+  }
+  sharedSaveInFlight = true;
+  try {
+    const response = await fetch(SHARED_STATE_API, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "공용 저장 실패");
+    sharedVersion = Number(result.version || sharedVersion);
+    return true;
+  } catch (error) {
+    console.warn("중만컵 공용 저장 실패:", error.message);
+    return false;
+  } finally {
+    sharedSaveInFlight = false;
+  }
+}
+
+function saveState() {
+  saveLocalState();
+  clearTimeout(sharedSaveTimer);
+  sharedSaveTimer = setTimeout(() => {
+    sharedSaveTimer = null;
+    pushSharedState();
+  }, 250);
+}
+
+function applySharedState(sharedState, version) {
+  state = sharedState;
+  sharedVersion = Number(version || 0);
+  saveLocalState();
+  if (selectedMatch && !state.matches?.[selectedMatch]) selectedMatch = null;
+  renderGroups();
+  renderMatchPanel();
+  if (cupStatsDialog.open) renderIndividualStats();
+}
+
+async function pullSharedState(initial = false) {
+  if (!initial && (sharedSaveTimer || sharedSaveInFlight || cupAdminDialog.open || document.hidden)) return;
+  try {
+    const response = await fetch(SHARED_STATE_API, { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "공용 불러오기 실패");
+    if (!result.state) {
+      if (hasSavedContent()) await pushSharedState();
+      return;
+    }
+    if (initial || Number(result.version || 0) > sharedVersion) {
+      applySharedState(result.state, result.version);
+    }
+  } catch (error) {
+    console.warn("중만컵 공용 불러오기 실패:", error.message);
+  }
+}
+
+function startSharedSync() {
+  pullSharedState(true);
+  setInterval(() => pullSharedState(false), 3000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pullSharedState(false);
+  });
 }
 
 function escapeHtml(value) {
@@ -76,6 +236,14 @@ function formatGroupDate(value) {
 function individualStandings() {
   const players = new Map();
   let completedGames = 0;
+  // 현재 대진표에 남아 있는 경기만 집계합니다.
+  // 날짜·대학을 수정해 생긴 이전 대진의 기록은 개인성적에 섞이지 않습니다.
+  const activeMatchKeys = new Set();
+  GROUPS.forEach((group) => {
+    (state.fixtures?.[group] || []).forEach((fixture) => {
+      if (fixture?.home && fixture?.away) activeMatchKeys.add(matchKey(group, fixture.home, fixture.away));
+    });
+  });
   const addGame = (name, won) => {
     const key = String(name || "").trim();
     if (!players.has(key)) players.set(key, { name: key, wins: 0, games: 0 });
@@ -84,8 +252,12 @@ function individualStandings() {
     if (won) player.wins += 1;
   };
 
-  Object.values(state.matches || {}).forEach((match) => {
-    (match.games || []).forEach((game) => {
+  Object.entries(state.matches || {}).forEach(([key, match]) => {
+    if (!activeMatchKeys.has(key)) return;
+    const score = matchScore(match);
+    (match.games || []).forEach((game, index) => {
+      // 5승이 결정된 이후의 세트는 기록이 남아 있어도 집계하지 않습니다.
+      if (index >= score.clinchedAt) return;
       const home = String(game.homePlayer || "").trim();
       const away = String(game.awayPlayer || "").trim();
       if (!home || !away || !["home", "away"].includes(game.winner)) return;
@@ -148,8 +320,15 @@ function getMatch(group, index) {
 function renderGroups() {
   groupGrid.innerHTML = GROUPS.map((group) => {
     const groupFixtures = state.fixtures?.[group] || [];
-    const fixtures = [0, 1, 2].map((index) => {
-      const fixture = groupFixtures[index] || {};
+    const orderedFixtures = [0, 1, 2].map((index) => ({
+      index,
+      fixture: groupFixtures[index] || {}
+    })).sort((a, b) => {
+      const aDate = /^\d{4}-\d{2}-\d{2}$/.test(a.fixture.date || "") ? a.fixture.date : "9999-12-31";
+      const bDate = /^\d{4}-\d{2}-\d{2}$/.test(b.fixture.date || "") ? b.fixture.date : "9999-12-31";
+      return aDate.localeCompare(bDate) || a.index - b.index;
+    });
+    const fixtures = orderedFixtures.map(({ index, fixture }, orderIndex) => {
       const home = fixture.home || "왼쪽 대학 미정";
       const away = fixture.away || "오른쪽 대학 미정";
       const fixtureDate = formatGroupDate(fixture.date);
@@ -159,7 +338,8 @@ function renderGroups() {
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time>' + escapeHtml(fixtureDate) +
+        '<span class="fixture-vs"><b>' + (orderIndex + 1) + '경기 · VS</b><time tabindex="0" data-pairing-home="' +
+          escapeHtml(fixture.home) + '" data-pairing-away="' + escapeHtml(fixture.away) + '">' + escapeHtml(fixtureDate) +
           '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
@@ -175,6 +355,7 @@ function renderGroups() {
       "</article>"
     ].join("");
   }).join("");
+  renderKnockoutBracket();
 }
 
 function matchScore(match) {
@@ -188,6 +369,128 @@ function matchScore(match) {
     if (home === 5 || away === 5) clinchedAt = index + 1;
   });
   return { home, away, clinchedAt };
+}
+
+function completedFixtureResult(group, fixture) {
+  if (!fixture?.home || !fixture?.away) return null;
+  const match = state.matches?.[matchKey(group, fixture.home, fixture.away)];
+  if (!match || !Array.isArray(match.games)) return null;
+  const score = matchScore(match);
+  if (score.home !== 5 && score.away !== 5) return null;
+  return {
+    home: fixture.home,
+    away: fixture.away,
+    homeScore: score.home,
+    awayScore: score.away
+  };
+}
+
+function groupUniversityStandings(group) {
+  const fixtures = (state.fixtures?.[group] || []).filter((fixture) => fixture?.home && fixture?.away);
+  const results = fixtures.map((fixture) => completedFixtureResult(group, fixture));
+  const complete = fixtures.length === 3 && results.every(Boolean);
+  const universities = new Map();
+  const rowFor = (name) => {
+    if (!universities.has(name)) {
+      universities.set(name, { name, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0 });
+    }
+    return universities.get(name);
+  };
+
+  results.filter(Boolean).forEach((result) => {
+    const home = rowFor(result.home);
+    const away = rowFor(result.away);
+    home.setsFor += result.homeScore;
+    home.setsAgainst += result.awayScore;
+    away.setsFor += result.awayScore;
+    away.setsAgainst += result.homeScore;
+    if (result.homeScore > result.awayScore) {
+      home.wins += 1;
+      away.losses += 1;
+    } else {
+      away.wins += 1;
+      home.losses += 1;
+    }
+  });
+
+  const rows = [...universities.values()].sort((a, b) =>
+    b.wins - a.wins ||
+    (b.setsFor - b.setsAgainst) - (a.setsFor - a.setsAgainst) ||
+    b.setsFor - a.setsFor ||
+    a.name.localeCompare(b.name, "ko")
+  );
+  return { complete, rows };
+}
+
+function groupStageComplete() {
+  return GROUPS.every((group) => groupUniversityStandings(group).complete);
+}
+
+function qualifiedTeam(group, rank) {
+  const standings = groupUniversityStandings(group);
+  return standings.complete && standings.rows[rank - 1]
+    ? standings.rows[rank - 1].name
+    : group + "조 " + rank + "위";
+}
+
+function knockoutMatch(number, home, away) {
+  return [
+    '<article class="knockout-match">',
+    '<span class="knockout-match-number">' + number + '경기</span>',
+    '<strong class="knockout-team">' + escapeHtml(home) + '</strong>',
+    '<b class="knockout-vs">VS</b>',
+    '<strong class="knockout-team">' + escapeHtml(away) + '</strong>',
+    '</article>'
+  ].join("");
+}
+
+function knockoutRound(label, title, dateText, matches, className) {
+  return [
+    '<section class="knockout-round ' + className + '">',
+    '<header><span>' + label + '</span><strong>' + title + '</strong><time>' + dateText + '</time></header>',
+    '<div class="knockout-match-list">' + matches.join("") + '</div>',
+    '</section>'
+  ].join("");
+}
+
+function knockoutArrow() {
+  return '<div class="round-arrow" aria-hidden="true"><span class="arrow-wide">→</span>' +
+    '<span class="arrow-narrow">↓</span><small>승자 진출</small></div>';
+}
+
+function renderKnockoutBracket() {
+  if (!knockoutBracket || !knockoutRounds) return;
+  const quarterfinals = [
+    knockoutMatch(1, qualifiedTeam("A", 1), qualifiedTeam("B", 2)),
+    knockoutMatch(2, qualifiedTeam("B", 1), qualifiedTeam("A", 2)),
+    knockoutMatch(3, qualifiedTeam("C", 1), qualifiedTeam("D", 2)),
+    knockoutMatch(4, qualifiedTeam("D", 1), qualifiedTeam("C", 2))
+  ];
+  const semifinals = [
+    knockoutMatch(1, "8강 1경기 승자", "8강 2경기 승자"),
+    knockoutMatch(2, "8강 3경기 승자", "8강 4경기 승자")
+  ];
+  const finalMatch = [knockoutMatch(1, "4강 1경기 승자", "4강 2경기 승자")];
+  knockoutRounds.innerHTML = [
+    knockoutRound("QUARTERFINAL", "8강", "9월 3일부터", quarterfinals, "quarterfinal-round"),
+    knockoutArrow(),
+    knockoutRound("SEMIFINAL", "4강", "9월 12일부터", semifinals, "semifinal-round"),
+    knockoutArrow(),
+    knockoutRound("FINAL", "결승", "9월 19일", finalMatch, "final-round")
+  ].join("");
+
+  const qualifiersFinished = groupStageComplete();
+  const promoted = qualifiersFinished || localDateKey() >= KNOCKOUT_PROMOTION_DATE;
+  knockoutBracket.classList.toggle("is-promoted", promoted);
+  if (promoted) {
+    cupHero.after(knockoutBracket);
+    knockoutStatus.textContent = qualifiersFinished
+      ? "조별리그 최종 순위를 반영한 본선 대진표입니다."
+      : "본선 일정이 시작되어 대진표를 화면 위에 표시합니다.";
+  } else {
+    cupLayout.after(knockoutBracket);
+    knockoutStatus.textContent = "조별리그가 끝나면 본선 대진표가 화면 맨 위로 이동합니다.";
+  }
 }
 
 function renderMatchPanel() {
@@ -281,6 +584,60 @@ function renderGroupEditor() {
   }).join("");
 }
 
+const pairingTooltip = document.createElement("div");
+pairingTooltip.className = "fixture-pairing-tooltip";
+pairingTooltip.hidden = true;
+pairingTooltip.setAttribute("role", "tooltip");
+document.body.appendChild(pairingTooltip);
+
+function showPairingTooltip(target) {
+  const home = target.dataset.pairingHome || "";
+  const away = target.dataset.pairingAway || "";
+  if (!home || !away) return;
+  const result = fixturePairings(home, away);
+  let content = '<strong>' + escapeHtml(home) + ' <i>VS</i> ' + escapeHtml(away) + '</strong>';
+  if (result.status === "loading") {
+    content += '<p>티어별 선수 대진을 불러오는 중입니다.</p>';
+  } else if (result.status === "error") {
+    content += '<p>선수 명단을 불러오지 못했습니다.</p>';
+  } else if (!result.tiers.length) {
+    content += '<p>같은 티어의 선수 대진이 없습니다.</p>';
+  } else {
+    content += result.tiers.map((tier) => '<section><b>' + escapeHtml(tier.tier) + '티어</b>' +
+      tier.pairs.map((pair) => '<span>' + escapeHtml(pair.home) + ' <i>vs</i> ' + escapeHtml(pair.away) + '</span>').join("") +
+      '</section>').join("");
+  }
+  pairingTooltip.innerHTML = content;
+  pairingTooltip.hidden = false;
+  const targetRect = target.getBoundingClientRect();
+  const tooltipRect = pairingTooltip.getBoundingClientRect();
+  const left = Math.max(12, Math.min(window.innerWidth - tooltipRect.width - 12,
+    targetRect.left + (targetRect.width - tooltipRect.width) / 2));
+  const below = targetRect.bottom + 10;
+  const top = below + tooltipRect.height <= window.innerHeight - 12
+    ? below
+    : Math.max(82, targetRect.top - tooltipRect.height - 10);
+  pairingTooltip.style.left = left + "px";
+  pairingTooltip.style.top = top + "px";
+}
+
+function hidePairingTooltip() {
+  pairingTooltip.hidden = true;
+}
+
+groupGrid.addEventListener("mouseover", (event) => {
+  const date = event.target.closest("[data-pairing-home][data-pairing-away]");
+  if (date) showPairingTooltip(date);
+});
+groupGrid.addEventListener("mouseout", (event) => {
+  if (event.target.closest("[data-pairing-home][data-pairing-away]")) hidePairingTooltip();
+});
+groupGrid.addEventListener("focusin", (event) => {
+  const date = event.target.closest("[data-pairing-home][data-pairing-away]");
+  if (date) showPairingTooltip(date);
+});
+groupGrid.addEventListener("focusout", hidePairingTooltip);
+
 groupGrid.addEventListener("click", (event) => {
   const button = event.target.closest("[data-group][data-fixture]");
   if (!button) return;
@@ -333,7 +690,7 @@ groupEditor.addEventListener("change", (event) => {
   state.fixtures[field.dataset.group][Number(field.dataset.index)][field.dataset.fixtureField] = field.value;
 });
 
-cupAdminSave.addEventListener("click", () => {
+cupAdminSave.addEventListener("click", async () => {
   const entries = GROUPS.flatMap((group) => (state.fixtures[group] || []).map((fixture, index) => ({
     group,
     index,
@@ -357,11 +714,21 @@ cupAdminSave.addEventListener("click", () => {
     cupAdminStatus.textContent = sameUniversity.group + "조 " + (sameUniversity.index + 1) + "경기는 서로 다른 대학을 선택해 주세요.";
     return;
   }
-  saveState();
+  saveLocalState();
+  clearTimeout(sharedSaveTimer);
+  sharedSaveTimer = null;
+  cupAdminSave.disabled = true;
+  cupAdminStatus.textContent = "공용 서버에 저장하고 있습니다...";
+  const sharedSaved = await pushSharedState();
+  cupAdminSave.disabled = false;
+  if (!sharedSaved) {
+    cupAdminStatus.textContent = "공용 서버에 저장하지 못했습니다. 잠시 후 저장을 다시 눌러 주세요.";
+    return;
+  }
   selectedMatch = null;
   renderGroups();
   renderMatchPanel();
-  cupAdminStatus.textContent = completed.length + "개 대전을 저장하고 화면에 반영했습니다.";
+  cupAdminStatus.textContent = completed.length + "개 대전을 공용 서버에 저장했습니다.";
   cupAdminDialog.close();
 });
 
@@ -377,3 +744,5 @@ cupAdminReset.addEventListener("click", () => {
 
 renderGroups();
 renderMatchPanel();
+loadTierRoster();
+startSharedSync();
