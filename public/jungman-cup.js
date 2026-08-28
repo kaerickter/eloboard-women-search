@@ -346,7 +346,18 @@ function renderPlayoffEditor() {
 }
 
 function renderPlayoffs() {
-  knockoutGrid.innerHTML = PLAYOFFS.map((stage) => {
+  const stageCompleted = (stage) => (state.playoffs?.[stage.key] || []).every((fixture, index) => {
+    const result = getPlayoffMatch(stage.key, index);
+    if (!fixture.home || !fixture.away || !result) return false;
+    const score = matchScore(result.match);
+    return score.home === 5 || score.away === 5;
+  });
+  const activeIndex = PLAYOFFS.findIndex((stage) => !stageCompleted(stage));
+  const orderedStages = activeIndex < 0
+    ? PLAYOFFS
+    : PLAYOFFS.slice(activeIndex).concat(PLAYOFFS.slice(0, activeIndex));
+
+  knockoutGrid.innerHTML = orderedStages.map((stage) => {
     const fixtures = (state.playoffs?.[stage.key] || []).map((fixture, index) => {
       const home = fixture.home || "왼쪽 대학 미정";
       const away = fixture.away || "오른쪽 대학 미정";

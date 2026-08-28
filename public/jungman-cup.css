@@ -201,6 +201,7 @@ select {
 }
 
 .knockout-section { margin-top: 42px; }
+.knockout-section-top { margin-top: 0; margin-bottom: 42px; }
 .knockout-heading { margin-bottom: 16px; }
 .knockout-grid { display: grid; gap: 18px; }
 .knockout-card { overflow: hidden; border: 1px solid var(--cup-line); border-radius: 8px; background: var(--cup-cream); box-shadow: 0 16px 38px rgba(23, 33, 58, .07); }

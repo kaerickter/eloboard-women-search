@@ -56,6 +56,13 @@
 
       <div class="cup-layout">
         <section>
+          <section class="knockout-section knockout-section-top" aria-labelledby="knockoutTitle">
+            <div class="section-heading knockout-heading">
+              <div><span>PLAYOFFS</span><h2 id="knockoutTitle">8강 · 4강 · 결승 대진표</h2></div>
+              <p>현재 진행 중인 단계가 가장 위에 표시됩니다.</p>
+            </div>
+            <div id="knockoutGrid" class="knockout-grid" aria-live="polite"></div>
+          </section>
           <div class="section-heading">
             <div>
               <span>QUALIFIERS</span>
@@ -64,13 +71,6 @@
             <p>대학 이름을 누르면 해당 경기 결과표가 열립니다.</p>
           </div>
           <div id="groupGrid" class="group-grid" aria-live="polite"></div>
-          <section class="knockout-section" aria-labelledby="knockoutTitle">
-            <div class="section-heading knockout-heading">
-              <div><span>PLAYOFFS</span><h2 id="knockoutTitle">8강 · 4강 · 결승 대진표</h2></div>
-              <p>각 경기를 조별 대진표처럼 직접 등록할 수 있습니다.</p>
-            </div>
-            <div id="knockoutGrid" class="knockout-grid" aria-live="polite"></div>
-          </section>
         </section>
 
         <aside id="matchPanel" class="match-panel" aria-live="polite"></aside>
