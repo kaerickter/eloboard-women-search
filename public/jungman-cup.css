@@ -28,68 +28,6 @@ select {
   padding: 42px 0 70px;
 }
 
-/* K-중만컵 전용 배치: 공통 메뉴 스타일에는 영향을 주지 않는다. */
-@media (min-width: 901px) {
-  body.jungman-cup-page .cup-shell {
-    width: min(1760px, calc(100% - 48px)) !important;
-    margin-right: auto !important;
-    margin-left: auto !important;
-    padding-top: 0 !important;
-    background: #f7f7fb !important;
-  }
-
-  body.jungman-cup-page .cup-hero {
-    box-sizing: border-box !important;
-    width: 142.8571dvw !important;
-    height: 137px !important;
-    min-height: 137px !important;
-    max-height: 137px !important;
-    margin-left: calc(50% - 71.4286dvw) !important;
-    padding: 20px calc(28.5714vw - 64.2857px) !important;
-    align-items: center !important;
-    overflow: hidden !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    color: #fff !important;
-    background:
-      radial-gradient(circle at 87% -40%, transparent 0 105px, rgba(157, 150, 255, 0.09) 106px 145px, transparent 146px),
-      radial-gradient(circle at 87% -40%, transparent 0 165px, rgba(157, 150, 255, 0.07) 166px 210px, transparent 211px),
-      linear-gradient(115deg, #1a1929 2%, #20203a 48%, #242080 100%) !important;
-    box-shadow: none !important;
-  }
-
-  body.jungman-cup-page .cup-hero h1 {
-    color: #fff !important;
-    font-size: clamp(22px, 2.4vw, 30px) !important;
-    line-height: 1.05 !important;
-    letter-spacing: -0.9px !important;
-  }
-
-  body.jungman-cup-page .cup-eyebrow {
-    margin-bottom: 6px !important;
-    color: #aaa5ff !important;
-    font-size: 11px !important;
-    letter-spacing: 1.7px !important;
-  }
-
-  body.jungman-cup-page .cup-hero p:last-child {
-    margin-top: 7px !important;
-    color: #bbb8d0 !important;
-    font-size: 13px !important;
-    line-height: 1.4 !important;
-  }
-
-  body.jungman-cup-page .cup-rule-card {
-    min-width: 230px !important;
-    padding: 7px 14px !important;
-    gap: 2px !important;
-  }
-
-  body.jungman-cup-page .cup-rule-card strong { font-size: 16px !important; }
-  body.jungman-cup-page .cup-rule-card span { font-size: 10px !important; }
-  body.jungman-cup-page .cup-rule-card em { font-size: 11px !important; }
-}
-
 .cup-hero {
   min-height: 245px;
   padding: 42px 46px;
@@ -262,6 +200,15 @@ select {
   gap: 18px;
 }
 
+.knockout-section { margin-top: 42px; }
+.knockout-heading { margin-bottom: 16px; }
+.knockout-grid { display: grid; gap: 18px; }
+.knockout-card { overflow: hidden; border: 1px solid var(--cup-line); border-radius: 8px; background: var(--cup-cream); box-shadow: 0 16px 38px rgba(23, 33, 58, .07); }
+.knockout-card header { padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--cup-line); background: #f7f8e9; }
+.knockout-card header strong { color: var(--cup-navy); font-size: 22px; }
+.knockout-card header span { color: var(--cup-green); font-size: 12px; font-weight: 900; }
+.knockout-fixtures { padding: 10px 16px 16px; display: grid; gap: 8px; }
+
 .group-card {
   overflow: hidden;
   border: 1px solid var(--cup-line);
@@ -399,80 +346,10 @@ select {
 .fixture-vs time {
   margin-top: 5px;
   color: var(--cup-navy);
-  cursor: help;
   font-size: 18px;
   font-weight: 950;
   line-height: 1.15;
   letter-spacing: -0.02em;
-}
-
-.fixture-pairing-tooltip {
-  position: fixed;
-  z-index: 1200;
-  width: min(980px, calc(100vw - 24px));
-  max-height: none;
-  padding: 14px 18px;
-  overflow: visible;
-  border: 2px solid #c9d438;
-  border-radius: 10px;
-  color: var(--cup-navy);
-  background: #fffef7;
-  box-shadow: 0 18px 48px rgba(23, 33, 58, .24);
-  text-align: left;
-  pointer-events: none;
-}
-
-.fixture-pairing-tooltip[hidden] { display: none; }
-
-.fixture-pairing-tooltip > strong {
-  display: block;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--cup-line);
-  font-size: 22px;
-  line-height: 1.15;
-}
-
-.fixture-pairing-tooltip i {
-  color: var(--cup-red);
-  font-style: normal;
-  font-weight: 950;
-}
-
-.fixture-pairing-tooltip p {
-  margin: 7px 0 0;
-  color: var(--cup-muted);
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.fixture-pairing-tooltip section {
-  display: flex;
-  align-items: baseline;
-  gap: 2px 12px;
-  min-height: 30px;
-  padding-top: 8px;
-  flex-wrap: wrap;
-}
-
-.fixture-pairing-tooltip section > b {
-  flex: 0 0 68px;
-  color: #68710b;
-  font-size: 17px;
-  line-height: 1.2;
-}
-
-.fixture-pairing-tooltip section > span {
-  display: inline-block;
-  font-size: 18px;
-  font-weight: 850;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.fixture-pairing-tooltip section > span + span::before {
-  margin-right: 10px;
-  color: #a3a79f;
-  content: "·";
 }
 
 .today-badge {
@@ -825,6 +702,9 @@ select {
   gap: 14px;
 }
 
+.playoff-editor { margin-top: 20px; display: grid; gap: 14px; }
+.playoff-editor::before { content: "8강 · 4강 · 결승 등록"; color: var(--cup-navy); font-size: 17px; font-weight: 950; }
+
 .group-edit-card {
   padding: 16px;
   border: 1px solid var(--cup-line);
@@ -1113,176 +993,5 @@ select {
 
   .player-entry input {
     font-size: 14px;
-  }
-}
-
-.knockout-bracket {
-  margin-top: 34px;
-  padding: 28px;
-  border: 1px solid var(--cup-line);
-  border-radius: 24px;
-  background: linear-gradient(145deg, #ffffff 0%, #f7f8f2 100%);
-  box-shadow: 0 16px 42px rgba(23, 33, 58, 0.09);
-}
-
-.knockout-bracket.is-promoted {
-  margin: 26px 0 30px;
-  border-color: rgba(181, 214, 40, 0.78);
-  box-shadow: 0 18px 48px rgba(23, 33, 58, 0.13), 0 0 0 4px rgba(181, 214, 40, 0.12);
-}
-
-.knockout-heading {
-  margin-bottom: 22px;
-}
-
-.knockout-rounds {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) 66px minmax(0, 1fr) 66px minmax(0, 0.9fr);
-  align-items: center;
-  gap: 10px;
-}
-
-.knockout-round {
-  overflow: hidden;
-  border: 1px solid #dfe4d5;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(23, 33, 58, 0.07);
-}
-
-.knockout-round > header {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: end;
-  gap: 2px 10px;
-  padding: 16px 18px;
-  color: #fff;
-  background: var(--cup-navy);
-}
-
-.knockout-round > header span {
-  grid-column: 1 / -1;
-  color: var(--cup-lime);
-  font-size: 11px;
-  font-weight: 950;
-  letter-spacing: 0.12em;
-}
-
-.knockout-round > header strong {
-  font-size: 25px;
-  line-height: 1;
-}
-
-.knockout-round > header time {
-  color: #fff;
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.knockout-match-list {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-}
-
-.knockout-match {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
-  align-items: center;
-  min-height: 74px;
-  padding: 19px 10px 10px;
-  border: 1px solid #e2e6da;
-  border-radius: 12px;
-  background: #fbfcf8;
-}
-
-.knockout-match-number {
-  position: absolute;
-  top: 6px;
-  left: 10px;
-  color: var(--cup-green);
-  font-size: 10px;
-  font-weight: 950;
-}
-
-.knockout-team {
-  min-width: 0;
-  color: var(--cup-navy);
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1.25;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-
-.knockout-vs {
-  color: var(--cup-green);
-  font-size: 11px;
-  text-align: center;
-}
-
-.round-arrow {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  justify-content: center;
-  color: var(--cup-green);
-  text-align: center;
-}
-
-.round-arrow span {
-  font-size: 48px;
-  font-weight: 900;
-  line-height: 0.9;
-}
-
-.round-arrow small {
-  margin-top: 8px;
-  color: var(--cup-muted);
-  font-size: 10px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.arrow-narrow {
-  display: none;
-}
-
-@media (max-width: 1050px) {
-  .knockout-rounds {
-    grid-template-columns: 1fr;
-  }
-
-  .round-arrow {
-    min-height: 54px;
-  }
-
-  .arrow-wide {
-    display: none;
-  }
-
-  .round-arrow .arrow-narrow {
-    display: inline;
-    font-size: 36px;
-  }
-
-  .round-arrow small {
-    margin-top: 1px;
-  }
-}
-
-@media (max-width: 760px) {
-  .knockout-bracket {
-    padding: 20px 14px;
-    border-radius: 18px;
-  }
-
-  .knockout-round > header strong {
-    font-size: 23px;
-  }
-
-  .knockout-match {
-    min-height: 70px;
   }
 }
