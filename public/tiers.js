@@ -150,14 +150,25 @@ function formatViewers(value) {
   return new Intl.NumberFormat("ko-KR").format(Number(value || 0)) + "명 시청";
 }
 
+function soopProfileUrl(player) {
+  const directId = String(player?.broadcastId || "").trim();
+  const urlId = String(player?.broadcastUrl || "").match(/play\.sooplive\.co\.kr\/([a-z0-9_-]+)/i)?.[1] || "";
+  const broadcastId = /^[a-z0-9_-]{2,40}$/i.test(directId) ? directId : urlId;
+  if (!/^[a-z0-9_-]{2,40}$/i.test(broadcastId)) return "";
+  const folder = broadcastId.slice(0, 2).toLowerCase();
+  return "https://profile.img.sooplive.co.kr/LOGO/" +
+    encodeURIComponent(folder) + "/" + encodeURIComponent(broadcastId) + "/" + encodeURIComponent(broadcastId) + ".jpg";
+}
+
 function avatar(player) {
   const initial = Array.from(player.name || "?")[0] || "?";
   const fallbackUrl = photoUrl(player.image);
+  const directSoopProfile = soopProfileUrl(player);
   const isIakkang = keyOf(player.name) === "이아깽";
   const broadcastProfileUrl = "https://profile.img.sooplive.co.kr/LOGO/2a/2ahgo1203/2ahgo1203.jpg";
   const staticUrl = isIakkang
     ? broadcastProfileUrl
-    : (photoUrl(player.tierStaticImage) || fallbackUrl);
+    : (photoUrl(player.tierStaticImage) || directSoopProfile || fallbackUrl);
   const animatedUrl = isIakkang ? "" : photoUrl(player.tierAnimatedImage);
   const image = staticUrl
     ? '<img class="player-photo" src="' + escapeHtml(staticUrl) + '" alt="" loading="lazy" decoding="async" fetchpriority="low"' +
