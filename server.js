@@ -3599,11 +3599,15 @@ const server = http.createServer(async (req, res) => {
     if (!requestIsSameOrigin(req)) return send(res, 403, JSON.stringify({ error: "같은 사이트 화면에서만 전적을 가져올 수 있습니다." }), "application/json; charset=utf-8");
     try {
       tierAdmin.assertWritableStorage();
-      const current = await loadIakkangRecordState();
-      if (!current?.matches?.some((item) => item.source === "ssustar")) return send(res, 409, JSON.stringify({ error: "먼저 수술대 전체 전적을 최초 저장해 주세요." }), "application/json; charset=utf-8");
+      // 최초 저장본을 불러오지 못한 상태여도 새 시트 전적은 바로 추가할 수 있어야 합니다.
+      // 서버 재시작·저장소 복구 뒤에도 버튼이 막히지 않도록 빈 상태로 시작합니다.
+      const current = await loadIakkangRecordState() || { matches: [], ssuImportedAt: "", sheetImportedAt: "" };
       const response = await fetchWithRetry(IAKKANG_SHEET_CSV_URL, { headers: { "Accept": "text/csv" } }, 1);
       if (!response.ok) throw new Error("구글시트 전적 요청 오류: " + response.status);
       const candidates = parseIakkangSheetRows(await response.text());
+      if (!candidates.length) {
+        throw new Error("구글시트에서 이아깽 전적 행을 찾지 못했습니다. 시트 공개 상태와 날짜·승자·패자 열 제목을 확인해 주세요.");
+      }
       const known = new Set(current.matches.map(iakkangMatchKey));
       const added = candidates.filter((row) => {
         const key = iakkangMatchKey(row);
