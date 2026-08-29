@@ -174,7 +174,8 @@ function avatar(player) {
     ? '<img class="player-photo" src="' + escapeHtml(staticUrl) + '" alt="" loading="lazy" decoding="async" fetchpriority="low"' +
       ' data-static-src="' + escapeHtml(staticUrl) + '"' +
       ' data-animated-src="' + escapeHtml(animatedUrl) + '"' +
-      ' data-fallback-src="' + escapeHtml(fallbackUrl) + '">'
+      ' data-soop-src="' + escapeHtml(directSoopProfile) + '"' +
+      ' data-fallback-src="' + escapeHtml(fallbackUrl) + '">' 
     : "";
   return '<span class="player-avatar">' + escapeHtml(initial) + image + "</span>";
 }
@@ -789,10 +790,16 @@ function bindCards() {
     image.addEventListener("error", () => {
       const failedSource = image.currentSrc || image.src;
       const animatedSource = image.dataset.animatedSrc || "";
+      const soopSource = image.dataset.soopSrc || "";
       const fallbackSource = image.dataset.fallbackSrc || "";
       if (animatedSource && failedSource === animatedSource) {
         image.dataset.animatedSrc = "";
         image.src = image.dataset.staticSrc || fallbackSource;
+        return;
+      }
+      if (soopSource && failedSource !== soopSource) {
+        image.dataset.staticSrc = soopSource;
+        image.src = soopSource;
         return;
       }
       if (fallbackSource && failedSource !== fallbackSource) {
