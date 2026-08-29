@@ -1225,6 +1225,29 @@ function parseIakkangSheetRows(csv) {
   const rows = [];
   for (const item of parseCsvRows(csv)) {
     const date = String(item["날짜"] || "").match(/^\d{4}-\d{2}-\d{2}/)?.[0] || "";
+    // 현재 시트 형식: 날짜, 상대, 맵, ELO, 경기방식, 메모
+    // ELO의 부호가 이아깽의 승패를 그대로 나타냅니다.
+    const directOpponent = csvPlayer(item["상대"]);
+    const directEloText = String(item["ELO"] || "").replace(/[^0-9.+-]/g, "");
+    const directElo = Number(directEloText);
+    if (date && directOpponent.name && Number.isFinite(directElo)) {
+      rows.push({
+        date,
+        opponent: directOpponent.name,
+        opponentRace: directOpponent.race,
+        opponentId: "",
+        opponentUrl: "",
+        map: String(item["맵"] || "").trim(),
+        elo: directElo,
+        eloText: (directElo >= 0 ? "+" : "-") + Math.abs(directElo).toFixed(1),
+        format: String(item["경기방식"] || "").trim(),
+        memo: String(item["메모"] || "").trim(),
+        url: "sheet:" + [date, directOpponent.name, item["맵"], item["경기방식"], item["메모"], directEloText].join("|"),
+        source: "sheet"
+      });
+      continue;
+    }
+    // 이전 시트 형식(승자·패자)도 계속 지원합니다.
     const winner = csvPlayer(item["승자"]);
     const loser = csvPlayer(item["패자"]);
     const iakkangWon = normalizeName(winner.name) === normalizeName("이아깽");
