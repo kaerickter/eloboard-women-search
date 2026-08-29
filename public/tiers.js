@@ -160,6 +160,33 @@ function soopProfileUrl(player) {
     encodeURIComponent(folder) + "/" + encodeURIComponent(broadcastId) + "/" + encodeURIComponent(broadcastId) + ".jpg";
 }
 
+// 이미지가 브라우저 캐시에서 즉시 실패해도 대체 사진을 시도할 수 있도록
+// img 태그의 onerror와 렌더 후 이벤트에서 공통으로 사용합니다.
+function retryPlayerPhoto(image) {
+  if (!image || image.dataset.photoRetrying === "done") return;
+  const failedSource = image.currentSrc || image.src;
+  const animatedSource = image.dataset.animatedSrc || "";
+  const soopSource = image.dataset.soopSrc || "";
+  const fallbackSource = image.dataset.fallbackSrc || "";
+  if (animatedSource && failedSource === animatedSource) {
+    image.dataset.animatedSrc = "";
+    image.src = image.dataset.staticSrc || soopSource || fallbackSource;
+    return;
+  }
+  if (soopSource && failedSource !== soopSource) {
+    image.dataset.staticSrc = soopSource;
+    image.src = soopSource;
+    return;
+  }
+  if (fallbackSource && failedSource !== fallbackSource) {
+    image.dataset.staticSrc = fallbackSource;
+    image.src = fallbackSource;
+    return;
+  }
+  image.dataset.photoRetrying = "done";
+  image.hidden = true;
+}
+
 function avatar(player) {
   const initial = Array.from(player.name || "?")[0] || "?";
   const fallbackUrl = photoUrl(player.image);
@@ -171,7 +198,7 @@ function avatar(player) {
     : (photoUrl(player.tierStaticImage) || directSoopProfile || fallbackUrl);
   const animatedUrl = isIakkang ? "" : photoUrl(player.tierAnimatedImage);
   const image = staticUrl
-    ? '<img class="player-photo" src="' + escapeHtml(staticUrl) + '" alt="" loading="lazy" decoding="async" fetchpriority="low"' +
+    ? '<img class="player-photo" src="' + escapeHtml(staticUrl) + '" alt="" loading="lazy" decoding="async" fetchpriority="low" onerror="retryPlayerPhoto(this)"' +
       ' data-static-src="' + escapeHtml(staticUrl) + '"' +
       ' data-animated-src="' + escapeHtml(animatedUrl) + '"' +
       ' data-soop-src="' + escapeHtml(directSoopProfile) + '"' +
@@ -787,28 +814,7 @@ function bindCards() {
   });
 
   board.querySelectorAll(".player-photo").forEach((image) => {
-    image.addEventListener("error", () => {
-      const failedSource = image.currentSrc || image.src;
-      const animatedSource = image.dataset.animatedSrc || "";
-      const soopSource = image.dataset.soopSrc || "";
-      const fallbackSource = image.dataset.fallbackSrc || "";
-      if (animatedSource && failedSource === animatedSource) {
-        image.dataset.animatedSrc = "";
-        image.src = image.dataset.staticSrc || fallbackSource;
-        return;
-      }
-      if (soopSource && failedSource !== soopSource) {
-        image.dataset.staticSrc = soopSource;
-        image.src = soopSource;
-        return;
-      }
-      if (fallbackSource && failedSource !== fallbackSource) {
-        image.dataset.staticSrc = fallbackSource;
-        image.src = fallbackSource;
-        return;
-      }
-      image.hidden = true;
-    });
+    image.addEventListener("error", () => retryPlayerPhoto(image));
   });
 
   board.querySelectorAll(".player-card").forEach((card) => {
