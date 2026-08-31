@@ -536,33 +536,37 @@ function renderIakkangMatchupPanel(profile) {
   const panel = $("iakkangMatchupPanel");
   const input = $("iakkangOpponentInput");
   const result = $("iakkangMatchupResult");
+  const title = $("iakkangMatchupTitle");
   if (!panel || !input || !result) return;
-  const isIakkang = cleanName(profile?.name) === cleanName(DEFAULT_NAME);
-  panel.hidden = !isIakkang;
-  if (!isIakkang) return;
-  const render = () => {
+  panel.hidden = !profile?.wrId;
+  if (!profile?.wrId) return;
+  if (title) title.textContent = profile.name + " 상대전적";
+  let requestId = 0;
+  const render = async () => {
     const query = cleanName(input.value);
     if (!query) {
-      result.innerHTML = '상대 이름을 입력하면 현재 불러온 이아깽 전적을 표시합니다.';
+      result.innerHTML = '상대 이름을 입력하면 전체전적과 최근 90일 전적을 표시합니다.';
       return;
     }
-    const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - 3);
-    cutoff.setHours(0, 0, 0, 0);
-    const rows = (profile.matches || []).filter((match) => {
-      const matchDate = new Date(String(match.date || "") + "T00:00:00");
-      return matchDate >= cutoff && cleanName(match.opponent).includes(query);
-    });
-    const wins = rows.filter((match) => Number(match.elo) > 0).length;
-    const losses = rows.filter((match) => Number(match.elo) < 0).length;
-    const rate = rows.length ? Math.round((wins / rows.length) * 1000) / 10 : 0;
-    if (!rows.length) {
-      result.innerHTML = '<div class="empty">최근 3개월 저장 전적에서 해당 상대를 찾지 못했습니다.</div>';
-      return;
+    const currentRequest = ++requestId;
+    result.innerHTML = '상대전적을 불러오는 중입니다.';
+    try {
+      const payload = await requestJson('/api/player-rival?player_id=' + encodeURIComponent(profile.wrId) + '&opponent=' + encodeURIComponent(input.value.trim()));
+      if (currentRequest !== requestId) return;
+      const overall = payload.overall;
+      const recent = payload.recent90 || { games: 0, wins: 0, losses: 0, rate: 0 };
+      if (!overall && !recent.games) {
+        result.innerHTML = '<div class="empty">해당 상대와의 전적을 찾지 못했습니다.</div>';
+        return;
+      }
+      const race = payload.opponentRace ? ' (' + escapeHtml(payload.opponentRace) + ')' : '';
+      const recordText = (record) => record ? record.games + '전 ' + record.wins + '승 ' + record.losses + '패 · ' + record.rate + '%' : '데이터 부족';
+      result.innerHTML = '<div class="iakkang-matchup-summary"><strong>' + escapeHtml(payload.opponentName) + race + '</strong></div>' +
+        '<div class="matchup-record-pairs"><div><span>전체전적</span><b>' + recordText(overall) + '</b></div><div><span>최근 90일</span><b>' + recordText(recent) + '</b></div></div>' +
+        (payload.recentMatches?.length ? '<div class="iakkang-matchup-list">' + payload.recentMatches.map((match) => { const matchResult = match.result || (Number(match.elo) > 0 ? '승' : Number(match.elo) < 0 ? '패' : '무'); const resultClass = matchResult === '승' ? 'delta-plus' : matchResult === '패' ? 'delta-minus' : ''; return '<div><span>' + escapeHtml(match.date) + '</span><span class="' + resultClass + '">' + escapeHtml(matchResult) + '</span><strong>' + escapeHtml(match.map || '-') + '</strong><small>' + escapeHtml(match.format || '-') + '</small></div>'; }).join("") + '</div>' : '');
+    } catch (error) {
+      if (currentRequest === requestId) result.innerHTML = '<div class="empty">' + escapeHtml(error.message || '상대전적을 불러오지 못했습니다.') + '</div>';
     }
-    const race = rows.find((match) => match.opponentRace)?.opponentRace || "";
-    result.innerHTML = '<div class="iakkang-matchup-summary"><strong>' + escapeHtml(rows[0].opponent) + (race ? ' (' + escapeHtml(race) + ')' : '') + '</strong><b>' + rows.length + '전 ' + wins + '승 ' + losses + '패 · ' + rate + '%</b></div>' +
-      '<div class="iakkang-matchup-list">' + rows.slice(0, 30).map((match) => '<div><span>' + escapeHtml(match.date) + '</span><span class="' + (Number(match.elo) > 0 ? 'delta-plus' : 'delta-minus') + '">' + (Number(match.elo) > 0 ? '승' : '패') + '</span><strong>' + escapeHtml(match.map || '-') + '</strong><small>' + escapeHtml(match.format || '-') + '</small></div>').join("") + '</div>';
   };
   input.value = "";
   input.oninput = render;
