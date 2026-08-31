@@ -841,7 +841,9 @@ function apiRecord(wins, losses, games) {
 
 function apiImageUrl(value) {
   const path = String(value || "").trim();
-  return path ? new URL(path, "https://eloboard.com/").href : "";
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return new URL("static/" + path.replace(/^\/+/, ""), "https://eloboard.com/").href;
 }
 
 async function fetchEloApi(path, params = {}) {
@@ -3748,6 +3750,45 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, imported: added.length, checked: candidates.length, total: saved.matches.length, message: added.length ? added.length + "건의 새 전적을 추가했습니다." : "새로 추가할 이아깽 전적이 없습니다." }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, error.statusCode || 502, JSON.stringify({ error: error.message || "구글시트 전적을 가져오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/player-rival" && req.method === "GET") {
+    try {
+      const playerId = String(url.searchParams.get("player_id") || "").trim();
+      const opponentQuery = String(url.searchParams.get("opponent") || "").trim();
+      if (!/^\d+$/.test(playerId) || !opponentQuery || opponentQuery.length > 40) {
+        return send(res, 400, JSON.stringify({ error: "선수와 상대 이름을 확인해 주세요." }), "application/json; charset=utf-8");
+      }
+      const profile = await loadApiProfile(playerId);
+      const rivals = await fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals", { q: opponentQuery });
+      const queryKey = normalizeName(opponentQuery);
+      const rival = (Array.isArray(rivals) ? rivals : []).find((item) => normalizeName(item.name) === queryKey)
+        || (Array.isArray(rivals) ? rivals : []).find((item) => normalizeName(item.name).includes(queryKey))
+        || null;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 90);
+      cutoff.setHours(0, 0, 0, 0);
+      const rows = (profile.matches || []).filter((match) => normalizeName(match.opponent).includes(queryKey));
+      const recentRows = rows.filter((match) => {
+        const playedAt = new Date(String(match.date || "") + "T00:00:00");
+        return !Number.isNaN(playedAt.getTime()) && playedAt >= cutoff;
+      });
+      const tally = (items) => {
+        const wins = items.filter((item) => Number(item.elo) > 0).length;
+        const losses = items.filter((item) => Number(item.elo) < 0).length;
+        const games = items.length;
+        return { games, wins, losses, rate: games ? Math.round((wins / games) * 1000) / 10 : 0 };
+      };
+      return send(res, 200, JSON.stringify({
+        playerName: profile.name,
+        opponentName: rival?.name || rows[0]?.opponent || opponentQuery,
+        opponentRace: rival?.race || rows.find((item) => item.opponentRace)?.opponentRace || "",
+        overall: rival ? { games: Number(rival.games || 0), wins: Number(rival.wins || 0), losses: Number(rival.losses || 0), rate: Number(rival.win_rate || 0) } : null,
+        recent90: tally(recentRows),
+        recentMatches: recentRows.slice(0, 30)
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "상대전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/data") {
