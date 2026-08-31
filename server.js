@@ -865,7 +865,12 @@ function apiMatchRows(matches, playerId) {
     const opponent = participants.find((item) => String(item.player_id) !== String(playerId)) || {};
     const won = mine?.result === "win";
     const lost = mine?.result === "loss";
-    const delta = Number(match.elo_delta);
+    // 새 API에서는 elo_delta가 없는 경기가 있습니다. Number(null)은 0이므로
+    // 그대로 쓰면 실제 승·패가 스폰일지에서 "미정"으로 저장됩니다.
+    const hasDelta = match.elo_delta !== null
+      && match.elo_delta !== undefined
+      && String(match.elo_delta).trim() !== "";
+    const delta = hasDelta ? Number(match.elo_delta) : Number.NaN;
     const elo = Number.isFinite(delta) ? (won ? Math.abs(delta) : lost ? -Math.abs(delta) : 0) : (won ? 1 : lost ? -1 : 0);
     return {
       date: String(match.played_on || ""), opponent: String(opponent.name || "상대 미상"),

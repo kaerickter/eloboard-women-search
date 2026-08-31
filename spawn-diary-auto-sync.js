@@ -62,6 +62,12 @@ function resultFromElo(value) {
   return "미정";
 }
 
+function resultFromMatch(match) {
+  const result = clean(match?.result, 10);
+  if (["승", "패", "무"].includes(result)) return result;
+  return resultFromElo(match?.elo);
+}
+
 function sourceKeyForMatch(playerName, match) {
   const opponent = opponentIdentity(match?.opponent).name;
   const identity = [
@@ -112,7 +118,7 @@ function candidateFromMatch(playerName, match, roster) {
     tier: tierSnapshot(opponentProfile),
     opponentRace: raceLabel(opponentProfile?.race) || raceLabel(matchRace) || raceLabel(opponentInfo.race) || null,
     mapName: clean(match?.map, 80) || null,
-    result: resultFromElo(match?.elo),
+    result: resultFromMatch(match),
   };
 }
 
@@ -244,11 +250,24 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       await client.query(`
         UPDATE spawn_diary_entries AS entry
         SET source_position = $2,
-            opponent_race = COALESCE(NULLIF(entry.opponent_race, ''), $3)
+            opponent_race = COALESCE(NULLIF(entry.opponent_race, ''), $3),
+            game_format = COALESCE(NULLIF(entry.game_format, ''), $4),
+            map_name = COALESCE(NULLIF(entry.map_name, ''), $5),
+            result = CASE
+              WHEN COALESCE(entry.result, '') IN ('', '미정') THEN $6
+              ELSE entry.result
+            END
         FROM spawn_diary_auto_seen AS seen
         WHERE seen.source_key = $1
           AND seen.imported_entry_id = entry.id
-      `, [candidate.sourceKey, candidate.profilePosition, candidate.opponentRace]);
+      `, [
+        candidate.sourceKey,
+        candidate.profilePosition,
+        candidate.opponentRace,
+        candidate.gameFormat,
+        candidate.mapName,
+        candidate.result
+      ]);
     }
 
     if (!pendingCandidates.length) {
