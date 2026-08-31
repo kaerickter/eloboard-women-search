@@ -40,7 +40,7 @@ function restoreSearchSession() {
     const isIakkang = cleanName(saved.name) === cleanName(DEFAULT_NAME);
     setSearchState("success", isIakkang ? "이전 이아깽 검색 결과를 표시한 뒤 최신 전적을 확인합니다." : "이전에 보던 검색 결과를 복원했습니다.");
     // 기존 화면은 즉시 유지하고, 이아깽만 뒤에서 ELOBoard 최신본을 조용히 확인합니다.
-    if (isIakkang) setTimeout(() => { load(DEFAULT_NAME, false, true).catch(() => {}); }, 0);
+    if (isIakkang) setTimeout(() => { load(DEFAULT_NAME, true, true).catch(() => {}); }, 0);
     return true;
   } catch {
     return false;
@@ -269,9 +269,9 @@ function periodStats(rows) {
   let wins = 0;
   let losses = 0;
   for (const row of rows) {
-    const elo = Number(row.elo || 0);
-    if (elo > 0) wins += 1;
-    else if (elo < 0) losses += 1;
+    const result = matchOutcome(row);
+    if (result === "승") wins += 1;
+    else if (result === "패") losses += 1;
   }
   const games = wins + losses;
   const rate = games ? Math.round((wins / games) * 1000) / 10 : 0;
@@ -335,6 +335,15 @@ function resetResultPanels(message, className = "") {
   $("profileLink").innerHTML = "";
   $("playerChoices").innerHTML = "";
   $("profile").innerHTML = '<div class="empty ' + escapeHtml(className) + '">' + escapeHtml(message) + '</div>';
+}
+
+// 새 ELOBoard는 승패 결과를 별도 값으로 제공합니다. 색상과 기간 통계는
+// 점수 증감이 아니라 이 결과값을 우선 사용해야 무승부·이관 경기에도 정확합니다.
+function matchOutcome(match) {
+  const result = String(match?.result || "").trim();
+  if (result === "승" || result === "패" || result === "무") return result;
+  const elo = Number(match?.elo || 0);
+  return elo > 0 ? "승" : elo < 0 ? "패" : "무";
 }
 
 function setSelectOptions(select, values, suffix) {
@@ -502,10 +511,10 @@ function renderProfile(data) {
     ? state.selectedYear + TXT.yearSuffix + " " + state.selectedMonth + TXT.monthSuffix + " " + TXT.profileMatches
     : TXT.profileMatches;
   const renderMatchRow = (match) => {
-    const resultClass = match.elo >= 0 ? "result-win" : "result-loss";
-    const deltaClass = match.elo >= 0 ? "delta-plus" : "delta-minus";
+    const result = matchOutcome(match);
+    const resultClass = result === "승" ? "result-win" : result === "패" ? "result-loss" : "";
+    const deltaClass = result === "승" ? "delta-plus" : result === "패" ? "delta-minus" : "";
     const memo = escapeHtml(match.memo || "-");
-    const result = match.result || (match.elo >= 0 ? "승" : "패");
     return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="결과" class="' + deltaClass + '">' + escapeHtml(result) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
   };
   const matchWindow = currentMatchWindow();
@@ -593,7 +602,7 @@ async function load(name = "", refresh = false, silent = false) {
   const params = new URLSearchParams({ pages: String(pages) });
   if (name) params.set("name", name);
   if (refresh) params.set("refresh", "1");
-  if (cleanName(name) === cleanName(DEFAULT_NAME) && !refresh) {
+  if (cleanName(name) === cleanName(DEFAULT_NAME)) {
     params.set("profileOnly", "1");
     params.set("wr_id", DEFAULT_WR_ID);
   }
