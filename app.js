@@ -1,13 +1,13 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_NAME = "\uc774\uc544\uae7d";
-const DEFAULT_WR_ID = "780";
-const SEARCH_SESSION_KEY = "record-search-session-v1";
+// 새 ELOBoard 선수 ID: 이아깽(기존 wr_id 780 → 현재 선수 ID 627)
+const DEFAULT_WR_ID = "627";
+const SEARCH_SESSION_KEY = "record-search-session-v2";
 const state = {
   query: "",
   data: null,
   selectedYear: "",
   selectedMonth: "",
-  opponentQuery: "",
   requestId: 0,
   activeController: null
 };
@@ -19,8 +19,7 @@ function saveSearchSession() {
       name: $("nameInput").value,
       data: state.data,
       selectedYear: state.selectedYear,
-      selectedMonth: state.selectedMonth,
-      opponentQuery: state.opponentQuery
+      selectedMonth: state.selectedMonth
     }));
   } catch {
     // 저장 공간이 부족한 경우 검색 기능은 그대로 사용합니다.
@@ -33,14 +32,15 @@ function restoreSearchSession() {
     if (!saved || typeof saved !== "object") return false;
     validateSearchResponse(saved.data);
     $("nameInput").value = String(saved.name || DEFAULT_NAME);
-    $("opponentInput").value = String(saved.opponentQuery || "");
     state.query = $("nameInput").value.trim();
     state.data = saved.data;
     state.selectedYear = String(saved.selectedYear || "");
     state.selectedMonth = String(saved.selectedMonth || "");
-    state.opponentQuery = $("opponentInput").value.trim();
     render(saved.data);
-    setSearchState("success", "이전에 보던 검색 결과를 복원했습니다.");
+    const isIakkang = cleanName(saved.name) === cleanName(DEFAULT_NAME);
+    setSearchState("success", isIakkang ? "이전 이아깽 검색 결과를 표시한 뒤 최신 전적을 확인합니다." : "이전에 보던 검색 결과를 복원했습니다.");
+    // 기존 화면은 즉시 유지하고, 이아깽만 뒤에서 ELOBoard 최신본을 조용히 확인합니다.
+    if (isIakkang) setTimeout(() => { load(DEFAULT_NAME, true, true).catch(() => {}); }, 0);
     return true;
   } catch {
     return false;
@@ -112,6 +112,32 @@ function setSearchState(kind, message) {
   $("refreshButton").disabled = kind === "loading";
 }
 
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Accept": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("서버가 올바른 JSON 응답을 보내지 않았습니다.");
+  }
+  if (!response.ok) throw new Error(data.error || "요청을 처리하지 못했습니다.");
+  return data;
+}
+
+function autoDiaryStatusSuffix(sync) {
+  if (!sync) return "";
+  if (sync.error) return " · 스폰일지 자동등록을 다시 확인해 주세요.";
+  if (Number(sync.imported) > 0) return " · 새 경기 " + Number(sync.imported) + "건을 스폰일지에 자동등록했습니다.";
+  if (sync.initialized) return " · 현재 기록을 기준으로 스폰일지 자동등록을 시작했습니다.";
+  return "";
+}
+
 function validateSearchResponse(data) {
   if (!data || typeof data !== "object") throw new Error("검색 응답 형식이 올바르지 않습니다.");
   if (!Array.isArray(data.matches) || !Array.isArray(data.players)) {
@@ -130,7 +156,7 @@ async function fetchSearchJson(url, signal, attempts = 2) {
     const timeoutController = new AbortController();
     const abortFromCaller = () => timeoutController.abort();
     signal.addEventListener("abort", abortFromCaller, { once: true });
-    const timeout = setTimeout(() => timeoutController.abort(), 15000);
+    const timeout = setTimeout(() => timeoutController.abort(), 30000);
     try {
       const response = await fetch(url, {
         signal: timeoutController.signal,
@@ -211,16 +237,31 @@ function getProfileRows(data) {
   return data && data.profile && Array.isArray(data.profile.matches) ? data.profile.matches : [];
 }
 
-function sortedYears(rows) {
-  return [...new Set(rows.map((row) => String(row.date || "").slice(0, 4)).filter(Boolean))]
+function currentKoreaPeriod(date = new Date()) {
+  const korea = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return {
+    year: String(korea.getUTCFullYear()),
+    month: String(korea.getUTCMonth() + 1).padStart(2, "0")
+  };
+}
+
+function sortedYears(rows, date = new Date()) {
+  const current = currentKoreaPeriod(date);
+  return [...new Set([
+    current.year,
+    ...rows.map((row) => String(row.date || "").slice(0, 4)).filter(Boolean)
+  ])]
     .sort((a, b) => b.localeCompare(a));
 }
 
-function sortedMonths(rows, year) {
-  return [...new Set(rows
+function sortedMonths(rows, year, date = new Date()) {
+  const current = currentKoreaPeriod(date);
+  const months = rows
     .filter((row) => String(row.date || "").startsWith(year + "-"))
     .map((row) => String(row.date || "").slice(5, 7))
-    .filter(Boolean))]
+    .filter(Boolean);
+  if (year === current.year) months.push(current.month);
+  return [...new Set(months)]
     .sort((a, b) => b.localeCompare(a));
 }
 
@@ -228,9 +269,9 @@ function periodStats(rows) {
   let wins = 0;
   let losses = 0;
   for (const row of rows) {
-    const elo = Number(row.elo || 0);
-    if (elo > 0) wins += 1;
-    else if (elo < 0) losses += 1;
+    const result = matchOutcome(row);
+    if (result === "승") wins += 1;
+    else if (result === "패") losses += 1;
   }
   const games = wins + losses;
   const rate = games ? Math.round((wins / games) * 1000) / 10 : 0;
@@ -290,10 +331,19 @@ function resetResultPanels(message, className = "") {
   setPeriodValues("year", { games: 0, wins: 0, losses: 0, rate: 0 });
   setPeriodValues("month", { games: 0, wins: 0, losses: 0, rate: 0 });
   setPeriodValues("day", { games: 0, wins: 0, losses: 0, rate: 0 });
-  setOpponentStats({ games: 0, wins: 0, losses: 0, rate: 0 }, TXT.opponentReady);
+  renderRaceRates(null);
   $("profileLink").innerHTML = "";
   $("playerChoices").innerHTML = "";
   $("profile").innerHTML = '<div class="empty ' + escapeHtml(className) + '">' + escapeHtml(message) + '</div>';
+}
+
+// 새 ELOBoard는 승패 결과를 별도 값으로 제공합니다. 색상과 기간 통계는
+// 점수 증감이 아니라 이 결과값을 우선 사용해야 무승부·이관 경기에도 정확합니다.
+function matchOutcome(match) {
+  const result = String(match?.result || "").trim();
+  if (result === "승" || result === "패" || result === "무") return result;
+  const elo = Number(match?.elo || 0);
+  return elo > 0 ? "승" : elo < 0 ? "패" : "무";
 }
 
 function setSelectOptions(select, values, suffix) {
@@ -304,6 +354,11 @@ function selectedMonthRows(rows) {
   if (!state.selectedYear || !state.selectedMonth) return rows;
   const prefix = state.selectedYear + "-" + state.selectedMonth;
   return rows.filter((row) => String(row.date || "").startsWith(prefix));
+}
+
+function selectedCurrentMonth(date = new Date()) {
+  const current = currentKoreaPeriod(date);
+  return state.selectedYear === current.year && state.selectedMonth === current.month;
 }
 
 function displayMonth(month) {
@@ -329,53 +384,54 @@ function recentRows(rows, days) {
   });
 }
 
-function setOpponentStats(stats, label) {
-  $("opponentLabel").textContent = label;
-  $("opponentGames").textContent = stats.games;
-  $("opponentWins").textContent = stats.wins;
-  $("opponentLosses").textContent = stats.losses;
-  $("opponentRate").textContent = stats.rate + "%";
-}
-
-function renderOpponent(data) {
+function renderRaceRates(data) {
   const rows = getProfileRows(data);
-  const query = cleanName(state.opponentQuery || $("opponentInput").value);
-  if (!rows.length || !query) {
-    setOpponentStats({ games: 0, wins: 0, losses: 0, rate: 0 }, query ? TXT.noData : TXT.opponentReady);
-    return;
-  }
+  const yearPrefix = state.selectedYear ? state.selectedYear + "-" : "";
+  const monthPrefix = state.selectedYear && state.selectedMonth
+    ? state.selectedYear + "-" + state.selectedMonth
+    : "";
+  $("raceYearHeading").textContent = state.selectedYear ? state.selectedYear + "년 승률" : "해당 연도 승률";
+  $("raceMonthHeading").textContent = state.selectedMonth ? Number(state.selectedMonth) + "월 승률" : "당월 승률";
 
-  const matches = recentRows(rows, 90).filter((row) => cleanName(row.opponent).includes(query));
-  const stats = periodStats(matches);
-  const label = stats.games
-    ? state.opponentQuery + " \u00b7 " + TXT.recent90Basis
-    : TXT.opponentNoData;
-  setOpponentStats(stats, label);
+  for (const race of ["T", "Z", "P"]) {
+    const raceRows = rows.filter((row) => String(row.opponentRace || "").toUpperCase() === race);
+    const yearRows = yearPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(yearPrefix)) : [];
+    const monthRows = monthPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(monthPrefix)) : [];
+    const parsedOverall = data && data.profile && data.profile.raceTotals
+      ? data.profile.raceTotals.combined && data.profile.raceTotals.combined[race]
+      : null;
+    const officialOverall = parsedOverall && Number(parsedOverall.games) > 0 ? parsedOverall : null;
+    const values = {
+      Overall: officialOverall || periodStats(raceRows),
+      Year: periodStats(yearRows),
+      Month: periodStats(monthRows)
+    };
+    for (const [period, stats] of Object.entries(values)) {
+      const element = $("race" + period + race);
+      element.innerHTML = '<span class="race-stat-games">' + stats.games + '전</span>' +
+        '<span class="race-stat-wins">' + stats.wins + '승</span>' +
+        '<span class="race-stat-losses">' + stats.losses + '패</span>' +
+        '<span class="race-stat-rate">' + stats.rate + '%</span>';
+      element.title = stats.games + "전 " + stats.wins + "승 " + stats.losses + "패";
+      element.dataset.empty = stats.games ? "false" : "true";
+    }
+  }
 }
 
 function renderPeriod(data) {
   const rows = getProfileRows(data);
+  const current = currentKoreaPeriod();
   const years = sortedYears(rows);
   const yearSelect = $("yearSelect");
   const monthSelect = $("monthSelect");
 
-  if (!years.length) {
-    state.selectedYear = "";
-    state.selectedMonth = "";
-    yearSelect.innerHTML = "";
-    monthSelect.innerHTML = "";
-    $("periodLabel").textContent = TXT.noPeriod;
-    $("yearRowLabel").textContent = "\ud574\ub2f9\ub144\ub3c4";
-    $("monthRowLabel").textContent = "\ub2f9\uc6d4";
-    setPeriodValues("year", { games: 0, wins: 0, losses: 0, rate: 0 });
-    setPeriodValues("month", { games: 0, wins: 0, losses: 0, rate: 0 });
-    setPeriodValues("day", { games: 0, wins: 0, losses: 0, rate: 0 });
-    return;
-  }
-
-  if (!years.includes(state.selectedYear)) state.selectedYear = years[0];
+  if (!years.includes(state.selectedYear)) state.selectedYear = current.year;
   const months = sortedMonths(rows, state.selectedYear);
-  if (!months.includes(state.selectedMonth)) state.selectedMonth = months[0] || "";
+  if (!months.includes(state.selectedMonth)) {
+    state.selectedMonth = state.selectedYear === current.year
+      ? current.month
+      : (months[0] || "");
+  }
 
   setSelectOptions(yearSelect, years, TXT.yearSuffix);
   setSelectOptions(monthSelect, months, TXT.monthSuffix);
@@ -387,12 +443,14 @@ function renderPeriod(data) {
   const yearRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-"));
   const monthRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-" + state.selectedMonth));
   const matchWindow = currentMatchWindow();
-  const dayRows = rows.filter((row) => isCurrentMatchDayRow(row, matchWindow));
+  const dayRows = selectedCurrentMonth()
+    ? monthRows.filter((row) => isCurrentMatchDayRow(row, matchWindow))
+    : [];
   const year = periodStats(yearRows);
   const month = periodStats(monthRows);
   const day = periodStats(dayRows);
 
-  $("periodLabel").textContent = (data.profile.name || state.query) + " \u00b7 " + TXT.periodBasis;
+  $("periodLabel").textContent = (data.profile?.name || state.query || "선수") + " \u00b7 " + TXT.periodBasis;
   $("dayRowLabel").innerHTML = "<span>당일</span><small>"
     + matchWindow.startDate + " 06:01 ~ " + matchWindow.endDate + " 06:00</small>";
   $("dayRowLabel").title = matchWindow.startDate + " 오전 06:01부터 "
@@ -418,7 +476,11 @@ function renderProfile(data) {
   const profile = data.profile;
   if (!state.query.trim() || !profile) {
     $("profileLink").innerHTML = "";
-    $("profile").innerHTML = '<div class="empty">' + TXT.noProfile + '</div>';
+    if (cleanName(state.query) === cleanName(DEFAULT_NAME)) {
+      $("profile").innerHTML = '<div class="empty">선수 전적을 찾지 못했습니다.</div>';
+    } else {
+      $("profile").innerHTML = '<div class="empty">' + TXT.noProfile + '</div>';
+    }
     return;
   }
 
@@ -449,13 +511,16 @@ function renderProfile(data) {
     ? state.selectedYear + TXT.yearSuffix + " " + state.selectedMonth + TXT.monthSuffix + " " + TXT.profileMatches
     : TXT.profileMatches;
   const renderMatchRow = (match) => {
-    const resultClass = match.elo >= 0 ? "result-win" : "result-loss";
-    const deltaClass = match.elo >= 0 ? "delta-plus" : "delta-minus";
+    const result = matchOutcome(match);
+    const resultClass = result === "승" ? "result-win" : result === "패" ? "result-loss" : "";
+    const deltaClass = result === "승" ? "delta-plus" : result === "패" ? "delta-minus" : "";
     const memo = escapeHtml(match.memo || "-");
-    return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="ELO" class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
+    return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="결과" class="' + deltaClass + '">' + escapeHtml(result) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
   };
   const matchWindow = currentMatchWindow();
-  const dayRows = profileRows.filter((match) => isCurrentMatchDayRow(match, matchWindow));
+  const dayRows = selectedCurrentMonth()
+    ? periodRows.filter((match) => isCurrentMatchDayRow(match, matchWindow))
+    : [];
   const otherRows = periodRows.filter((match) => !isCurrentMatchDayRow(match, matchWindow));
   const dayGroup = dayRows.length
     ? '<section class="profile-day-group" aria-label="당일 전적"><div class="profile-day-group-title"><strong>당일 전적</strong><small>'
@@ -466,34 +531,78 @@ function renderProfile(data) {
     ? dayGroup + otherRows.map(renderMatchRow).join("")
     : '<div class="empty">' + TXT.noData + '</div>';
 
-  const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>ELO</span><span>경기방식</span><span>메모</span></div>';
+  const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>결과</span><span>경기방식</span><span>메모</span></div>';
 
-  $("profile").innerHTML = '<div class="profile-title"><div class="profile-identity">' + avatarMarkup(profile.name, profile.image) + '<div><strong>' + escapeHtml(profile.name) + '</strong><span>wr_id=' + profile.wrId + '</span></div></div></div>' +
+  $("profile").innerHTML = '<div class="profile-title"><div class="profile-identity">' + avatarMarkup(profile.name, profile.image) + '<div><strong>' + escapeHtml(profile.name) + '</strong><span>선수 ID=' + profile.wrId + '</span></div></div></div>' +
     '<div class="profile-cards">' + cards.map((card) => '<div class="profile-card"><span>' + card[0] + '</span><strong>' + card[1] + '</strong><small>' + card[2] + '</small></div>').join("") + '</div>' +
     most +
-    '<div class="profile-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
+    '<div class="profile-section profile-period-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
   bindImageFallbacks($("profile"));
+  renderIakkangMatchupPanel(profile);
+}
+
+function renderIakkangMatchupPanel(profile) {
+  const panel = $("iakkangMatchupPanel");
+  const input = $("iakkangOpponentInput");
+  const result = $("iakkangMatchupResult");
+  const title = $("iakkangMatchupTitle");
+  if (!panel || !input || !result) return;
+  panel.hidden = !profile?.wrId;
+  if (!profile?.wrId) return;
+  if (title) title.textContent = profile.name + " 상대전적";
+  let requestId = 0;
+  const render = async () => {
+    const query = cleanName(input.value);
+    if (!query) {
+      result.innerHTML = '상대 이름을 입력하면 전체전적과 최근 90일 전적을 표시합니다.';
+      return;
+    }
+    const currentRequest = ++requestId;
+    result.innerHTML = '상대전적을 불러오는 중입니다.';
+    try {
+      const payload = await requestJson('/api/player-rival?player_id=' + encodeURIComponent(profile.wrId) + '&opponent=' + encodeURIComponent(input.value.trim()));
+      if (currentRequest !== requestId) return;
+      const overall = payload.overall;
+      const recent = payload.recent90 || { games: 0, wins: 0, losses: 0, rate: 0 };
+      if (!overall && !recent.games) {
+        result.innerHTML = '<div class="empty">해당 상대와의 전적을 찾지 못했습니다.</div>';
+        return;
+      }
+      const race = payload.opponentRace ? ' (' + escapeHtml(payload.opponentRace) + ')' : '';
+      const recordText = (record) => record ? record.games + '전 ' + record.wins + '승 ' + record.losses + '패 · ' + record.rate + '%' : '데이터 부족';
+      result.innerHTML = '<div class="iakkang-matchup-summary"><strong>' + escapeHtml(payload.opponentName) + race + '</strong></div>' +
+        '<div class="matchup-record-pairs"><div><span>전체전적</span><b>' + recordText(overall) + '</b></div><div><span>최근 90일</span><b>' + recordText(recent) + '</b></div></div>' +
+        (payload.recentMatches?.length ? '<div class="iakkang-matchup-list">' + payload.recentMatches.map((match) => { const matchResult = match.result || (Number(match.elo) > 0 ? '승' : Number(match.elo) < 0 ? '패' : '무'); const resultClass = matchResult === '승' ? 'delta-plus' : matchResult === '패' ? 'delta-minus' : ''; return '<div><span>' + escapeHtml(match.date) + '</span><span class="' + resultClass + '">' + escapeHtml(matchResult) + '</span><strong>' + escapeHtml(match.map || '-') + '</strong><small>' + escapeHtml(match.format || '-') + '</small></div>'; }).join("") + '</div>' : '');
+    } catch (error) {
+      if (currentRequest === requestId) result.innerHTML = '<div class="empty">' + escapeHtml(error.message || '상대전적을 불러오지 못했습니다.') + '</div>';
+    }
+  };
+  input.value = "";
+  input.oninput = render;
+  render();
 }
 
 function render(data) {
   renderPeriod(data);
-  renderOpponent(data);
+  renderRaceRates(data);
   renderProfile(data);
 }
 
-async function load(name = "", refresh = false) {
+async function load(name = "", refresh = false, silent = false) {
   if (state.activeController) state.activeController.abort();
   const controller = new AbortController();
   state.activeController = controller;
   const requestId = state.requestId + 1;
   state.requestId = requestId;
   const pages = 10;
-  setSearchState("loading", refresh ? TXT.refreshing : TXT.loading);
-  resetResultPanels("검색 결과를 확인하고 있습니다.", "search-loading");
+  if (!silent) {
+    setSearchState("loading", refresh ? TXT.refreshing : TXT.loading);
+    resetResultPanels("검색 결과를 확인하고 있습니다.", "search-loading");
+  }
   const params = new URLSearchParams({ pages: String(pages) });
   if (name) params.set("name", name);
   if (refresh) params.set("refresh", "1");
-  if (cleanName(name) === cleanName(DEFAULT_NAME) && !refresh) {
+  if (cleanName(name) === cleanName(DEFAULT_NAME)) {
     params.set("profileOnly", "1");
     params.set("wr_id", DEFAULT_WR_ID);
   }
@@ -509,9 +618,14 @@ async function load(name = "", refresh = false) {
   if (name && (!data.profile || data.resultState === "empty")) {
     setSearchState("empty", TXT.noResult);
   } else {
-    setSearchState("success", data.profileOnly
+    if (data.cacheNotice) {
+      setSearchState("success", data.cacheNotice);
+      return;
+    }
+    const successMessage = data.profileOnly
       ? when + " " + TXT.basis + " \u00b7 " + (data.profile?.name || name) + " \ud504\ub85c\ud544 \uc804\uc801\uc744 \uc77d\uc5c8\uc2b5\ub2c8\ub2e4."
-      : when + " " + TXT.basis + " \u00b7 " + TXT.pagesFrom + " " + data.pagesLoaded + TXT.pagesUnit + " " + data.matches.length + TXT.readUnit);
+      : when + " " + TXT.basis + " \u00b7 " + TXT.pagesFrom + " " + data.pagesLoaded + TXT.pagesUnit + " " + data.matches.length + TXT.readUnit;
+    setSearchState("success", successMessage + autoDiaryStatusSuffix(data.autoDiarySync));
   }
 }
 
@@ -540,11 +654,6 @@ async function search(refresh = false) {
 $("searchButton").addEventListener("click", () => search(false));
 $("refreshButton").addEventListener("click", () => search(true));
 $("nameInput").addEventListener("keydown", (event) => { if (event.key === "Enter") search(false); });
-$("opponentInput").addEventListener("input", (event) => {
-  state.opponentQuery = event.target.value.trim();
-  renderOpponent(state.data);
-  saveSearchSession();
-});
 $("yearSelect").addEventListener("change", (event) => {
   state.selectedYear = event.target.value;
   state.selectedMonth = "";
