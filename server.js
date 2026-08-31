@@ -2099,6 +2099,33 @@ async function loadTierRoster(force = false) {
   return tierRosterPromise;
 }
 
+// 대학대결은 별도 대학 명단이 아니라, 화면에 표시되는 티어표와 같은 명단·소속·티어를 사용합니다.
+// 따라서 선수관리에서 소속이나 티어를 바꾸면 대학대결에도 바로 같은 기준으로 반영됩니다.
+async function loadTierBasedUniversityPlayers() {
+  const players = tierAdmin.applyOverrides(await loadTierRoster(false));
+  return players.filter((player) => {
+    const universities = Array.isArray(player.universities) ? player.universities : [player.university];
+    return String(player.tier || "").trim() && universities.some((name) => String(name || "").trim() && String(name).trim() !== "연합팀");
+  });
+}
+
+function tierBasedUniversities(players) {
+  const seen = new Set();
+  return players.flatMap((player) => Array.isArray(player.universities) ? player.universities : [player.university])
+    .map((name) => String(name || "").trim())
+    .filter((name) => name && name !== "연합팀" && !seen.has(name) && Boolean(seen.add(name)))
+    .sort((a, b) => a.localeCompare(b, "ko"))
+    .map((name) => ({ name, label: name }));
+}
+
+function tierBasedUniversityRoster(players, university) {
+  const target = normalizeName(university);
+  return players.filter((player) => {
+    const universities = Array.isArray(player.universities) ? player.universities : [player.university];
+    return universities.some((name) => normalizeName(name) === target);
+  });
+}
+
 function scheduleChannelRegistrySave() {
   if (channelRegistrySaveTimer) return;
   channelRegistrySaveTimer = setTimeout(() => {
@@ -3630,9 +3657,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/universities" && req.method === "GET") {
     try {
-      const force = url.searchParams.get("refresh") === "1";
-      const universities = await loadUniversities(force);
-      return send(res, 200, JSON.stringify({ universities, source: UNIVERSITY_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+      const players = await loadTierBasedUniversityPlayers();
+      const universities = tierBasedUniversities(players);
+      return send(res, 200, JSON.stringify({ universities, source: "현재 티어표", updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "대학 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
@@ -3640,10 +3667,11 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/api/universities/roster" && req.method === "GET") {
     try {
       const name = String(url.searchParams.get("name") || "").trim();
-      const universities = await loadUniversities();
+      const tierPlayers = await loadTierBasedUniversityPlayers();
+      const universities = tierBasedUniversities(tierPlayers);
       if (!universities.some((item) => item.name === name)) return send(res, 400, JSON.stringify({ error: "지원하는 대학을 선택해 주세요." }), "application/json; charset=utf-8");
-      const players = await loadUniversityRoster(name, url.searchParams.get("refresh") === "1");
-      return send(res, 200, JSON.stringify({ university: name, players, source: UNIVERSITY_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+      const players = tierBasedUniversityRoster(tierPlayers, name);
+      return send(res, 200, JSON.stringify({ university: name, players, source: "현재 티어표", updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "대학 선수 명단을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
@@ -3654,10 +3682,11 @@ const server = http.createServer(async (req, res) => {
       const universityA = String(body.universityA || "").trim();
       const universityB = String(body.universityB || "").trim();
       if (!universityA || !universityB || universityA === universityB) return send(res, 400, JSON.stringify({ error: "서로 다른 두 대학을 선택해 주세요." }), "application/json; charset=utf-8");
-      const universities = await loadUniversities();
+      const tierPlayers = await loadTierBasedUniversityPlayers();
+      const universities = tierBasedUniversities(tierPlayers);
       const allowed = new Set(universities.map((item) => item.name));
       if (!allowed.has(universityA) || !allowed.has(universityB)) return send(res, 400, JSON.stringify({ error: "지원하는 대학을 선택해 주세요." }), "application/json; charset=utf-8");
-      const [rosterA, rosterB] = await Promise.all([loadUniversityRoster(universityA), loadUniversityRoster(universityB)]);
+      const [rosterA, rosterB] = [tierBasedUniversityRoster(tierPlayers, universityA), tierBasedUniversityRoster(tierPlayers, universityB)];
       const pairs = buildUniversityPairs(rosterA, rosterB);
       if (pairs.length > 200) return send(res, 400, JSON.stringify({ error: "동일 티어 대결 조합이 200개를 초과합니다." }), "application/json; charset=utf-8");
       const rows = await mapConcurrent(pairs, 4, fetchUniversityPair);
@@ -3675,7 +3704,7 @@ const server = http.createServer(async (req, res) => {
         recent: tallyRows(rows, "recent"),
         tiers,
         rows,
-        source: UNIVERSITY_LIST_URL,
+        source: "현재 티어표",
         updatedAt: new Date().toISOString()
       }), "application/json; charset=utf-8");
     } catch (error) {
