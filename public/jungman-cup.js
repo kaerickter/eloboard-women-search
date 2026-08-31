@@ -186,6 +186,24 @@ function getPlayoffMatch(stageKey, index) {
   return { key, match: state.matches[key] };
 }
 
+// 날짜 위에 마우스를 올리면, 경기등록에 입력한 양쪽 출전자를 바로 확인할 수 있습니다.
+// 조별리그·8강·4강·결승 모두 같은 형식으로 표시합니다.
+function fixtureMatchupTitle(stage, index, fixture) {
+  const home = String(fixture?.home || "").trim();
+  const away = String(fixture?.away || "").trim();
+  if (!home || !away) return "대학 대진이 아직 정해지지 않았습니다.";
+  const key = matchKey(stage, home, away);
+  const games = Array.isArray(state.matches?.[key]?.games) ? state.matches[key].games : [];
+  const playerLines = games.map((game, gameIndex) => {
+    const homePlayer = String(game?.homePlayer || "").trim();
+    const awayPlayer = String(game?.awayPlayer || "").trim();
+    return homePlayer && awayPlayer ? (gameIndex + 1) + "세트 · " + homePlayer + " vs " + awayPlayer : "";
+  }).filter(Boolean);
+  return [fixtureStageName(stage) + " " + (index + 1) + "경기", home + " vs " + away]
+    .concat(playerLines.length ? playerLines : ["출전자 대진은 아직 등록되지 않았습니다."])
+    .join("\n");
+}
+
 function renderGroups() {
   groupGrid.innerHTML = GROUPS.map((group) => {
     const groupFixtures = state.fixtures?.[group] || [];
@@ -194,13 +212,14 @@ function renderGroups() {
       const home = fixture.home || "왼쪽 대학 미정";
       const away = fixture.away || "오른쪽 대학 미정";
       const fixtureDate = formatGroupDate(fixture.date);
+      const matchupTitle = fixtureMatchupTitle(group, index, fixture);
       const today = isToday(fixture.date);
       const disabled = !fixture.home || !fixture.away;
       return [
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time>' + escapeHtml(fixtureDate) +
+        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time title="' + escapeHtml(matchupTitle) + '" aria-label="' + escapeHtml(matchupTitle) + '">' + escapeHtml(fixtureDate) +
           '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
@@ -363,10 +382,11 @@ function renderPlayoffs() {
       const away = fixture.away || "오른쪽 대학 미정";
       const today = isToday(fixture.date);
       const disabled = !fixture.home || !fixture.away;
+      const matchupTitle = fixtureMatchupTitle(stage.title, index, fixture);
       return [
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-playoff="' + stage.key + '" data-fixture="' + index + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time>' + escapeHtml(formatGroupDate(fixture.date)) + '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
+        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time title="' + escapeHtml(matchupTitle) + '" aria-label="' + escapeHtml(matchupTitle) + '">' + escapeHtml(formatGroupDate(fixture.date)) + '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-playoff="' + stage.key + '" data-fixture="' + index + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
         "</div>"
       ].join("");
