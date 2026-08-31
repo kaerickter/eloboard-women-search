@@ -528,10 +528,15 @@ function renderProfile(data) {
     return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="결과" class="' + deltaClass + '">' + escapeHtml(result) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
   };
   const matchWindow = currentMatchWindow();
-  const dayRows = selectedCurrentMonth()
+  const showCurrentDayGroup = selectedCurrentMonth();
+  const dayRows = showCurrentDayGroup
     ? periodRows.filter((match) => isCurrentMatchDayRow(match, matchWindow))
     : [];
-  const otherRows = periodRows.filter((match) => !isCurrentMatchDayRow(match, matchWindow));
+  // 선택한 달이 당월이 아닐 때는 당일 묶음을 만들지 않습니다.
+  // 이때도 전날(예: 9월 1일 새벽의 8월 31일) 경기를 목록에서 빼면 안 됩니다.
+  const otherRows = showCurrentDayGroup
+    ? periodRows.filter((match) => !isCurrentMatchDayRow(match, matchWindow))
+    : periodRows;
   const dayGroup = dayRows.length
     ? '<section class="profile-day-group" aria-label="당일 전적"><div class="profile-day-group-title"><strong>당일 전적</strong><small>'
       + matchWindow.startDate + ' 06:01 ~ ' + matchWindow.endDate + ' 06:00</small></div>'
