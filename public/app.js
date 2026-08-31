@@ -37,10 +37,10 @@ function restoreSearchSession() {
     state.selectedYear = String(saved.selectedYear || "");
     state.selectedMonth = String(saved.selectedMonth || "");
     render(saved.data);
-    const isIakkang = cleanName(saved.name) === cleanName(DEFAULT_NAME);
-    setSearchState("success", isIakkang ? "이전 이아깽 검색 결과를 표시한 뒤 최신 전적을 확인합니다." : "이전에 보던 검색 결과를 복원했습니다.");
-    // 기존 화면은 즉시 유지하고, 이아깽만 뒤에서 ELOBoard 최신본을 조용히 확인합니다.
-    if (isIakkang) setTimeout(() => { load(DEFAULT_NAME, true, true).catch(() => {}); }, 0);
+    const savedName = String(saved.name || DEFAULT_NAME).trim();
+    setSearchState("success", "이전 검색 결과를 표시한 뒤 최신 전적을 확인합니다.");
+    // 검색했던 선수가 누구든 오래된 브라우저 저장본에 머물지 않도록 최신 API 결과로 교체합니다.
+    if (savedName) setTimeout(() => { load(savedName, true, true).catch(() => {}); }, 0);
     return true;
   } catch {
     return false;
