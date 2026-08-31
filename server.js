@@ -1722,22 +1722,28 @@ function parseMatchupRows(html, main, opponent) {
     maps: matches.slice(0, 6).map((match) => ({ map: match.map, result: match.result, date: match.date.slice(4, 6) + "." + match.date.slice(6, 8) }))
   };
 }
-async function loadMatchupPlayers() {
-  const response = await fetch(MATCHUP_LIST_URL, { headers: { "User-Agent": "Mozilla/5.0 elo-kitten matchup", "Accept-Language": "ko-KR,ko;q=0.9" } });
-  if (!response.ok) throw new Error("선수 목록 응답 오류: " + response.status);
-  const html = await response.text();
-  const select = html.match(/<select[^>]+name=["']player_1["'][\s\S]*?<\/select>/i)?.[0] || "";
-  return [...select.matchAll(/<option[^>]+value=["']([^"']+)["'][^>]*>([^<]+)<\/option>/gi)]
-    .map((match) => {
-      const parts = cleanText(match[2]).split("|");
-      const raceText = (parts[1] || "").toLowerCase();
-      return { name: (parts[0] || "").trim(), race: raceText.startsWith("t") ? "T" : raceText.startsWith("z") ? "Z" : "P" };
-    })
-    .filter((player) => player.name);
+async function loadMatchupPlayers(query = "") {
+  // 기존 search_list 주소는 새 ELOBoard에서 더 이상 선수 목록을 제공하지 않습니다.
+  // 상대전적 탭도 전적검색과 같은 새 선수 API를 사용합니다.
+  const keyword = String(query || "").trim();
+  const players = await fetchEloApi("/players", keyword
+    ? { q: keyword }
+    : { division: "women", limit: 200, offset: 0 });
+  return (Array.isArray(players) ? players : []).map((player) => ({
+    name: String(player.display_name || player.name || "").trim(),
+    race: String(player.main_race || "P").toUpperCase(),
+    wrId: String(player.id || ""),
+    url: apiPlayerUrl(player.id)
+  })).filter((player) => player.name && player.wrId);
 }
 async function findMatchupProfile(name) {
-  const players = await searchPlayerCandidates(name);
-  return players[0]?.wrId ? loadProfile(players[0].wrId) : null;
+  const players = await searchAllPlayerCandidates(name);
+  const key = normalizeName(name);
+  const selected = players.find((player) => normalizeName(player.name) === key) || players[0];
+  if (!selected?.wrId) return null;
+  return selected.division === "men"
+    ? loadMenProfile(selected.wrId, false, selected.name)
+    : loadProfile(selected.wrId, false);
 }
 async function loadMatchupPhotos(rawNames) {
   const names = [...new Set((rawNames || []).map((name) => String(name || "").trim()).filter(Boolean))].slice(0, 24);
@@ -1776,15 +1782,60 @@ function recentOpponentRecommendations(profile, days = 90) {
   }
   return [...opponents.values()].sort((a, b) => b.games - a.games || b.lastPlayed.localeCompare(a.lastPlayed) || a.name.localeCompare(b.name, "ko"));
 }
+function matchupResult(row) {
+  const result = String(row?.result || "").trim();
+  if (result === "승" || result === "패") return result;
+  return Number(row?.elo || 0) > 0 ? "승" : Number(row?.elo || 0) < 0 ? "패" : "";
+}
+function matchupDateText(value) {
+  const date = String(value || "");
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.slice(5).replace("-", ".") : date || "-";
+}
+function matchupTally(rows) {
+  let wins = 0;
+  let losses = 0;
+  for (const row of rows) {
+    if (matchupResult(row) === "승") wins += 1;
+    if (matchupResult(row) === "패") losses += 1;
+  }
+  return [wins, losses];
+}
 async function fetchMatchup(main, opponent) {
-  const body = new URLSearchParams({ wr_1: main, wr_2: opponent, sear: "", b_id: "eloboard" });
-  const response = await fetch(MATCHUP_SEARCH_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "Mozilla/5.0 elo-kitten matchup" },
-    body
+  const [mainProfile, opponentProfile] = await Promise.all([
+    findMatchupProfile(main), findMatchupProfile(opponent)
+  ]);
+  if (!mainProfile || !opponentProfile) throw new Error("선수 정보를 찾지 못했습니다.");
+  const [rivals] = await Promise.all([
+    fetchEloApi("/players/" + encodeURIComponent(mainProfile.wrId) + "/stats/rivals", { q: opponentProfile.name }).catch(() => [])
+  ]);
+  const opponentKey = normalizeName(opponentProfile.name);
+  const directRows = (mainProfile.matches || []).filter((row) =>
+    String(row.opponentId || "") === String(opponentProfile.wrId)
+    || normalizeName(row.opponent) === opponentKey
+  );
+  const rival = (Array.isArray(rivals) ? rivals : []).find((item) =>
+    String(item.player_id || "") === String(opponentProfile.wrId)
+    || normalizeName(item.name) === opponentKey
+  );
+  const total = rival
+    ? [Number(rival.wins || 0), Number(rival.losses || 0)]
+    : matchupTally(directRows);
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 90);
+  const recentRows = directRows.filter((row) => {
+    const date = new Date(String(row.date || "") + "T00:00:00+09:00");
+    return !Number.isNaN(date.getTime()) && date >= cutoff;
   });
-  if (!response.ok) throw new Error("상대전적 응답 오류: " + response.status);
-  return parseMatchupRows(await response.text(), main, opponent);
+  const latest = directRows[0]?.date || rival?.last_played_on || "";
+  return {
+    main: mainProfile.name,
+    opponent: opponentProfile.name,
+    total,
+    recent: matchupTally(recentRows),
+    lastPlayed: latest ? String(latest).replace(/-/g, ".") : "경기 없음",
+    maps: directRows.slice(0, 6).map((row) => ({ map: row.map || "-", result: matchupResult(row), date: matchupDateText(row.date) }))
+  };
 }
 function selectOptions(html, name) {
   const select = html.match(new RegExp("<select[^>]+(?:name|id)=[\"']" + name + "[\"'][\\s\\S]*?<\\/select>", "i"))?.[0] || "";
@@ -3610,7 +3661,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/matchup/players" && req.method === "GET") {
     try {
-      const players = await loadMatchupPlayers();
+      const players = await loadMatchupPlayers(url.searchParams.get("q") || "");
       return send(res, 200, JSON.stringify({ players, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "선수 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
