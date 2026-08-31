@@ -22,6 +22,7 @@ const BOARD_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_board";
 const BJ_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=bj_list";
 const MEN_BJ_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=bj_list";
 const WOMEN_RECORD_AJAX_URL = "https://eloboard.com/women/bbs/ajax_women_record.php";
+const ELOBOARD_API_URL = "https://eloboard.com/api";
 const SSUSTAR_Iakkang_GAMES_URL = "https://ssustar.iwinv.net/recent_games_embed.php?player=%EC%9D%B4%EC%95%84%EA%B9%BD_T_780";
 const IAKKANG_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/11PQGexmMtcaOJlcfyAKg6tLsDDjbijMK_6crKta2RFM/export?format=csv&gid=540473952";
 const IAKKANG_WR_ID = "780";
@@ -822,6 +823,86 @@ function addPlayer(map, name, wrId, url, source) {
     map.set(key, { name, wrId, url: url || playerUrl(wrId), source });
   }
 }
+
+function apiPlayerUrl(playerId) {
+  return "https://eloboard.com/players/" + encodeURIComponent(playerId);
+}
+
+function apiRaceName(race) {
+  return ({ T: "테란", Z: "저그", P: "프로토스" })[String(race || "").toUpperCase()] || "";
+}
+
+function apiRecord(wins, losses, games) {
+  const safeWins = Number(wins || 0);
+  const safeLosses = Number(losses || 0);
+  const safeGames = Number(games || safeWins + safeLosses);
+  return { label: "총전적", games: safeGames, wins: safeWins, losses: safeLosses, rate: safeGames ? Math.round((safeWins / safeGames) * 1000) / 10 : 0 };
+}
+
+function apiImageUrl(value) {
+  const path = String(value || "").trim();
+  return path ? new URL(path, "https://eloboard.com/").href : "";
+}
+
+async function fetchEloApi(path, params = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+  }
+  const response = await fetchWithRetry(ELOBOARD_API_URL + path + (query.size ? "?" + query : ""), {
+    headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0 elo-kitten" }
+  }, 1);
+  if (!response.ok) throw new Error("ELOBoard API response error: " + response.status);
+  return response.json();
+}
+
+function apiMatchRows(matches, playerId) {
+  return (Array.isArray(matches) ? matches : []).map((match) => {
+    const participants = Array.isArray(match.participants) ? match.participants : [];
+    const mine = participants.find((item) => String(item.player_id) === String(playerId));
+    const opponent = participants.find((item) => String(item.player_id) !== String(playerId)) || {};
+    const won = mine?.result === "win";
+    const lost = mine?.result === "loss";
+    const delta = Number(match.elo_delta);
+    const elo = Number.isFinite(delta) ? (won ? Math.abs(delta) : lost ? -Math.abs(delta) : 0) : (won ? 1 : lost ? -1 : 0);
+    return {
+      date: String(match.played_on || ""), opponent: String(opponent.name || "상대 미상"),
+      opponentRace: String(opponent.race || "").toUpperCase(), opponentId: String(opponent.player_id || ""),
+      opponentUrl: opponent.player_id ? apiPlayerUrl(opponent.player_id) : "", map: String(match.map_name || match.map_raw || ""),
+      elo, result: won ? "승" : lost ? "패" : "무",
+      eloText: won ? "+" + Math.abs(elo).toFixed(1) : lost ? "-" + Math.abs(elo).toFixed(1) : "0.0",
+      format: String(match.format_raw || ""), memo: [match.event_name, match.round_label, match.memo].filter(Boolean).join(" · "),
+      url: "https://eloboard.com/matches/" + encodeURIComponent(match.id || [match.played_on, opponent.player_id, match.map_name].join("-")), source: "eloboard-api"
+    };
+  }).filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.date));
+}
+
+async function loadApiProfile(playerId, force = false) {
+  const cacheKey = "api:" + String(playerId);
+  const cached = profileCache.get(cacheKey);
+  if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
+  const [player, matches, rivals] = await Promise.all([
+    fetchEloApi("/players/" + encodeURIComponent(playerId)),
+    // 현재 ELOBoard API의 한 번 요청 최대치는 200경기입니다.
+    fetchEloApi("/matches", { player_id: playerId, limit: 200, offset: 0 }),
+    fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals").catch(() => [])
+  ]);
+  if (!player?.id || !String(player.name || "").trim()) throw new Error("ELOBoard 선수 정보를 확인하지 못했습니다.");
+  const total = apiRecord(player.wins, player.losses, player.games);
+  const profile = {
+    wrId: String(player.id), name: String(player.display_name || player.name), race: apiRaceName(player.main_race),
+    division: player.division === "men" ? "men" : "women", url: apiPlayerUrl(player.id), image: apiImageUrl(player.thumb_url),
+    broadcastId: String(player.soop_id || ""), broadcastUrl: player.soop_id ? "https://play.sooplive.co.kr/" + encodeURIComponent(player.soop_id) : "",
+    info: { elo: String(player.elo_raw || ""), source: "ELOBoard" }, total, women: player.division === "women" ? total : null, mixed: null,
+    records: [], raceTotals: { women: {}, mixed: {}, combined: {} }, recent30: null,
+    mostMatches: (Array.isArray(rivals) ? rivals : []).slice(0, 7).map((item) => ({ name: item.name, wins: Number(item.wins || 0), losses: Number(item.losses || 0), wrId: String(item.player_id || ""), url: item.player_id ? apiPlayerUrl(item.player_id) : "" })),
+    matches: mergeProfileRows(apiMatchRows(matches, player.id))
+  };
+  profile.recent30 = inferRecent30(profile.matches);
+  profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
+  void rememberProfileSnapshot(profile);
+  return profile;
+}
 function playersFromMatches(matches) {
   const map = new Map();
   for (const match of matches) {
@@ -941,6 +1022,17 @@ async function searchAllPlayerCandidates(name, force = false) {
 }
 
 async function searchPlayerCandidates(name) {
+  // 새 ELOBoard는 선수 검색 API가 여성·남성을 함께 반환합니다.
+  try {
+    const players = await fetchEloApi("/players", { q: name });
+    const converted = (Array.isArray(players) ? players : []).map((player) => ({
+      name: String(player.display_name || player.name || ""), wrId: String(player.id || ""),
+      url: apiPlayerUrl(player.id), source: "eloboard-api", division: player.division === "men" ? "men" : "women"
+    })).filter((player) => player.name && player.wrId);
+    if (converted.length) return findPlayers(name, [], converted);
+  } catch (error) {
+    console.warn("ELOBoard API player search unavailable; trying legacy search:", error.message);
+  }
   const searchUrl = BJ_LIST_URL + "&sfl=wr_subject&stx=" + encodeURIComponent(name);
   const response = await fetchWithRetry(searchUrl, {
     headers: {
@@ -1466,6 +1558,12 @@ async function loadProfile(wrId, force = false) {
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
   const promise = (async () => {
     try {
+      // ELOBoard가 새 API로 전환되어, 현재 선수 번호와 경기 목록은 API를 우선 사용합니다.
+      try {
+        return await loadApiProfile(wrId, force);
+      } catch (apiError) {
+        console.warn("ELOBoard API profile unavailable; trying legacy profile:", apiError.message);
+      }
       const response = await fetchWithRetry(
         playerUrl(wrId),
         { headers: { "User-Agent": "Mozilla/5.0 eloboard-women-search", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8" } },
@@ -1502,6 +1600,13 @@ async function loadMenProfile(wrId, force = false, playerName = "") {
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
   const promise = (async () => {
     try {
+      try {
+        const profile = await loadApiProfile(wrId, force);
+        profile.division = "men";
+        return profile;
+      } catch (apiError) {
+        console.warn("ELOBoard men API profile unavailable; trying legacy profile:", apiError.message);
+      }
       const url = menPlayerUrl(wrId);
       const allRowsPromise = playerName ? fetchMenAllRows(playerName).catch((error) => {
         console.warn("Men all-period rows unavailable:", error.message);
@@ -3672,22 +3777,12 @@ const server = http.createServer(async (req, res) => {
           resultState: profile ? "found" : "empty"
         }, null, 2), "application/json; charset=utf-8");
       }
-      // 이아깽 저장 전적은 새로고침·직접 검색에서도 ELOBoard에 다시 요청하지 않습니다.
-      if (normalizeName(query) === normalizeName("이아깽")) {
-        const profile = await loadStoredIakkangProfile();
-        if (profile) {
-          const autoDiarySync = await syncSpawnDiaryNow(query, profile);
-          return send(res, 200, JSON.stringify({
-            source: "ssustar.iwinv.net + Google Sheets",
-            fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [],
-            ...summarize([], query),
-            players: [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "saved-iakkang-records" }],
-            profile, autoDiarySync, resultState: "found"
-          }, null, 2), "application/json; charset=utf-8");
-        }
-      }
       // 남성전적은 별도 게시판을 사용하므로 여성 게시판을 읽지 못해도 검색을 계속합니다.
-      const dataPromise = loadData(url.searchParams.get("pages"), force).catch((error) => {
+      // 선수 이름 검색은 새 API의 선수·경기 정보를 사용하므로, 폐기된 게시판 전체를 함께 읽지 않습니다.
+      const dataPromise = (query
+        ? Promise.resolve({ source: ELOBOARD_API_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [] })
+        : loadData(url.searchParams.get("pages"), force)
+      ).catch((error) => {
         if (query) {
           console.warn("Women board unavailable; continuing with player search:", error.message);
           return { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [] };
