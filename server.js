@@ -1843,10 +1843,16 @@ function selectOptions(html, name) {
     .map((match) => ({ value: cleanText(match[1]), label: cleanText(match[2]) })).filter((item) => item.value.trim());
 }
 async function loadMenOptions() {
-  const response = await fetch(MEN_LIST_URL, { headers: { "User-Agent": "Mozilla/5.0 elo-kitten men records", "Accept-Language": "ko-KR,ko;q=0.9" } });
-  if (!response.ok) throw new Error("남성 선수 목록 응답 오류: " + response.status);
-  const html = await response.text();
-  return { players: selectOptions(html, "wr_3").map((item) => item.label), maps: selectOptions(html, "wr_subject").map((item) => item.label) };
+  // 기존 men/bbs 검색 주소는 새 ELOBoard에서 더 이상 전적 검색을 제공하지 않습니다.
+  // 자동완성은 가볍게 첫 목록만 사용하고, 실제 선수 확인은 아래 새 API 검색으로 합니다.
+  const players = await fetchEloApi("/players", { division: "men", limit: 200, offset: 0 });
+  return {
+    players: [...new Set((Array.isArray(players) ? players : [])
+      .filter((player) => player.division === "men")
+      .map((player) => String(player.display_name || player.name || "").trim())
+      .filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
+    maps: []
+  };
 }
 function parseMenPairRecord(html, player1, player2) {
   let wins = 0;
@@ -1902,11 +1908,47 @@ function parseMenRecord(html, filters = {}) {
   return { raceRecords, opponents };
 }
 async function fetchMenRecords(filters) {
-  const body = new URLSearchParams({ wr_1: filters.startDate || "", wr_2: filters.endDate || "", wr_3: filters.player1 || " ", wr_4: filters.player2 || " ", wr_5: filters.memo || "", wr_6: filters.inputBy || "", wr_subject: filters.map || " ", sear: "", b_id: "eloboard" });
-  if (filters.proLeague) body.set("wr_8", "1");
-  const response = await fetch(MEN_SEARCH_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "Mozilla/5.0 elo-kitten men records" }, body });
-  if (!response.ok) throw new Error("남성전적 응답 오류: " + response.status);
-  return parseMenRecord(await response.text(), filters);
+  const player1Name = String(filters.player1 || "").trim();
+  const player2Name = String(filters.player2 || "").trim();
+  if (!player1Name || !player2Name) throw new Error("플레이어 1과 플레이어 2의 이름을 모두 입력해 주세요.");
+
+  // 새 사이트는 /api/players 검색 결과에 남녀 선수가 함께 있으므로, 남성만 정확히 고릅니다.
+  const findMenProfile = async (name) => {
+    const candidates = await fetchEloApi("/players", { q: name });
+    const normalized = normalizeName(name);
+    const men = (Array.isArray(candidates) ? candidates : []).filter((player) => player.division === "men");
+    const selected = men.find((player) => normalizeName(player.display_name || player.name) === normalized) || men[0];
+    if (!selected?.id) throw new Error("새 ELOBoard에서 남성 선수 '" + name + "'을 찾지 못했습니다.");
+    const profile = await loadApiProfile(selected.id);
+    profile.division = "men";
+    return profile;
+  };
+
+  const [player1, player2] = await Promise.all([findMenProfile(player1Name), findMenProfile(player2Name)]);
+  const opponentKey = normalizeName(player2.name);
+  const directRows = player1.matches
+    .filter((row) => String(row.opponentId) === String(player2.wrId) || normalizeName(row.opponent) === opponentKey)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const rivals = await fetchEloApi("/players/" + encodeURIComponent(player1.wrId) + "/stats/rivals", { q: player2.name }).catch(() => []);
+  const rival = (Array.isArray(rivals) ? rivals : []).find((item) => String(item.player_id) === String(player2.wrId)
+    || normalizeName(item.name) === opponentKey);
+  const wins = rival ? Number(rival.wins || 0) : directRows.filter((row) => row.result === "승").length;
+  const losses = rival ? Number(rival.losses || 0) : directRows.filter((row) => row.result === "패").length;
+  const games = wins + losses;
+  const matches = directRows.map((row) => ({
+    date: row.date, winner: row.result === "승" ? player1.name : player2.name,
+    loser: row.result === "패" ? player1.name : player2.name,
+    map: row.map, elo: row.eloText || row.elo, format: row.format, memo: row.memo
+  }));
+  return {
+    raceRecords: [],
+    opponents: [{
+      name: player2Name, race: player2.race, player1Race: player1.race,
+      wins, losses, rate: games ? Math.round((wins / games) * 1000) / 10 : 0,
+      eloPoint: "-", player1Elo: player1.info?.elo || "", opponentElo: player2.info?.elo || "",
+      player1Image: player1.image || "", opponentImage: player2.image || "", matches
+    }]
+  };
 }
 async function fetchMenAllRows(playerName) {
   const body = new URLSearchParams({ wr_1: "", wr_2: "", wr_3: playerName || " ", wr_4: " ", wr_5: "", wr_6: "", wr_subject: " ", sear: "", b_id: "eloboard" });
@@ -3643,7 +3685,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/api/men/options" && req.method === "GET") {
     try {
       const options = await loadMenOptions();
-      return send(res, 200, JSON.stringify({ ...options, source: MEN_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+      return send(res, 200, JSON.stringify({ ...options, source: ELOBOARD_API_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "남성 선수 목록을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
@@ -3654,7 +3696,7 @@ const server = http.createServer(async (req, res) => {
       const filters = { startDate: String(body.startDate || "").trim(), endDate: String(body.endDate || "").trim(), player1: String(body.player1 || "").trim(), player2: String(body.player2 || "").trim(), map: String(body.map || "").trim(), memo: String(body.memo || "").trim(), inputBy: String(body.inputBy || "").trim(), proLeague: body.proLeague === true };
       if (!filters.player1 && !filters.player2 && !filters.map && !filters.memo && !filters.inputBy && !filters.startDate && !filters.endDate && !filters.proLeague) return send(res, 400, JSON.stringify({ error: "선수 또는 검색 조건을 하나 이상 선택해 주세요." }), "application/json; charset=utf-8");
       const result = await fetchMenRecords(filters);
-      return send(res, 200, JSON.stringify({ ...result, filters, source: MEN_LIST_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+      return send(res, 200, JSON.stringify({ ...result, filters, source: ELOBOARD_API_URL, updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "남성전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
