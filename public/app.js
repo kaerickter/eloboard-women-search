@@ -249,7 +249,7 @@ function sortedYears(rows, date = new Date()) {
   const current = currentKoreaPeriod(date);
   return [...new Set([
     current.year,
-    ...rows.map((row) => String(row.date || "").slice(0, 4)).filter(Boolean)
+    ...rows.map((row) => matchDateKey(row.date).slice(0, 4)).filter(Boolean)
   ])]
     .sort((a, b) => b.localeCompare(a));
 }
@@ -257,12 +257,24 @@ function sortedYears(rows, date = new Date()) {
 function sortedMonths(rows, year, date = new Date()) {
   const current = currentKoreaPeriod(date);
   const months = rows
-    .filter((row) => String(row.date || "").startsWith(year + "-"))
-    .map((row) => String(row.date || "").slice(5, 7))
+    .filter((row) => matchDateKey(row.date).startsWith(year + "-"))
+    .map((row) => matchDateKey(row.date).slice(5, 7))
     .filter(Boolean);
   if (year === current.year) months.push(current.month);
   return [...new Set(months)]
     .sort((a, b) => b.localeCompare(a));
+}
+
+function matchDateKey(value) {
+  const source = String(value || "").trim();
+  const found = source.match(/^(\d{4})[^\d]?(\d{1,2})[^\d]?(\d{1,2})/);
+  if (!found) return source;
+  return found[1] + "-" + found[2].padStart(2, "0") + "-" + found[3].padStart(2, "0");
+}
+
+function selectedPeriodPrefix() {
+  if (!state.selectedYear || !state.selectedMonth) return "";
+  return state.selectedYear + "-" + String(state.selectedMonth).padStart(2, "0");
 }
 
 function periodStats(rows) {
@@ -307,7 +319,7 @@ function currentMatchDay(now = new Date()) {
 }
 
 function isCurrentMatchDayRow(row, window = currentMatchWindow()) {
-  const date = String(row?.date || "");
+  const date = matchDateKey(row?.date);
   return date === window.startDate
     || (window.beforeReset && date === window.calendarDay);
 }
@@ -351,9 +363,9 @@ function setSelectOptions(select, values, suffix) {
 }
 
 function selectedMonthRows(rows) {
-  if (!state.selectedYear || !state.selectedMonth) return rows;
-  const prefix = state.selectedYear + "-" + state.selectedMonth;
-  return rows.filter((row) => String(row.date || "").startsWith(prefix));
+  const prefix = selectedPeriodPrefix();
+  if (!prefix) return rows;
+  return rows.filter((row) => matchDateKey(row.date).startsWith(prefix));
 }
 
 function selectedCurrentMonth(date = new Date()) {
@@ -387,16 +399,14 @@ function recentRows(rows, days) {
 function renderRaceRates(data) {
   const rows = getProfileRows(data);
   const yearPrefix = state.selectedYear ? state.selectedYear + "-" : "";
-  const monthPrefix = state.selectedYear && state.selectedMonth
-    ? state.selectedYear + "-" + state.selectedMonth
-    : "";
+  const monthPrefix = selectedPeriodPrefix();
   $("raceYearHeading").textContent = state.selectedYear ? state.selectedYear + "년 승률" : "해당 연도 승률";
   $("raceMonthHeading").textContent = state.selectedMonth ? Number(state.selectedMonth) + "월 승률" : "당월 승률";
 
   for (const race of ["T", "Z", "P"]) {
     const raceRows = rows.filter((row) => String(row.opponentRace || "").toUpperCase() === race);
-    const yearRows = yearPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(yearPrefix)) : [];
-    const monthRows = monthPrefix ? raceRows.filter((row) => String(row.date || "").startsWith(monthPrefix)) : [];
+    const yearRows = yearPrefix ? raceRows.filter((row) => matchDateKey(row.date).startsWith(yearPrefix)) : [];
+    const monthRows = monthPrefix ? raceRows.filter((row) => matchDateKey(row.date).startsWith(monthPrefix)) : [];
     const parsedOverall = data && data.profile && data.profile.raceTotals
       ? data.profile.raceTotals.combined && data.profile.raceTotals.combined[race]
       : null;
@@ -440,8 +450,8 @@ function renderPeriod(data) {
   $("yearRowLabel").textContent = state.selectedYear + TXT.yearSuffix;
   $("monthRowLabel").textContent = displayMonth(state.selectedMonth) + TXT.monthSuffix;
 
-  const yearRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-"));
-  const monthRows = rows.filter((row) => String(row.date || "").startsWith(state.selectedYear + "-" + state.selectedMonth));
+  const yearRows = rows.filter((row) => matchDateKey(row.date).startsWith(state.selectedYear + "-"));
+  const monthRows = rows.filter((row) => matchDateKey(row.date).startsWith(selectedPeriodPrefix()));
   const matchWindow = currentMatchWindow();
   const dayRows = selectedCurrentMonth()
     ? monthRows.filter((row) => isCurrentMatchDayRow(row, matchWindow))
