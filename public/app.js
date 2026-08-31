@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_NAME = "\uc774\uc544\uae7d";
-const DEFAULT_WR_ID = "780";
+// 새 ELOBoard 선수 ID: 이아깽(기존 wr_id 780 → 현재 선수 ID 627)
+const DEFAULT_WR_ID = "627";
 const SEARCH_SESSION_KEY = "record-search-session-v2";
 const state = {
   query: "",
@@ -37,8 +38,8 @@ function restoreSearchSession() {
     state.selectedMonth = String(saved.selectedMonth || "");
     render(saved.data);
     const isIakkang = cleanName(saved.name) === cleanName(DEFAULT_NAME);
-    setSearchState("success", isIakkang ? "저장된 이아깽 전적을 바로 표시했습니다." : "이전에 보던 검색 결과를 복원했습니다.");
-    // 기존 화면은 즉시 유지하고, 이아깽만 뒤에서 저장소의 최신본을 조용히 확인합니다.
+    setSearchState("success", isIakkang ? "이전 이아깽 검색 결과를 표시한 뒤 최신 전적을 확인합니다." : "이전에 보던 검색 결과를 복원했습니다.");
+    // 기존 화면은 즉시 유지하고, 이아깽만 뒤에서 ELOBoard 최신본을 조용히 확인합니다.
     if (isIakkang) setTimeout(() => { load(DEFAULT_NAME, false, true).catch(() => {}); }, 0);
     return true;
   } catch {
@@ -467,8 +468,7 @@ function renderProfile(data) {
   if (!state.query.trim() || !profile) {
     $("profileLink").innerHTML = "";
     if (cleanName(state.query) === cleanName(DEFAULT_NAME)) {
-      $("profile").innerHTML = '<div class="empty">수술대 최초 전적을 저장하면 ELOBoard 연결 없이 이아깽 전적을 표시합니다.</div>' + iakkangImportMarkup();
-      bindIakkangRecordButtons();
+      $("profile").innerHTML = '<div class="empty">선수 전적을 찾지 못했습니다.</div>';
     } else {
       $("profile").innerHTML = '<div class="empty">' + TXT.noProfile + '</div>';
     }
@@ -505,7 +505,8 @@ function renderProfile(data) {
     const resultClass = match.elo >= 0 ? "result-win" : "result-loss";
     const deltaClass = match.elo >= 0 ? "delta-plus" : "delta-minus";
     const memo = escapeHtml(match.memo || "-");
-    return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="ELO" class="' + deltaClass + '">' + escapeHtml(match.eloText) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
+    const result = match.result || (match.elo >= 0 ? "승" : "패");
+    return '<div class="profile-match ' + resultClass + '"><span data-label="날짜">' + match.date + '</span><strong data-label="상대">' + escapeHtml(match.opponent) + '</strong><span data-label="맵">' + escapeHtml(match.map) + '</span><span data-label="결과" class="' + deltaClass + '">' + escapeHtml(result) + '</span><span data-label="경기방식">' + escapeHtml(match.format) + '</span><span data-label="메모" class="profile-match-memo" title="' + memo + '">' + memo + '</span></div>';
   };
   const matchWindow = currentMatchWindow();
   const dayRows = selectedCurrentMonth()
@@ -521,42 +522,14 @@ function renderProfile(data) {
     ? dayGroup + otherRows.map(renderMatchRow).join("")
     : '<div class="empty">' + TXT.noData + '</div>';
 
-  const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>ELO</span><span>경기방식</span><span>메모</span></div>';
+  const matchHeader = '<div class="profile-match profile-match-head"><span>날짜</span><span>상대</span><span>맵</span><span>결과</span><span>경기방식</span><span>메모</span></div>';
 
-  const iakkangControls = cleanName(profile.name) === cleanName(DEFAULT_NAME) ? iakkangImportMarkup(profile.importedRecordStatus) : '';
-  $("profile").innerHTML = '<div class="profile-title"><div class="profile-identity">' + avatarMarkup(profile.name, profile.image) + '<div><strong>' + escapeHtml(profile.name) + '</strong><span>wr_id=' + profile.wrId + '</span></div></div></div>' +
-    iakkangControls +
+  $("profile").innerHTML = '<div class="profile-title"><div class="profile-identity">' + avatarMarkup(profile.name, profile.image) + '<div><strong>' + escapeHtml(profile.name) + '</strong><span>선수 ID=' + profile.wrId + '</span></div></div></div>' +
     '<div class="profile-cards">' + cards.map((card) => '<div class="profile-card"><span>' + card[0] + '</span><strong>' + card[1] + '</strong><small>' + card[2] + '</small></div>').join("") + '</div>' +
     most +
     '<div class="profile-section profile-period-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
   bindImageFallbacks($("profile"));
-  bindIakkangRecordButtons();
   renderIakkangMatchupPanel(profile);
-}
-
-function iakkangImportMarkup(status = {}) {
-  return '<div class="record-import record-import-primary"><div class="record-import-actions"><button id="importSheetRecords" type="button">전적 가져오기</button></div></div>';
-}
-
-function bindIakkangRecordButtons() {
-  const sheetButton = $("importSheetRecords");
-  const runImport = async (button, endpoint) => {
-    if (!button) return;
-    const originalLabel = button.textContent;
-    button.disabled = true;
-    button.textContent = "가져오는 중...";
-    try {
-      const result = await requestJson(endpoint, { method: "POST" });
-      setSearchState("success", result.message || "전적을 저장했습니다.");
-      await search(false);
-    } catch (error) {
-      setSearchState("error", error.message || "전적을 가져오지 못했습니다.");
-    } finally {
-      button.disabled = false;
-      button.textContent = originalLabel;
-    }
-  };
-  if (sheetButton) sheetButton.addEventListener("click", () => runImport(sheetButton, "/api/iakkang-records/import-sheet"));
 }
 
 function renderIakkangMatchupPanel(profile) {
@@ -570,7 +543,7 @@ function renderIakkangMatchupPanel(profile) {
   const render = () => {
     const query = cleanName(input.value);
     if (!query) {
-      result.innerHTML = '상대 이름을 입력하면 저장된 이아깽 전적을 표시합니다.';
+      result.innerHTML = '상대 이름을 입력하면 현재 불러온 이아깽 전적을 표시합니다.';
       return;
     }
     const cutoff = new Date();
