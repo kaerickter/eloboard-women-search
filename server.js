@@ -109,6 +109,9 @@ const menDirectSearchCache = new Map();
 let playerIndexPromise = null;
 let profileCache = new Map();
 let profilePromises = new Map();
+let matchupProfileCache = new Map();
+let matchupProfilePromises = new Map();
+let eloApiNextRequestAt = 0;
 const profileSnapshotMemory = new Map();
 let profileSnapshotSchemaPromise = null;
 let iakkangRecordStoreReady = false;
@@ -127,6 +130,8 @@ let channelAliases = {};
 let menBroadcastMapRows = [];
 let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
+const ELO_API_REQUEST_INTERVAL_MS = 180;
+const ELO_API_429_RETRY_MS = 2500;
 const PROFILE_SNAPSHOT_LIMIT = 120;
 const PROFILE_SNAPSHOT_MATCH_LIMIT = 250;
 const LIVE_CACHE_MS = 1000 * 15;
@@ -851,11 +856,23 @@ async function fetchEloApi(path, params = {}) {
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
   }
-  const response = await fetchWithRetry(ELOBOARD_API_URL + path + (query.size ? "?" + query : ""), {
-    headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0 elo-kitten" }
-  }, 1);
-  if (!response.ok) throw new Error("ELOBoard API response error: " + response.status);
-  return response.json();
+  const url = ELOBOARD_API_URL + path + (query.size ? "?" + query : "");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    // 모든 화면이 같은 ELOBoard API를 쓰므로 요청을 짧게 간격 두어 429를 예방합니다.
+    const waitMs = Math.max(0, eloApiNextRequestAt - Date.now());
+    eloApiNextRequestAt = Math.max(Date.now(), eloApiNextRequestAt) + ELO_API_REQUEST_INTERVAL_MS;
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    const response = await fetchWithRetry(url, {
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0 elo-kitten" }
+    }, 1);
+    if (response.ok) return response.json();
+    if (response.status !== 429 || attempt === 1) {
+      throw new Error("ELOBoard API response error: " + response.status);
+    }
+    // 제한에 걸렸을 때는 바로 재요청하지 않고 한 번만 쉬었다가 다시 시도합니다.
+    await new Promise((resolve) => setTimeout(resolve, ELO_API_429_RETRY_MS));
+  }
+  throw new Error("ELOBoard API response error: 429");
 }
 
 function apiMatchRows(matches, playerId) {
@@ -903,6 +920,7 @@ async function loadApiProfile(playerId, force = false) {
     info: { elo: String(player.elo_raw || ""), source: "ELOBoard" }, total, women: player.division === "women" ? total : null, mixed: null,
     records: [], raceTotals: { women: {}, mixed: {}, combined: {} }, recent30: null,
     mostMatches: (Array.isArray(rivals) ? rivals : []).slice(0, 7).map((item) => ({ name: item.name, wins: Number(item.wins || 0), losses: Number(item.losses || 0), wrId: String(item.player_id || ""), url: item.player_id ? apiPlayerUrl(item.player_id) : "" })),
+    rivals: Array.isArray(rivals) ? rivals : [],
     matches: mergeProfileRows(apiMatchRows(matches, player.id))
   };
   profile.recent30 = inferRecent30(profile.matches);
@@ -1737,13 +1755,26 @@ async function loadMatchupPlayers(query = "") {
   })).filter((player) => player.name && player.wrId);
 }
 async function findMatchupProfile(name) {
-  const players = await searchAllPlayerCandidates(name);
   const key = normalizeName(name);
-  const selected = players.find((player) => normalizeName(player.name) === key) || players[0];
-  if (!selected?.wrId) return null;
-  return selected.division === "men"
-    ? loadMenProfile(selected.wrId, false, selected.name)
-    : loadProfile(selected.wrId, false);
+  const cached = matchupProfileCache.get(key);
+  if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
+  if (matchupProfilePromises.has(key)) return matchupProfilePromises.get(key);
+  const task = (async () => {
+    const players = await searchAllPlayerCandidates(name);
+    const selected = players.find((player) => normalizeName(player.name) === key) || players[0];
+    if (!selected?.wrId) return null;
+    const profile = selected.division === "men"
+      ? await loadMenProfile(selected.wrId, false, selected.name)
+      : await loadProfile(selected.wrId, false);
+    if (profile) matchupProfileCache.set(key, { cacheTime: Date.now(), profile });
+    return profile;
+  })();
+  matchupProfilePromises.set(key, task);
+  try {
+    return await task;
+  } finally {
+    matchupProfilePromises.delete(key);
+  }
 }
 async function loadMatchupPhotos(rawNames) {
   const names = [...new Set((rawNames || []).map((name) => String(name || "").trim()).filter(Boolean))].slice(0, 24);
@@ -1805,9 +1836,9 @@ async function fetchMatchup(main, opponent) {
     findMatchupProfile(main), findMatchupProfile(opponent)
   ]);
   if (!mainProfile || !opponentProfile) throw new Error("선수 정보를 찾지 못했습니다.");
-  const [rivals] = await Promise.all([
-    fetchEloApi("/players/" + encodeURIComponent(mainProfile.wrId) + "/stats/rivals", { q: opponentProfile.name }).catch(() => [])
-  ]);
+  // 프로필을 불러올 때 이미 받은 전체 상대전적을 재사용합니다.
+  // 대학대결의 여러 조합마다 같은 API를 다시 호출하지 않아 429를 막습니다.
+  const rivals = Array.isArray(mainProfile.rivals) ? mainProfile.rivals : [];
   const opponentKey = normalizeName(opponentProfile.name);
   const directRows = (mainProfile.matches || []).filter((row) =>
     String(row.opponentId || "") === String(opponentProfile.wrId)
@@ -2459,13 +2490,19 @@ function matchupFromMenResult(result, main, opponent) {
 }
 
 async function fetchUniversityPair(pair) {
-  // 대학 페이지의 문자 티어(갓/킹/잭/조커)는 남성 전적, 숫자 티어는 여성·혼성 전적 체계를 사용한다.
-  // 이미지가 없는 선수도 있어 프로필 이미지 경로보다 티어 표기를 우선한다.
-  const useMen = !/^\d+$/.test(pair.tier);
-  const record = useMen
-    ? matchupFromMenResult(await fetchMenRecords({ player1: pair.playerA.name, player2: pair.playerB.name }), pair.playerA.name, pair.playerB.name)
-    : await fetchMatchup(pair.playerA.name, pair.playerB.name);
-  return { tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB, ...record };
+  // 프로필·상대전적 캐시를 공유하는 같은 조회 경로를 사용합니다.
+  // 남성·여성 모두 새 API에서 가져오며 조합마다 중복 호출하지 않습니다.
+  try {
+    const record = await fetchMatchup(pair.playerA.name, pair.playerB.name);
+    return { tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB, ...record };
+  } catch (error) {
+    // 새 ELOBoard로 아직 이전되지 않은 선수가 있어도 전체 대학대결을 실패시키지 않습니다.
+    return {
+      tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB,
+      main: pair.playerA.name, opponent: pair.playerB.name,
+      total: [0, 0], recent: [0, 0], lastPlayed: "전적 미확인", maps: [], unavailable: true
+    };
+  }
 }
 
 async function mapConcurrent(items, limit, mapper) {
