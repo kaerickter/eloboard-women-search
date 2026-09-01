@@ -2157,6 +2157,18 @@ function tierBasedUniversityRoster(players, university) {
   });
 }
 
+function universitySharedTiers(rosterA, rosterB) {
+  const tierValue = (value) => String(value || "").trim().replace(/\s*티어$/i, "");
+  const tiersA = new Set(rosterA.map((player) => tierValue(player.tier)).filter(Boolean));
+  const tiersB = new Set(rosterB.map((player) => tierValue(player.tier)).filter(Boolean));
+  const order = new Map([
+    ["갓", 0], ["킹", 1], ["잭", 2], ["조커", 3], ["스페이드", 4],
+    ...Array.from({ length: 10 }, (_, index) => [String(index), index + 5]), ["FA", 20]
+  ]);
+  return [...tiersA].filter((tier) => tiersB.has(tier))
+    .sort((a, b) => (order.get(a) ?? 99) - (order.get(b) ?? 99));
+}
+
 function scheduleChannelRegistrySave() {
   if (channelRegistrySaveTimer) return;
   channelRegistrySaveTimer = setTimeout(() => {
@@ -3711,6 +3723,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ university: name, players, source: "현재 티어표", updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "대학 선수 명단을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/universities/tier-matchup" && req.method === "GET") {
+    try {
+      const universityA = String(url.searchParams.get("universityA") || "").trim();
+      const universityB = String(url.searchParams.get("universityB") || "").trim();
+      if (!universityA || !universityB || universityA === universityB) {
+        return send(res, 400, JSON.stringify({ error: "서로 다른 두 대학을 선택해 주세요." }), "application/json; charset=utf-8");
+      }
+      const tierPlayers = await loadTierBasedUniversityPlayers();
+      const universities = new Set(tierBasedUniversities(tierPlayers).map((item) => item.name));
+      if (!universities.has(universityA) || !universities.has(universityB)) {
+        return send(res, 400, JSON.stringify({ error: "현재 티어표에 없는 대학입니다." }), "application/json; charset=utf-8");
+      }
+      const rosterA = tierBasedUniversityRoster(tierPlayers, universityA);
+      const rosterB = tierBasedUniversityRoster(tierPlayers, universityB);
+      return send(res, 200, JSON.stringify({
+        universityA, universityB, tiers: universitySharedTiers(rosterA, rosterB), source: "현재 티어표"
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, 502, JSON.stringify({ error: error.message || "티어 대진을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/universities/matchup" && req.method === "POST") {
