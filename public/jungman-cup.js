@@ -32,6 +32,7 @@ const cupStatsEmpty = document.getElementById("cupStatsEmpty");
 const authenticated = true;
 let selectedMatch = null;
 let state = readState();
+const fixtureTierTooltipCache = new Map();
 PLAYOFFS.forEach((stage) => {
   if (!Array.isArray(state.playoffs?.[stage.key])) state.playoffs[stage.key] = emptyPlayoffs()[stage.key];
 });
@@ -186,22 +187,45 @@ function getPlayoffMatch(stageKey, index) {
   return { key, match: state.matches[key] };
 }
 
-// 날짜 위에 마우스를 올리면, 경기등록에 입력한 양쪽 출전자를 바로 확인할 수 있습니다.
-// 조별리그·8강·4강·결승 모두 같은 형식으로 표시합니다.
+function fixtureTierKey(fixture) {
+  return [String(fixture?.home || "").trim(), String(fixture?.away || "").trim()].join("::");
+}
+
+function tierLabel(tier) {
+  const value = String(tier || "").trim();
+  return value ? (value.endsWith("티어") ? value : value + "티어") : "티어 미정";
+}
+
+// 날짜 위에는 출전자 기록이 아니라 티어표 기준의 대학별 같은 티어 대결을 표시합니다.
+// 조별리그·8강·4강·결승 모두 같은 형식으로 사용합니다.
 function fixtureMatchupTitle(stage, index, fixture) {
   const home = String(fixture?.home || "").trim();
   const away = String(fixture?.away || "").trim();
   if (!home || !away) return "대학 대진이 아직 정해지지 않았습니다.";
-  const key = matchKey(stage, home, away);
-  const games = Array.isArray(state.matches?.[key]?.games) ? state.matches[key].games : [];
-  const playerLines = games.map((game, gameIndex) => {
-    const homePlayer = String(game?.homePlayer || "").trim();
-    const awayPlayer = String(game?.awayPlayer || "").trim();
-    return homePlayer && awayPlayer ? (gameIndex + 1) + "세트 · " + homePlayer + " vs " + awayPlayer : "";
-  }).filter(Boolean);
+  const tiers = fixtureTierTooltipCache.get(fixtureTierKey(fixture));
+  if (!tiers) return fixtureStageName(stage) + " " + (index + 1) + "경기\n티어 대진을 불러오는 중입니다.";
   return [fixtureStageName(stage) + " " + (index + 1) + "경기", home + " vs " + away]
-    .concat(playerLines.length ? playerLines : ["출전자 대진은 아직 등록되지 않았습니다."])
+    .concat(tiers.length ? tiers.map((tier) => home + " " + tierLabel(tier) + " vs " + away + " " + tierLabel(tier)) : ["같은 티어 대진이 없습니다."])
     .join("\n");
+}
+
+async function loadFixtureTierTooltips() {
+  const fixtures = GROUPS.flatMap((group) => state.fixtures?.[group] || [])
+    .concat(PLAYOFFS.flatMap((stage) => state.playoffs?.[stage.key] || []))
+    .filter((fixture) => fixture?.home && fixture?.away);
+  const uniqueFixtures = [...new Map(fixtures.map((fixture) => [fixtureTierKey(fixture), fixture])).values()];
+  await Promise.all(uniqueFixtures.map(async (fixture) => {
+    const key = fixtureTierKey(fixture);
+    try {
+      const response = await fetch("/api/universities/tier-matchup?universityA=" + encodeURIComponent(fixture.home) + "&universityB=" + encodeURIComponent(fixture.away));
+      const data = await response.json();
+      fixtureTierTooltipCache.set(key, response.ok ? (data.tiers || []) : []);
+    } catch {
+      fixtureTierTooltipCache.set(key, []);
+    }
+  }));
+  renderGroups();
+  renderPlayoffs();
 }
 
 function renderGroups() {
@@ -495,6 +519,8 @@ cupAdminSave.addEventListener("click", () => {
   renderGroups();
   renderPlayoffs();
   renderMatchPanel();
+  fixtureTierTooltipCache.clear();
+  void loadFixtureTierTooltips();
   cupAdminStatus.textContent = completed.length + "개 대전을 저장하고 화면에 반영했습니다.";
   cupAdminDialog.close();
 });
@@ -502,6 +528,7 @@ cupAdminSave.addEventListener("click", () => {
 cupAdminReset.addEventListener("click", () => {
   state = { fixtures: emptyFixtures(), playoffs: emptyPlayoffs(), matches: state.matches || {} };
   saveState();
+  fixtureTierTooltipCache.clear();
   selectedMatch = null;
   renderGroupEditor();
   renderPlayoffEditor();
@@ -514,3 +541,4 @@ cupAdminReset.addEventListener("click", () => {
 renderGroups();
 renderPlayoffs();
 renderMatchPanel();
+void loadFixtureTierTooltips();
