@@ -1213,6 +1213,26 @@
       background: #7771e7 !important;
       box-shadow: none !important;
     }
+
+    /* 대포 번호 뽑기 미리보기: 빙고판 데이터와는 연결하지 않습니다. */
+    .cannon-preview { overflow: hidden; }
+    .cannon-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .cannon-preview-badge { padding: 4px 8px; border-radius: 999px; background: #eef0ff; color: #5952c8; font-size: 11px; font-weight: 900; }
+    .cannon-preview-hint { margin: 7px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .cannon-stage { position: relative; min-height: 164px; padding: 14px; overflow: hidden; border: 1px solid #dce0f5; border-radius: 14px; background: radial-gradient(circle at 50% 18%, #ffffff 0 18%, #eef2ff 68%, #e4e8fb 100%); }
+    .cannon-stage::before { content: ""; position: absolute; top: 50%; left: -12px; width: 74px; height: 42px; border: 7px solid #625fd1; border-radius: 0 28px 28px 0; background: linear-gradient(180deg, #9693f2, #5d5ac5); box-shadow: inset 0 5px 0 rgba(255,255,255,.28), 0 8px 15px rgba(65,61,153,.22); transform: translateY(-50%); }
+    .cannon-stage::after { content: ""; position: absolute; left: 49px; top: 50%; width: 0; height: 0; border-top: 17px solid transparent; border-bottom: 17px solid transparent; border-left: 34px solid #ff8152; transform: translateY(-50%); filter: drop-shadow(0 3px 2px rgba(180,68,32,.28)); }
+    .cannon-ball { position: absolute; z-index: 1; top: 50%; left: 54%; display: grid; width: 86px; height: 86px; place-items: center; border: 6px solid #fff; border-radius: 50%; color: #fff; background: radial-gradient(circle at 32% 26%, #fff 0 7%, #ffc38f 8% 16%, #ff8052 42%, #ec4e45 100%); box-shadow: 0 14px 24px rgba(210,65,51,.32), inset -8px -10px 0 rgba(151,35,46,.18); font-size: 36px; font-weight: 950; transform: translate(-50%, -50%); }
+    .cannon-ball.is-fired { animation: cannon-pop .52s cubic-bezier(.2, .8, .3, 1.25); }
+    @keyframes cannon-pop { 0% { transform: translate(-180%, -50%) scale(.55); opacity: .15; } 70% { transform: translate(-42%, -50%) scale(1.16); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); } }
+    .cannon-preview-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+    .cannon-preview-controls label { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 800; }
+    .cannon-preview-controls input[type="number"] { width: 68px; min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; text-align: center; }
+    .cannon-preview-options { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+    .cannon-preview-options label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 750; }
+    .cannon-recent { margin: 11px 0 0; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .cannon-recent output { display: inline; color: #554fc4; font-weight: 950; }
+    @media (max-width: 520px) { .cannon-stage { min-height: 145px; } .cannon-ball { left: 59%; width: 72px; height: 72px; font-size: 30px; } }
   </style>
   </head>
 <body class="bingo-page">
@@ -1348,6 +1368,21 @@
           <button class="button primary" id="randomFill" type="button">랜덤 채우기</button>
         </div>
         <div class="status" id="status">예: 1 ~ 30 입력 후 랜덤 채우기</div>
+      </section>
+
+      <section class="section cannon-preview" aria-label="대포 번호 뽑기 미리보기">
+        <div class="cannon-preview-head"><div class="label">대포 번호 뽑기</div><span class="cannon-preview-badge">미리보기</span></div>
+        <p class="cannon-preview-hint">참고 기능처럼 번호를 무작위 순서로 하나씩 뽑습니다. 현재 빙고판에는 아직 적용되지 않습니다.</p>
+        <div class="cannon-stage" aria-live="polite"><output id="cannonBall" class="cannon-ball" aria-label="뽑힌 번호">?</output></div>
+        <div class="cannon-preview-controls">
+          <label for="cannonCount">공 갯수 <input id="cannonCount" type="number" value="30" min="3" max="10000" inputmode="numeric"></label>
+          <button class="button primary" id="cannonFire" type="button">발사</button>
+        </div>
+        <div class="cannon-preview-options">
+          <label><input id="cannonDuplicates" type="checkbox"> 중복 번호 허용</label>
+          <button class="button" id="cannonRestart" type="button">다시</button>
+        </div>
+        <p class="cannon-recent">최근 나온 번호: <output id="cannonRecent">아직 없음</output></p>
       </section>
 
       <section class="section">
@@ -2155,6 +2190,52 @@
       realtimeRoom?.sendSet("territoryBingoPoints", state.territoryBingoPoints, 0);
       render();
     });
+
+    // 대포 번호 뽑기 미리보기는 빙고판과 완전히 분리되어 있어 현재 방송 데이터는 바꾸지 않습니다.
+    const cannonBall = document.getElementById("cannonBall");
+    const cannonCount = document.getElementById("cannonCount");
+    const cannonDuplicates = document.getElementById("cannonDuplicates");
+    const cannonRecent = document.getElementById("cannonRecent");
+    let cannonPool = [];
+    let cannonHistory = [];
+
+    function cannonTotal() {
+      const total = Math.min(10000, Math.max(3, Number.parseInt(cannonCount.value, 10) || 30));
+      cannonCount.value = String(total);
+      return total;
+    }
+
+    function resetCannonPreview() {
+      cannonPool = Array.from({ length: cannonTotal() }, (_, index) => index + 1);
+      cannonHistory = [];
+      cannonBall.textContent = "?";
+      cannonBall.classList.remove("is-fired");
+      cannonRecent.textContent = "아직 없음";
+    }
+
+    function fireCannonPreview() {
+      const total = cannonTotal();
+      if (!cannonDuplicates.checked && !cannonPool.length) {
+        cannonRecent.textContent = "모든 번호를 뽑았습니다. 다시를 눌러 주세요.";
+        return;
+      }
+      const value = cannonDuplicates.checked
+        ? Math.floor(Math.random() * total) + 1
+        : cannonPool.splice(Math.floor(Math.random() * cannonPool.length), 1)[0];
+      cannonHistory.unshift(value);
+      cannonHistory = cannonHistory.slice(0, 10);
+      cannonBall.textContent = String(value);
+      cannonBall.classList.remove("is-fired");
+      void cannonBall.offsetWidth;
+      cannonBall.classList.add("is-fired");
+      cannonRecent.textContent = cannonHistory.join(" · ") + (cannonDuplicates.checked ? " (중복 허용)" : "");
+    }
+
+    document.getElementById("cannonFire").addEventListener("click", fireCannonPreview);
+    document.getElementById("cannonRestart").addEventListener("click", resetCannonPreview);
+    cannonCount.addEventListener("change", resetCannonPreview);
+    cannonDuplicates.addEventListener("change", resetCannonPreview);
+    resetCannonPreview();
 
     document.getElementById("randomFill").addEventListener("click", randomFill);
     document.getElementById("clearMarks").addEventListener("click", () => {
