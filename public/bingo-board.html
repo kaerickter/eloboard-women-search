@@ -1222,9 +1222,19 @@
     .cannon-stage { position: relative; min-height: 164px; padding: 14px; overflow: hidden; border: 1px solid #dce0f5; border-radius: 14px; background: radial-gradient(circle at 50% 18%, #ffffff 0 18%, #eef2ff 68%, #e4e8fb 100%); }
     .cannon-stage::before { content: ""; position: absolute; top: 50%; left: -12px; width: 74px; height: 42px; border: 7px solid #625fd1; border-radius: 0 28px 28px 0; background: linear-gradient(180deg, #9693f2, #5d5ac5); box-shadow: inset 0 5px 0 rgba(255,255,255,.28), 0 8px 15px rgba(65,61,153,.22); transform: translateY(-50%); }
     .cannon-stage::after { content: ""; position: absolute; left: 49px; top: 50%; width: 0; height: 0; border-top: 17px solid transparent; border-bottom: 17px solid transparent; border-left: 34px solid #ff8152; transform: translateY(-50%); filter: drop-shadow(0 3px 2px rgba(180,68,32,.28)); }
+    .cannon-trail { position: absolute; z-index: 0; top: 50%; left: 58px; width: 0; height: 12px; border-radius: 999px; opacity: 0; background: linear-gradient(90deg, rgba(255, 239, 135, .9), rgba(255, 142, 70, .62), transparent); transform: translateY(-50%); filter: blur(1px); }
+    .cannon-smoke { position: absolute; z-index: 0; top: 50%; left: 54px; width: 17px; height: 17px; border-radius: 50%; opacity: 0; background: rgba(92, 92, 118, .48); transform: translate(-50%, -50%); box-shadow: 18px -9px 0 5px rgba(117, 117, 141, .31), 31px 8px 0 8px rgba(143, 143, 164, .22), 47px -12px 0 3px rgba(103, 103, 128, .18); }
     .cannon-ball { position: absolute; z-index: 1; top: 50%; left: 54%; display: grid; width: 86px; height: 86px; place-items: center; border: 6px solid #fff; border-radius: 50%; color: #fff; background: radial-gradient(circle at 32% 26%, #fff 0 7%, #ffc38f 8% 16%, #ff8052 42%, #ec4e45 100%); box-shadow: 0 14px 24px rgba(210,65,51,.32), inset -8px -10px 0 rgba(151,35,46,.18); font-size: 36px; font-weight: 950; transform: translate(-50%, -50%); }
-    .cannon-ball.is-fired { animation: cannon-pop .52s cubic-bezier(.2, .8, .3, 1.25); }
-    @keyframes cannon-pop { 0% { transform: translate(-180%, -50%) scale(.55); opacity: .15; } 70% { transform: translate(-42%, -50%) scale(1.16); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); } }
+    .cannon-stage.is-firing::before { animation: cannon-recoil .44s cubic-bezier(.2, .8, .3, 1); }
+    .cannon-stage.is-firing::after { animation: cannon-flash .4s ease-out; }
+    .cannon-stage.is-firing .cannon-trail { animation: cannon-trail .48s ease-out; }
+    .cannon-stage.is-firing .cannon-smoke { animation: cannon-smoke .9s ease-out; }
+    .cannon-ball.is-fired { animation: cannon-pop .64s cubic-bezier(.14, .82, .25, 1.18); }
+    @keyframes cannon-recoil { 0%, 100% { transform: translateY(-50%) translateX(0); } 20% { transform: translateY(-50%) translateX(-14px); } 55% { transform: translateY(-50%) translateX(4px); } }
+    @keyframes cannon-flash { 0% { border-top-width: 12px; border-bottom-width: 12px; border-left-width: 22px; opacity: .45; } 16% { border-top-width: 38px; border-bottom-width: 38px; border-left-width: 92px; opacity: 1; filter: drop-shadow(0 0 16px #ffd25c) drop-shadow(0 0 30px #ff7145); } 100% { border-top-width: 17px; border-bottom-width: 17px; border-left-width: 34px; opacity: 1; } }
+    @keyframes cannon-trail { 0% { width: 0; opacity: 1; } 55% { width: calc(54% - 58px); opacity: .92; } 100% { width: calc(62% - 58px); opacity: 0; } }
+    @keyframes cannon-smoke { 0% { opacity: .75; transform: translate(-50%, -50%) scale(.55); } 100% { opacity: 0; transform: translate(85px, -85px) scale(2.2); } }
+    @keyframes cannon-pop { 0% { transform: translate(-405%, -50%) scale(.3) rotate(-16deg); opacity: .1; filter: brightness(2.2); } 30% { transform: translate(-185%, -50%) scale(.78) rotate(10deg); opacity: 1; filter: brightness(1.25); } 72% { transform: translate(-42%, -50%) scale(1.18) rotate(-3deg); opacity: 1; filter: brightness(1); } 100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; } }
     .cannon-preview-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
     .cannon-preview-controls label { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 800; }
     .cannon-preview-controls input[type="number"] { width: 68px; min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; text-align: center; }
@@ -1411,7 +1421,7 @@
         <div><strong id="cannonDialogTitle">랜덤 대포쏘기</strong><span>무작위 순서로 번호를 하나씩 뽑습니다.</span></div>
         <button id="closeCannonDialog" class="cannon-dialog-close" type="button" aria-label="대포 뽑기 닫기">×</button>
       </div>
-      <div class="cannon-stage" aria-live="polite"><output id="cannonBall" class="cannon-ball" aria-label="뽑힌 번호">?</output></div>
+      <div id="cannonStage" class="cannon-stage" aria-live="polite"><span class="cannon-trail" aria-hidden="true"></span><span class="cannon-smoke" aria-hidden="true"></span><output id="cannonBall" class="cannon-ball" aria-label="뽑힌 번호">?</output></div>
       <div class="cannon-preview-controls">
         <label for="cannonCount">공 갯수 <input id="cannonCount" type="number" value="30" min="3" max="10000" inputmode="numeric"></label>
         <button class="button primary" id="cannonFire" type="button">발사</button>
@@ -2213,8 +2223,9 @@
     });
 
     // 대포 번호 뽑기 미리보기는 빙고판과 완전히 분리되어 있어 현재 방송 데이터는 바꾸지 않습니다.
-    const cannonDialog = document.getElementById("cannonDialog");
-    const cannonBall = document.getElementById("cannonBall");
+const cannonDialog = document.getElementById("cannonDialog");
+const cannonStage = document.getElementById("cannonStage");
+const cannonBall = document.getElementById("cannonBall");
     const cannonCount = document.getElementById("cannonCount");
     const cannonDuplicates = document.getElementById("cannonDuplicates");
     const cannonRecent = document.getElementById("cannonRecent");
@@ -2227,11 +2238,12 @@
       return total;
     }
 
-    function resetCannonPreview() {
+function resetCannonPreview() {
       cannonPool = Array.from({ length: cannonTotal() }, (_, index) => index + 1);
       cannonHistory = [];
-      cannonBall.textContent = "?";
-      cannonBall.classList.remove("is-fired");
+    cannonBall.textContent = "?";
+    cannonBall.classList.remove("is-fired");
+    cannonStage.classList.remove("is-firing");
       cannonRecent.textContent = "아직 없음";
     }
 
@@ -2246,10 +2258,13 @@
         : cannonPool.splice(Math.floor(Math.random() * cannonPool.length), 1)[0];
       cannonHistory.unshift(value);
       cannonHistory = cannonHistory.slice(0, 10);
-      cannonBall.textContent = String(value);
-      cannonBall.classList.remove("is-fired");
-      void cannonBall.offsetWidth;
-      cannonBall.classList.add("is-fired");
+    cannonBall.textContent = String(value);
+    cannonBall.classList.remove("is-fired");
+    cannonStage.classList.remove("is-firing");
+    void cannonBall.offsetWidth;
+    cannonBall.classList.add("is-fired");
+    void cannonStage.offsetWidth;
+    cannonStage.classList.add("is-firing");
       cannonRecent.textContent = cannonHistory.join(" · ") + (cannonDuplicates.checked ? " (중복 허용)" : "");
     }
 
