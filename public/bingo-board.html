@@ -1232,6 +1232,16 @@
     .cannon-preview-options label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 750; }
     .cannon-recent { margin: 11px 0 0; color: var(--muted); font-size: 12px; font-weight: 800; }
     .cannon-recent output { display: inline; color: #554fc4; font-weight: 950; }
+    .stage-cannon-preview { width: min(100%, 620px); margin: clamp(16px, 2.2vw, 26px) auto 0; padding: 14px; border: 1px solid rgba(119, 113, 231, .28); border-radius: 18px; background: rgba(255, 255, 255, .58); box-shadow: 0 12px 28px rgba(76, 72, 173, .1); }
+    .stage-cannon-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; color: #49448f; font-size: 15px; font-weight: 950; }
+    .stage-cannon-head small { color: #7771e7; font-size: 11px; font-weight: 850; }
+    .stage-cannon-preview .cannon-stage { min-height: 138px; }
+    .stage-cannon-preview .cannon-ball { left: 55%; width: 76px; height: 76px; font-size: 32px; }
+    .stage-cannon-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+    .stage-cannon-fire { min-width: 86px; min-height: 38px; border: 0; border-radius: 10px; color: #fff; background: linear-gradient(135deg, #6e68df, #4c47b4); box-shadow: 0 6px 12px rgba(75, 70, 174, .25); font: inherit; font-size: 14px; font-weight: 950; cursor: pointer; }
+    .stage-cannon-fire:active { transform: translateY(1px); }
+    .stage-cannon-recent { flex: 1; min-width: 0; overflow: hidden; color: #656274; font-size: 12px; font-weight: 800; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+    .stage-cannon-recent output { color: #554fc4; font-weight: 950; }
     @media (max-width: 520px) { .cannon-stage { min-height: 145px; } .cannon-ball { left: 59%; width: 72px; height: 72px; font-size: 30px; } }
   </style>
   </head>
@@ -1267,6 +1277,11 @@
         </div>
         <div class="preview-board" id="previewBoard"></div>
         <div class="bingo-message" id="bingoMessage"></div>
+        <section class="stage-cannon-preview" aria-label="대포 번호 뽑기">
+          <div class="stage-cannon-head"><span>대포 번호 뽑기</span><small>무작위 순서</small></div>
+          <div class="cannon-stage" aria-live="polite"><output id="stageCannonBall" class="cannon-ball" aria-label="왼쪽 화면 뽑힌 번호">?</output></div>
+          <div class="stage-cannon-footer"><button id="stageCannonFire" class="stage-cannon-fire" type="button">발사</button><span class="stage-cannon-recent">최근 번호 <output id="stageCannonRecent">아직 없음</output></span></div>
+        </section>
       </div>
     </section>
 
@@ -2193,9 +2208,13 @@
 
     // 대포 번호 뽑기 미리보기는 빙고판과 완전히 분리되어 있어 현재 방송 데이터는 바꾸지 않습니다.
     const cannonBall = document.getElementById("cannonBall");
+    const stageCannonBall = document.getElementById("stageCannonBall");
     const cannonCount = document.getElementById("cannonCount");
     const cannonDuplicates = document.getElementById("cannonDuplicates");
     const cannonRecent = document.getElementById("cannonRecent");
+    const stageCannonRecent = document.getElementById("stageCannonRecent");
+    const cannonBalls = [cannonBall, stageCannonBall];
+    const cannonRecents = [cannonRecent, stageCannonRecent];
     let cannonPool = [];
     let cannonHistory = [];
 
@@ -2208,15 +2227,14 @@
     function resetCannonPreview() {
       cannonPool = Array.from({ length: cannonTotal() }, (_, index) => index + 1);
       cannonHistory = [];
-      cannonBall.textContent = "?";
-      cannonBall.classList.remove("is-fired");
-      cannonRecent.textContent = "아직 없음";
+      cannonBalls.forEach((ball) => { ball.textContent = "?"; ball.classList.remove("is-fired"); });
+      cannonRecents.forEach((recent) => { recent.textContent = "아직 없음"; });
     }
 
     function fireCannonPreview() {
       const total = cannonTotal();
       if (!cannonDuplicates.checked && !cannonPool.length) {
-        cannonRecent.textContent = "모든 번호를 뽑았습니다. 다시를 눌러 주세요.";
+        cannonRecents.forEach((recent) => { recent.textContent = "모든 번호를 뽑았습니다. 다시를 눌러 주세요."; });
         return;
       }
       const value = cannonDuplicates.checked
@@ -2224,14 +2242,18 @@
         : cannonPool.splice(Math.floor(Math.random() * cannonPool.length), 1)[0];
       cannonHistory.unshift(value);
       cannonHistory = cannonHistory.slice(0, 10);
-      cannonBall.textContent = String(value);
-      cannonBall.classList.remove("is-fired");
-      void cannonBall.offsetWidth;
-      cannonBall.classList.add("is-fired");
-      cannonRecent.textContent = cannonHistory.join(" · ") + (cannonDuplicates.checked ? " (중복 허용)" : "");
+      cannonBalls.forEach((ball) => {
+        ball.textContent = String(value);
+        ball.classList.remove("is-fired");
+        void ball.offsetWidth;
+        ball.classList.add("is-fired");
+      });
+      const recentText = cannonHistory.join(" · ") + (cannonDuplicates.checked ? " (중복 허용)" : "");
+      cannonRecents.forEach((recent) => { recent.textContent = recentText; });
     }
 
     document.getElementById("cannonFire").addEventListener("click", fireCannonPreview);
+    document.getElementById("stageCannonFire").addEventListener("click", fireCannonPreview);
     document.getElementById("cannonRestart").addEventListener("click", resetCannonPreview);
     cannonCount.addEventListener("change", resetCannonPreview);
     cannonDuplicates.addEventListener("change", resetCannonPreview);
