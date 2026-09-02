@@ -1264,11 +1264,12 @@
     @keyframes cannon-smoke { 0% { opacity: .75; transform: translate(-50%, -50%) scale(.55); } 100% { opacity: 0; transform: translate(85px, -85px) scale(2.2); } }
     @keyframes cannon-pop { 0% { transform: translate(-290%, -50%) scale(.24) rotate(-24deg); opacity: .08; filter: brightness(2.4); } 32% { transform: translate(-176%, -115%) scale(.72) rotate(13deg); opacity: 1; filter: brightness(1.35); } 78% { transform: translate(-10%, -68%) scale(1.16) rotate(-4deg); opacity: 1; filter: brightness(1); } 100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; } }
     .cannon-preview-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
-    .cannon-preview-controls label { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 800; }
+    .cannon-preview-controls label { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 16px; font-weight: 800; }
     .cannon-preview-controls input[type="number"] { width: 68px; min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; text-align: center; }
+    .cannon-preview-controls .button, .cannon-preview-options .button { min-height: 42px; padding: 0 18px; font-size: 16px; font-weight: 900; }
     .cannon-preview-options { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
-    .cannon-preview-options label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 750; }
-    .cannon-recent { margin: 11px 0 0; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .cannon-preview-options label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 16px; font-weight: 750; }
+    .cannon-recent { margin: 11px 0 0; color: var(--muted); font-size: 16px; font-weight: 800; }
     .cannon-recent output { display: inline; color: #554fc4; font-weight: 950; }
     .cannon-launcher { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .cannon-launcher .label { margin: 0; }
@@ -1448,11 +1449,11 @@
       <div id="cannonStage" class="cannon-stage" aria-live="polite"><span class="cannon-barrel" aria-hidden="true"></span><span class="cannon-wheel one" aria-hidden="true"></span><span class="cannon-wheel two" aria-hidden="true"></span><span class="cannon-trail" aria-hidden="true"></span><span class="cannon-smoke" aria-hidden="true"></span><output id="cannonBall" class="cannon-ball" aria-label="뽑힌 번호">?</output></div>
       <div class="cannon-preview-controls">
         <label for="cannonCount">공 갯수 <input id="cannonCount" type="number" value="30" min="3" max="10000" inputmode="numeric"></label>
-        <button class="button primary" id="cannonFire" type="button">발사</button>
+        <button class="button primary" id="cannonFire" type="button">발사하기</button>
       </div>
       <div class="cannon-preview-options">
         <label><input id="cannonDuplicates" type="checkbox"> 중복 번호 허용</label>
-        <button class="button" id="cannonRestart" type="button">다시</button>
+        <button class="button" id="cannonRestart" type="button">다시 쏘기</button>
       </div>
       <p class="cannon-recent">최근 나온 번호: <output id="cannonRecent">아직 없음</output></p>
     </div>
@@ -2253,6 +2254,7 @@ const cannonBall = document.getElementById("cannonBall");
     const cannonCount = document.getElementById("cannonCount");
     const cannonDuplicates = document.getElementById("cannonDuplicates");
     const cannonRecent = document.getElementById("cannonRecent");
+    const cannonStorageKey = "broadcast-bingo-cannon-state";
     let cannonPool = [];
     let cannonHistory = [];
 
@@ -2262,13 +2264,50 @@ const cannonBall = document.getElementById("cannonBall");
       return total;
     }
 
-function resetCannonPreview() {
+    function saveCannonState() {
+      localStorage.setItem(cannonStorageKey, JSON.stringify({
+        count: cannonTotal(),
+        duplicates: cannonDuplicates.checked,
+        pool: cannonPool,
+        history: cannonHistory
+      }));
+    }
+
+    function renderCannonResult() {
+      const lastNumber = cannonHistory[0];
+      cannonBall.textContent = Number.isInteger(lastNumber) ? String(lastNumber) : "?";
+      cannonBall.classList.remove("is-fired");
+      cannonStage.classList.remove("is-firing");
+      cannonRecent.textContent = cannonHistory.length
+        ? cannonHistory.join(" · ") + (cannonDuplicates.checked ? " (중복 허용)" : "")
+        : "아직 없음";
+    }
+
+    function resetCannonPreview() {
       cannonPool = Array.from({ length: cannonTotal() }, (_, index) => index + 1);
       cannonHistory = [];
-    cannonBall.textContent = "?";
-    cannonBall.classList.remove("is-fired");
-    cannonStage.classList.remove("is-firing");
-      cannonRecent.textContent = "아직 없음";
+      renderCannonResult();
+      saveCannonState();
+    }
+
+    function restoreCannonState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(cannonStorageKey) || "null");
+        const savedCount = Number.parseInt(saved?.count, 10);
+        if (!Number.isInteger(savedCount) || savedCount < 3 || savedCount > 10000) return resetCannonPreview();
+        cannonCount.value = String(savedCount);
+        cannonDuplicates.checked = Boolean(saved.duplicates);
+        cannonHistory = Array.isArray(saved.history)
+          ? saved.history.filter(value => Number.isInteger(value) && value >= 1 && value <= savedCount).slice(0, 10)
+          : [];
+        const usablePool = Array.isArray(saved.pool)
+          && saved.pool.every(value => Number.isInteger(value) && value >= 1 && value <= savedCount)
+          && new Set(saved.pool).size === saved.pool.length;
+        cannonPool = usablePool ? saved.pool : Array.from({ length: savedCount }, (_, index) => index + 1);
+        renderCannonResult();
+      } catch {
+        resetCannonPreview();
+      }
     }
 
     function fireCannonPreview() {
@@ -2288,8 +2327,9 @@ function resetCannonPreview() {
     void cannonBall.offsetWidth;
     cannonBall.classList.add("is-fired");
     void cannonStage.offsetWidth;
-    cannonStage.classList.add("is-firing");
+      cannonStage.classList.add("is-firing");
       cannonRecent.textContent = cannonHistory.join(" · ") + (cannonDuplicates.checked ? " (중복 허용)" : "");
+      saveCannonState();
     }
 
     document.getElementById("openCannonDialog").addEventListener("click", () => {
@@ -2304,7 +2344,7 @@ function resetCannonPreview() {
     document.getElementById("cannonRestart").addEventListener("click", resetCannonPreview);
     cannonCount.addEventListener("change", resetCannonPreview);
     cannonDuplicates.addEventListener("change", resetCannonPreview);
-    resetCannonPreview();
+    restoreCannonState();
 
     document.getElementById("randomFill").addEventListener("click", randomFill);
     document.getElementById("clearMarks").addEventListener("click", () => {
