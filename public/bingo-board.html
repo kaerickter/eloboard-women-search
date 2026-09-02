@@ -43,21 +43,8 @@
 
     .app {
       display: grid;
-      grid-template-columns: minmax(500px, 1.3fr) minmax(390px, .8fr) 129px minmax(390px, .8fr);
+      grid-template-columns: minmax(620px, 1.15fr) minmax(370px, .7fr) minmax(370px, .7fr);
       min-height: calc(100vh - 59px);
-    }
-
-    @media (min-width: 1300px) {
-      body.bingo-page .app {
-        width: 129%;
-        min-height: calc((100vh - 59px) / .775);
-        zoom: .775;
-      }
-
-      body.bingo-page .broadcast {
-        justify-items: start;
-        padding-left: 0;
-      }
     }
 
     .site-nav {
@@ -481,7 +468,7 @@
     }
 
     .editor-settings {
-      grid-column: 4;
+      grid-column: 3;
       grid-row: 1;
     }
 
