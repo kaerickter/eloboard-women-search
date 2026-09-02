@@ -47,6 +47,14 @@
       min-height: calc(100vh - 59px);
     }
 
+    @media (min-width: 1300px) {
+      body.bingo-page .app {
+        width: 130%;
+        min-height: calc((100vh - 59px) / .76923);
+        zoom: .76923;
+      }
+    }
+
     .site-nav {
       position: sticky;
       top: 0;
