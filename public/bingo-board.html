@@ -43,7 +43,7 @@
 
     .app {
       display: grid;
-      grid-template-columns: minmax(420px, 1.15fr) minmax(360px, .85fr);
+      grid-template-columns: minmax(500px, 1.3fr) minmax(390px, .8fr) minmax(390px, .8fr);
       min-height: calc(100vh - 59px);
     }
 
@@ -458,6 +458,14 @@
       background: var(--panel);
       border-left: 1px solid var(--line);
       overflow-y: auto;
+    }
+
+    .editor-controls {
+      grid-column: 2;
+    }
+
+    .editor-settings {
+      grid-column: 3;
     }
 
     .topbar {
@@ -927,6 +935,11 @@
         border-top: 1px solid var(--line);
       }
 
+      .editor-controls,
+      .editor-settings {
+        grid-column: auto;
+      }
+
     }
 
     @media (max-width: 560px) {
@@ -1323,7 +1336,7 @@
       </div>
     </section>
 
-    <aside class="editor" aria-label="빙고판 수정">
+    <aside class="editor editor-settings" aria-label="빙고판 수정과 시간 설정">
       <div class="topbar">
         <div>
           <h1>빙고판 수정</h1>
@@ -1370,6 +1383,10 @@
           <div class="status" id="timerStatus">시간을 설정한 뒤 시작을 눌러주세요.</div>
         </div>
       </section>
+
+    </aside>
+
+    <aside class="editor editor-controls" aria-label="빙고판 숫자와 모드 설정">
 
       <section class="section">
         <div class="label">판 크기 / 모드</div>
