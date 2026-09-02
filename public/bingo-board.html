@@ -2292,7 +2292,12 @@ function resetCannonPreview() {
       cannonRecent.textContent = cannonHistory.join(" · ") + (cannonDuplicates.checked ? " (중복 허용)" : "");
     }
 
-    document.getElementById("openCannonDialog").addEventListener("click", () => cannonDialog.showModal());
+    document.getElementById("openCannonDialog").addEventListener("click", () => {
+      // 팝업을 다시 열 때는 마지막 번호를 결과 위치에 그대로 두고 발사 연출만 멈춥니다.
+      cannonBall.classList.remove("is-fired");
+      cannonStage.classList.remove("is-firing");
+      cannonDialog.showModal();
+    });
     document.getElementById("closeCannonDialog").addEventListener("click", () => cannonDialog.close());
     cannonDialog.addEventListener("click", event => { if (event.target === cannonDialog) cannonDialog.close(); });
     document.getElementById("cannonFire").addEventListener("click", fireCannonPreview);
