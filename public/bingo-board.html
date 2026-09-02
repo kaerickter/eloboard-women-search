@@ -1253,11 +1253,11 @@
     .cannon-trail { position: absolute; z-index: 0; top: 43%; left: 210px; width: 0; height: 12px; border-radius: 999px; opacity: 0; background: linear-gradient(90deg, rgba(255, 239, 135, .9), rgba(255, 142, 70, .62), transparent); transform: translateY(-50%); filter: blur(1px); }
     .cannon-smoke { position: absolute; z-index: 6; top: 43%; left: 207px; width: 17px; height: 17px; border-radius: 50%; opacity: 0; background: rgba(92, 92, 118, .48); transform: translate(-50%, -50%); box-shadow: 18px -9px 0 5px rgba(117, 117, 141, .31), 31px 8px 0 8px rgba(143, 143, 164, .22), 47px -12px 0 3px rgba(103, 103, 128, .18); }
     .cannon-ball { position: absolute; z-index: 1; top: 50%; left: 70%; display: grid; width: 86px; height: 86px; place-items: center; border: 6px solid #fff; border-radius: 50%; color: #fff; background: radial-gradient(circle at 32% 26%, #fff 0 7%, #ffc38f 8% 16%, #ff8052 42%, #ec4e45 100%); box-shadow: 0 14px 24px rgba(210,65,51,.32), inset -8px -10px 0 rgba(151,35,46,.18); font-size: 36px; font-weight: 950; transform: translate(-50%, -50%); }
-    .cannon-stage.is-firing .cannon-barrel { animation: cannon-recoil .44s cubic-bezier(.2, .8, .3, 1); }
-    .cannon-stage.is-firing::after { animation: cannon-flash .4s ease-out; }
-    .cannon-stage.is-firing .cannon-trail { animation: cannon-trail .48s ease-out; }
-    .cannon-stage.is-firing .cannon-smoke { animation: cannon-smoke .9s ease-out; }
-    .cannon-ball.is-fired { animation: cannon-pop .64s cubic-bezier(.14, .82, .25, 1.18); }
+    .cannon-stage.is-firing .cannon-barrel { animation: cannon-recoil .7s cubic-bezier(.2, .8, .3, 1); }
+    .cannon-stage.is-firing::after { animation: cannon-flash .65s ease-out; }
+    .cannon-stage.is-firing .cannon-trail { animation: cannon-trail 1.25s ease-out; }
+    .cannon-stage.is-firing .cannon-smoke { animation: cannon-smoke 1.35s ease-out; }
+    .cannon-ball.is-fired { animation: cannon-pop 1.45s cubic-bezier(.14, .82, .25, 1.18); }
     @keyframes cannon-recoil { 0%, 100% { transform: translateY(-50%) translateX(0) rotate(-18deg) scaleX(-1); } 20% { transform: translateY(-50%) translateX(-14px) rotate(-18deg) scaleX(-1); } 55% { transform: translateY(-50%) translateX(4px) rotate(-18deg) scaleX(-1); } }
     @keyframes cannon-flash { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.25); } 16% { opacity: 1; transform: translate(-50%, -50%) scale(2.4); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); } }
     @keyframes cannon-trail { 0% { width: 0; opacity: 1; } 55% { width: calc(70% - 210px); opacity: .92; } 100% { width: calc(78% - 210px); opacity: 0; } }
