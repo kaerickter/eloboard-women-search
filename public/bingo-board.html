@@ -47,6 +47,14 @@
       min-height: calc(100vh - 59px);
     }
 
+    @media (min-width: 1300px) {
+      body.bingo-page .app {
+        width: 129%;
+        min-height: calc((100vh - 59px) / .775);
+        zoom: .775;
+      }
+    }
+
     .site-nav {
       position: sticky;
       top: 0;
@@ -87,6 +95,8 @@
     }
 
     .broadcast {
+      grid-column: 1;
+      grid-row: 1;
       position: relative;
       isolation: isolate;
       display: grid;
@@ -462,10 +472,12 @@
 
     .editor-controls {
       grid-column: 2;
+      grid-row: 1;
     }
 
     .editor-settings {
       grid-column: 3;
+      grid-row: 1;
     }
 
     .topbar {
@@ -927,6 +939,8 @@
       }
 
       .broadcast {
+        grid-column: auto;
+        grid-row: auto;
         min-height: 62vh;
       }
 
@@ -938,6 +952,7 @@
       .editor-controls,
       .editor-settings {
         grid-column: auto;
+        grid-row: auto;
       }
 
     }
