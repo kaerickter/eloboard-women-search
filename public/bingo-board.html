@@ -43,7 +43,7 @@
 
     .app {
       display: grid;
-      grid-template-columns: minmax(500px, 1.3fr) minmax(390px, .8fr) minmax(390px, .8fr);
+      grid-template-columns: minmax(500px, 1.3fr) minmax(390px, .8fr) 129px minmax(390px, .8fr);
       min-height: calc(100vh - 59px);
     }
 
@@ -51,12 +51,11 @@
       body.bingo-page .app {
         width: 129%;
         min-height: calc((100vh - 59px) / .775);
-        column-gap: 129px;
         zoom: .775;
       }
 
-      body.bingo-page .broadcast .stage {
-        transform: translateX(-129px);
+      body.bingo-page .broadcast {
+        justify-items: end;
       }
     }
 
@@ -481,7 +480,7 @@
     }
 
     .editor-settings {
-      grid-column: 3;
+      grid-column: 4;
       grid-row: 1;
     }
 
