@@ -1252,7 +1252,7 @@
     .cannon-wheel.two { display: none; }
     .cannon-trail { position: absolute; z-index: 0; top: 43%; left: 210px; width: 0; height: 12px; border-radius: 999px; opacity: 0; background: linear-gradient(90deg, rgba(255, 239, 135, .9), rgba(255, 142, 70, .62), transparent); transform: translateY(-50%); filter: blur(1px); }
     .cannon-smoke { position: absolute; z-index: 6; top: 43%; left: 207px; width: 17px; height: 17px; border-radius: 50%; opacity: 0; background: rgba(92, 92, 118, .48); transform: translate(-50%, -50%); box-shadow: 18px -9px 0 5px rgba(117, 117, 141, .31), 31px 8px 0 8px rgba(143, 143, 164, .22), 47px -12px 0 3px rgba(103, 103, 128, .18); }
-    .cannon-ball { position: absolute; z-index: 1; top: 50%; left: 54%; display: grid; width: 86px; height: 86px; place-items: center; border: 6px solid #fff; border-radius: 50%; color: #fff; background: radial-gradient(circle at 32% 26%, #fff 0 7%, #ffc38f 8% 16%, #ff8052 42%, #ec4e45 100%); box-shadow: 0 14px 24px rgba(210,65,51,.32), inset -8px -10px 0 rgba(151,35,46,.18); font-size: 36px; font-weight: 950; transform: translate(-50%, -50%); }
+    .cannon-ball { position: absolute; z-index: 1; top: 50%; left: 70%; display: grid; width: 86px; height: 86px; place-items: center; border: 6px solid #fff; border-radius: 50%; color: #fff; background: radial-gradient(circle at 32% 26%, #fff 0 7%, #ffc38f 8% 16%, #ff8052 42%, #ec4e45 100%); box-shadow: 0 14px 24px rgba(210,65,51,.32), inset -8px -10px 0 rgba(151,35,46,.18); font-size: 36px; font-weight: 950; transform: translate(-50%, -50%); }
     .cannon-stage.is-firing .cannon-barrel { animation: cannon-recoil .44s cubic-bezier(.2, .8, .3, 1); }
     .cannon-stage.is-firing::after { animation: cannon-flash .4s ease-out; }
     .cannon-stage.is-firing .cannon-trail { animation: cannon-trail .48s ease-out; }
@@ -1260,9 +1260,9 @@
     .cannon-ball.is-fired { animation: cannon-pop .64s cubic-bezier(.14, .82, .25, 1.18); }
     @keyframes cannon-recoil { 0%, 100% { transform: translateY(-50%) translateX(0) rotate(-18deg) scaleX(-1); } 20% { transform: translateY(-50%) translateX(-14px) rotate(-18deg) scaleX(-1); } 55% { transform: translateY(-50%) translateX(4px) rotate(-18deg) scaleX(-1); } }
     @keyframes cannon-flash { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.25); } 16% { opacity: 1; transform: translate(-50%, -50%) scale(2.4); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); } }
-    @keyframes cannon-trail { 0% { width: 0; opacity: 1; } 55% { width: calc(65% - 210px); opacity: .92; } 100% { width: calc(72% - 210px); opacity: 0; } }
+    @keyframes cannon-trail { 0% { width: 0; opacity: 1; } 55% { width: calc(70% - 210px); opacity: .92; } 100% { width: calc(78% - 210px); opacity: 0; } }
     @keyframes cannon-smoke { 0% { opacity: .75; transform: translate(-50%, -50%) scale(.55); } 100% { opacity: 0; transform: translate(85px, -85px) scale(2.2); } }
-    @keyframes cannon-pop { 0% { transform: translate(-200%, -25%) scale(.24) rotate(-24deg); opacity: .08; filter: brightness(2.4); } 32% { transform: translate(-115%, -105%) scale(.72) rotate(13deg); opacity: 1; filter: brightness(1.35); } 78% { transform: translate(-10%, -68%) scale(1.16) rotate(-4deg); opacity: 1; filter: brightness(1); } 100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; } }
+    @keyframes cannon-pop { 0% { transform: translate(-290%, -25%) scale(.24) rotate(-24deg); opacity: .08; filter: brightness(2.4); } 32% { transform: translate(-176%, -105%) scale(.72) rotate(13deg); opacity: 1; filter: brightness(1.35); } 78% { transform: translate(-10%, -68%) scale(1.16) rotate(-4deg); opacity: 1; filter: brightness(1); } 100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; } }
     .cannon-preview-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
     .cannon-preview-controls label { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 800; }
     .cannon-preview-controls input[type="number"] { width: 68px; min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; text-align: center; }
@@ -1272,17 +1272,17 @@
     .cannon-recent output { display: inline; color: #554fc4; font-weight: 950; }
     .cannon-launcher { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .cannon-launcher .label { margin: 0; }
-    .cannon-dialog { width: min(92vw, 560px); padding: 0; overflow: hidden; border: 0; border-radius: 20px; box-shadow: 0 28px 80px rgba(31, 29, 86, .32); }
+    .cannon-dialog { width: min(96vw, 780px); padding: 0; overflow: hidden; border: 0; border-radius: 20px; box-shadow: 0 28px 80px rgba(31, 29, 86, .32); }
     .cannon-dialog::backdrop { background: rgba(25, 23, 62, .58); backdrop-filter: blur(4px); }
     .cannon-dialog-inner { padding: clamp(18px, 3vw, 28px); background: linear-gradient(145deg, #fdfdff, #f0f2ff); }
     .cannon-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
     .cannon-dialog-head strong { display: block; color: #3f3a91; font-size: 22px; }
     .cannon-dialog-head span { display: block; margin-top: 4px; color: #77748a; font-size: 13px; font-weight: 700; }
     .cannon-dialog-close { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 10px; color: #514d9e; background: #e7e8fc; font-size: 23px; line-height: 1; cursor: pointer; }
-    .cannon-dialog .cannon-stage { min-height: 220px; }
+    .cannon-dialog .cannon-stage { min-height: 300px; }
     .cannon-dialog .cannon-ball { width: 104px; height: 104px; font-size: 44px; }
     .cannon-dialog .cannon-preview-controls { margin-top: 14px; }
-    @media (max-width: 520px) { .cannon-stage { min-height: 145px; } .cannon-ball { left: 59%; width: 72px; height: 72px; font-size: 30px; } }
+    @media (max-width: 520px) { .cannon-stage { min-height: 205px; } .cannon-dialog .cannon-stage { min-height: 240px; } .cannon-ball { left: 67%; width: 72px; height: 72px; font-size: 30px; } }
   </style>
   </head>
 <body class="bingo-page">
