@@ -976,6 +976,7 @@
 
     .mode-layout {
       display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
       gap: 12px;
     }
 
@@ -1005,6 +1006,26 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #eef1f5;
+    }
+
+    .cannon-launch-button {
+      width: 100%;
+      min-height: 44px;
+      margin-bottom: 7px;
+      border: 0;
+      border-radius: 9px;
+      color: #fff;
+      background: linear-gradient(135deg, #5d59c9, #7873e6);
+      box-shadow: 0 5px 12px rgba(76, 70, 180, .25), inset 0 1px 0 rgba(255,255,255,.3);
+      font-size: 15px;
+      font-weight: 950;
+      cursor: pointer;
+    }
+
+    .cannon-launch-button:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+    @media (max-width: 520px) {
+      .mode-layout { grid-template-columns: 1fr; }
     }
 
     .territory-mode-row button {
@@ -1220,11 +1241,12 @@
     .cannon-preview-badge { padding: 4px 8px; border-radius: 999px; background: #eef0ff; color: #5952c8; font-size: 11px; font-weight: 900; }
     .cannon-preview-hint { margin: 7px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .cannon-stage { position: relative; min-height: 164px; padding: 14px; overflow: hidden; border: 1px solid #dce0f5; border-radius: 14px; background: radial-gradient(circle at 50% 18%, #ffffff 0 18%, #eef2ff 68%, #e4e8fb 100%); }
-    .cannon-stage::before { content: ""; position: absolute; z-index: 1; top: calc(50% + 26px); left: 14px; width: 118px; height: 20px; border: 3px solid #3b3a70; border-radius: 6px 9px 11px 6px; background: linear-gradient(180deg, #8d8fc2, #54558d); box-shadow: inset 0 3px 0 rgba(255,255,255,.3), 0 7px 10px rgba(49,48,104,.2); transform: translateY(-50%) skewX(-12deg); }
+    .cannon-stage::before { content: ""; position: absolute; z-index: 1; top: calc(50% + 27px); left: 14px; width: 123px; height: 23px; border: 3px solid #2f304f; border-radius: 7px 12px 12px 7px; background: linear-gradient(180deg, #8c6d41, #4c3826); box-shadow: inset 0 3px 0 rgba(255,232,177,.25), 0 7px 10px rgba(49,35,24,.24); transform: translateY(-50%) skewX(-12deg); }
     .cannon-stage::after { content: ""; position: absolute; z-index: 3; left: 152px; top: 50%; width: 0; height: 0; border-top: 17px solid transparent; border-bottom: 17px solid transparent; border-left: 34px solid #ff8152; transform: translateY(-50%); filter: drop-shadow(0 3px 2px rgba(180,68,32,.28)); }
-    .cannon-barrel { position: absolute; z-index: 2; top: 50%; left: 20px; width: 137px; height: 39px; border: 4px solid #34345e; border-radius: 21px 8px 8px 21px; background: linear-gradient(180deg, #9ea1d5 0 18%, #6e70aa 19% 54%, #4d4e83 55% 100%); box-shadow: inset 0 5px 0 rgba(255,255,255,.32), inset 0 -5px 0 rgba(31,31,70,.22), 0 9px 12px rgba(54,54,105,.2); transform: translateY(-50%); }
-    .cannon-barrel::before { content: ""; position: absolute; top: -7px; right: -12px; width: 19px; height: 45px; border: 4px solid #34345e; border-radius: 5px; background: linear-gradient(90deg, #55588f, #a6a8d7 44%, #4a4b7f); box-shadow: inset 3px 0 0 rgba(255,255,255,.22); }
-    .cannon-wheel { position: absolute; z-index: 2; top: calc(50% + 43px); width: 32px; height: 32px; border: 4px solid #34345e; border-radius: 50%; background: radial-gradient(circle, #c6c8e8 0 15%, #626498 17% 40%, #42436f 43% 100%); box-shadow: inset 0 0 0 5px #787aad, 0 4px 6px rgba(47,46,93,.23); }
+    .cannon-barrel { position: absolute; z-index: 2; top: 50%; left: 18px; width: 140px; height: 42px; border: 5px solid #2e2f49; border-radius: 25px 8px 8px 25px; background: linear-gradient(180deg, #b69a68 0 17%, #7d603d 18% 52%, #4c3727 53% 100%); box-shadow: inset 0 5px 0 rgba(255,238,186,.34), inset 0 -5px 0 rgba(31,23,18,.28), 0 9px 12px rgba(54,39,25,.24); transform: translateY(-50%); }
+    .cannon-barrel::before { content: ""; position: absolute; top: -9px; right: -14px; width: 22px; height: 49px; border: 5px solid #2e2f49; border-radius: 6px; background: linear-gradient(90deg, #563e2b, #c6aa74 44%, #5c432f); box-shadow: inset 3px 0 0 rgba(255,240,197,.24); }
+    .cannon-barrel::after { content: ""; position: absolute; left: 23px; bottom: -26px; width: 27px; height: 30px; border: 4px solid #2e2f49; border-radius: 4px 4px 10px 10px; background: linear-gradient(90deg, #5c432e, #a48655, #553c29); transform: skewX(-13deg); }
+    .cannon-wheel { position: absolute; z-index: 2; top: calc(50% + 44px); width: 35px; height: 35px; border: 5px solid #2e2f49; border-radius: 50%; background: radial-gradient(circle, #e4c98f 0 13%, #7e613d 15% 37%, #3f3028 40% 100%); box-shadow: inset 0 0 0 5px #8e7047, 0 4px 6px rgba(47,35,23,.28); }
     .cannon-wheel.one { left: 34px; }
     .cannon-wheel.two { left: 100px; }
     .cannon-trail { position: absolute; z-index: 0; top: 50%; left: 161px; width: 0; height: 12px; border-radius: 999px; opacity: 0; background: linear-gradient(90deg, rgba(255, 239, 135, .9), rgba(255, 142, 70, .62), transparent); transform: translateY(-50%); filter: blur(1px); }
@@ -1357,6 +1379,7 @@
           </div>
           <div class="mode-group">
             <div class="mode-group-title">게임 모드</div>
+            <button class="cannon-launch-button" id="openCannonDialog" type="button">랜덤 대포쏘기</button>
             <div class="territory-mode-row" role="group" aria-label="땅따먹기 모드 선택">
               <button type="button" data-mode="territory">땅따먹기</button>
               <button type="button" data-mode="score-territory">점수 땅따먹기</button>
@@ -1395,11 +1418,6 @@
           <button class="button primary" id="randomFill" type="button">랜덤 채우기</button>
         </div>
         <div class="status" id="status">예: 1 ~ 30 입력 후 랜덤 채우기</div>
-      </section>
-
-      <section class="section cannon-launcher" aria-label="랜덤 대포쏘기">
-        <div><div class="label">랜덤 대포쏘기</div><p class="hint">번호를 무작위 순서로 하나씩 뽑습니다.</p></div>
-        <button class="button primary" id="openCannonDialog" type="button">대포 열기</button>
       </section>
 
       <section class="section">
