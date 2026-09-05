@@ -913,10 +913,11 @@ async function loadApiProfile(playerId, force = false) {
   ]);
   if (!player?.id || !String(player.name || "").trim()) throw new Error("ELOBoard 선수 정보를 확인하지 못했습니다.");
   const total = apiRecord(player.wins, player.losses, player.games);
+  const broadcastId = String(player.soop_id || "").trim();
   const profile = {
     wrId: String(player.id), name: String(player.display_name || player.name), race: apiRaceName(player.main_race),
-    division: player.division === "men" ? "men" : "women", url: apiPlayerUrl(player.id), image: apiImageUrl(player.thumb_url),
-    broadcastId: String(player.soop_id || ""), broadcastUrl: player.soop_id ? "https://play.sooplive.co.kr/" + encodeURIComponent(player.soop_id) : "",
+    division: player.division === "men" ? "men" : "women", url: apiPlayerUrl(player.id), image: apiImageUrl(player.thumb_url) || soopProfileImageUrl(broadcastId),
+    broadcastId, broadcastUrl: broadcastId ? "https://play.sooplive.co.kr/" + encodeURIComponent(broadcastId) : "",
     info: { elo: String(player.elo_raw || ""), source: "ELOBoard" }, total, women: player.division === "women" ? total : null, mixed: null,
     records: [], raceTotals: { women: {}, mixed: {}, combined: {} }, recent30: null,
     mostMatches: (Array.isArray(rivals) ? rivals : []).slice(0, 7).map((item) => ({ name: item.name, wins: Number(item.wins || 0), losses: Number(item.losses || 0), wrId: String(item.player_id || ""), url: item.player_id ? apiPlayerUrl(item.player_id) : "" })),
