@@ -2169,6 +2169,17 @@ function universitySharedTiers(rosterA, rosterB) {
     .sort((a, b) => (order.get(a) ?? 99) - (order.get(b) ?? 99));
 }
 
+function universityTierMatchups(rosterA, rosterB) {
+  const tierValue = (value) => String(value || "").trim().replace(/\s*티어$/i, "");
+  return universitySharedTiers(rosterA, rosterB).map((tier) => ({
+    tier,
+    homePlayers: rosterA.filter((player) => tierValue(player.tier) === tier)
+      .map((player) => String(player.name || "").trim()).filter(Boolean),
+    awayPlayers: rosterB.filter((player) => tierValue(player.tier) === tier)
+      .map((player) => String(player.name || "").trim()).filter(Boolean)
+  }));
+}
+
 function scheduleChannelRegistrySave() {
   if (channelRegistrySaveTimer) return;
   channelRegistrySaveTimer = setTimeout(() => {
@@ -3739,8 +3750,9 @@ const server = http.createServer(async (req, res) => {
       }
       const rosterA = tierBasedUniversityRoster(tierPlayers, universityA);
       const rosterB = tierBasedUniversityRoster(tierPlayers, universityB);
+      const matchups = universityTierMatchups(rosterA, rosterB);
       return send(res, 200, JSON.stringify({
-        universityA, universityB, tiers: universitySharedTiers(rosterA, rosterB), source: "현재 티어표"
+        universityA, universityB, tiers: matchups.map((matchup) => matchup.tier), matchups, source: "현재 티어표"
       }), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "티어 대진을 불러오지 못했습니다." }), "application/json; charset=utf-8");
