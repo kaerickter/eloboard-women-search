@@ -10,6 +10,7 @@ const PLAYOFFS = [
 ];
 const STORAGE_KEY = "jungman-cup-preview-v2";
 const PREVIOUS_STORAGE_KEY = "jungman-cup-preview-v1";
+const PLAYOFF_SCHEDULE_VERSION = 1;
 
 const groupGrid = document.getElementById("groupGrid");
 const knockoutGrid = document.getElementById("knockoutGrid");
@@ -71,6 +72,28 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function applyKnownPlayoffSchedule() {
+  if (Number(state.playoffScheduleVersion || 0) >= PLAYOFF_SCHEDULE_VERSION) return;
+  const semifinals = state.playoffs.semifinals;
+  const final = state.playoffs.final;
+  semifinals[0] = {
+    ...semifinals[0], date: "2026-09-12", home: "JSA", away: "케이대",
+    homeSource: null, awaySource: null
+  };
+  semifinals[1] = {
+    ...semifinals[1], date: "2026-09-13", home: "", away: "",
+    homeSource: { stage: "quarterfinals", index: 2 }, awaySource: { stage: "quarterfinals", index: 3 }
+  };
+  final[0] = {
+    ...final[0], date: "2026-09-19", home: "", away: "",
+    homeSource: { stage: "semifinals", index: 0 }, awaySource: { stage: "semifinals", index: 1 }
+  };
+  state.playoffScheduleVersion = PLAYOFF_SCHEDULE_VERSION;
+  saveState();
+}
+
+applyKnownPlayoffSchedule();
+
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -107,8 +130,11 @@ function individualStandings() {
     if (won) player.wins += 1;
   };
 
-  Object.values(state.matches || {}).forEach((match) => {
-    (match.games || []).forEach((game) => {
+  const registeredMatches = registeredMatchKeys();
+  Object.entries(state.matches || {}).forEach(([key, match]) => {
+    if (!registeredMatches.has(key)) return;
+    const score = matchScore(match);
+    (match.games || []).slice(0, score.clinchedAt).forEach((game) => {
       const home = String(game.homePlayer || "").trim();
       const away = String(game.awayPlayer || "").trim();
       if (!home || !away || !["home", "away"].includes(game.winner)) return;
@@ -168,11 +194,54 @@ function getMatch(group, index) {
   return { key, match: state.matches[key] };
 }
 
+function playoffSourceLabel(source) {
+  if (!source) return "대학 미정";
+  const stage = PLAYOFFS.find((item) => item.key === source.stage);
+  return (stage?.title || "이전") + " " + (Number(source.index) + 1) + "경기 승자";
+}
+
+function playoffWinner(stageKey, index) {
+  const fixture = state.playoffs?.[stageKey]?.[index];
+  if (!fixture?.home || !fixture?.away) return "";
+  const key = matchKey(PLAYOFFS.find((item) => item.key === stageKey)?.title || stageKey, fixture.home, fixture.away);
+  const match = state.matches?.[key];
+  if (!match) return "";
+  const score = matchScore(match);
+  if (score.home === 5) return fixture.home;
+  if (score.away === 5) return fixture.away;
+  return "";
+}
+
+function playoffFixtureTeams(fixture) {
+  const resolve = (side) => {
+    const source = fixture?.[side + "Source"];
+    return source ? (playoffWinner(source.stage, Number(source.index)) || playoffSourceLabel(source)) : String(fixture?.[side] || "").trim();
+  };
+  return { home: resolve("home"), away: resolve("away") };
+}
+
+function isResolvedPlayoffTeam(value) {
+  return Boolean(value) && !/경기 승자$/.test(value);
+}
+
+function registeredMatchKeys() {
+  const keys = new Set();
+  GROUPS.forEach((group) => (state.fixtures?.[group] || []).forEach((fixture) => {
+    if (fixture?.home && fixture?.away) keys.add(matchKey(group, fixture.home, fixture.away));
+  }));
+  PLAYOFFS.forEach((stage) => (state.playoffs?.[stage.key] || []).forEach((fixture) => {
+    const teams = playoffFixtureTeams(fixture);
+    if (isResolvedPlayoffTeam(teams.home) && isResolvedPlayoffTeam(teams.away)) {
+      keys.add(matchKey(stage.title, teams.home, teams.away));
+    }
+  }));
+  return keys;
+}
+
 function getPlayoffMatch(stageKey, index) {
   const fixture = state.playoffs?.[stageKey]?.[index];
-  const home = fixture?.home || "";
-  const away = fixture?.away || "";
-  if (!home || !away) return null;
+  const { home, away } = playoffFixtureTeams(fixture);
+  if (!isResolvedPlayoffTeam(home) || !isResolvedPlayoffTeam(away)) return null;
   const stage = PLAYOFFS.find((item) => item.key === stageKey);
   const group = stage?.title || stageKey;
   const key = matchKey(group, home, away);
@@ -205,21 +274,27 @@ function fixtureMatchupTitle(stage, index, fixture) {
   const tiers = fixtureTierTooltipCache.get(fixtureTierKey(fixture));
   if (!tiers) return fixtureStageName(stage) + " " + (index + 1) + "경기\n티어 대진을 불러오는 중입니다.";
   return [fixtureStageName(stage) + " " + (index + 1) + "경기", home + " vs " + away]
-    .concat(tiers.length ? tiers.map((tier) => home + " " + tierLabel(tier) + " vs " + away + " " + tierLabel(tier)) : ["같은 티어 대진이 없습니다."])
+    .concat(tiers.length ? tiers.map((matchup) => {
+      if (typeof matchup === "string") return home + " " + tierLabel(matchup) + " vs " + away + " " + tierLabel(matchup);
+      const tier = tierLabel(matchup.tier);
+      const homePlayers = (matchup.homePlayers || []).join(", ") || "선수 미정";
+      const awayPlayers = (matchup.awayPlayers || []).join(", ") || "선수 미정";
+      return home + " " + tier + " " + homePlayers + " vs " + away + " " + tier + " " + awayPlayers;
+    }) : ["같은 티어 대진이 없습니다."])
     .join("\n");
 }
 
 async function loadFixtureTierTooltips() {
   const fixtures = GROUPS.flatMap((group) => state.fixtures?.[group] || [])
-    .concat(PLAYOFFS.flatMap((stage) => state.playoffs?.[stage.key] || []))
-    .filter((fixture) => fixture?.home && fixture?.away);
+    .concat(PLAYOFFS.flatMap((stage) => (state.playoffs?.[stage.key] || []).map((fixture) => ({ ...fixture, ...playoffFixtureTeams(fixture) }))))
+    .filter((fixture) => isResolvedPlayoffTeam(fixture?.home) && isResolvedPlayoffTeam(fixture?.away));
   const uniqueFixtures = [...new Map(fixtures.map((fixture) => [fixtureTierKey(fixture), fixture])).values()];
   await Promise.all(uniqueFixtures.map(async (fixture) => {
     const key = fixtureTierKey(fixture);
     try {
       const response = await fetch("/api/universities/tier-matchup?universityA=" + encodeURIComponent(fixture.home) + "&universityB=" + encodeURIComponent(fixture.away));
       const data = await response.json();
-      fixtureTierTooltipCache.set(key, response.ok ? (data.tiers || []) : []);
+      fixtureTierTooltipCache.set(key, response.ok ? (data.matchups || data.tiers || []) : []);
     } catch {
       fixtureTierTooltipCache.set(key, []);
     }
@@ -382,7 +457,8 @@ function renderPlayoffEditor() {
       '<div class="fixture-edit-row"><span class="fixture-edit-number">' + (index + 1) + '경기</span>' +
       '<input type="date" data-playoff-field="date" data-stage="' + stage.key + '" data-index="' + index + '" value="' + escapeHtml(fixture.date) + '">' +
       '<select data-playoff-field="home" data-stage="' + stage.key + '" data-index="' + index + '">' + options(fixture.home, "왼쪽 대학 선택") + '</select><b>VS</b>' +
-      '<select data-playoff-field="away" data-stage="' + stage.key + '" data-index="' + index + '">' + options(fixture.away, "오른쪽 대학 선택") + "</select></div>"
+      '<select data-playoff-field="away" data-stage="' + stage.key + '" data-index="' + index + '">' + options(fixture.away, "오른쪽 대학 선택") + "</select>" +
+      ((fixture.homeSource || fixture.awaySource) ? '<small class="playoff-source-note">자동 대진: ' + escapeHtml(playoffSourceLabel(fixture.homeSource)) + ' · ' + escapeHtml(playoffSourceLabel(fixture.awaySource)) + "</small>" : "") + "</div>"
     ).join("");
     return '<div class="group-edit-card"><strong>' + stage.title + '</strong><span class="group-editor-label">날짜와 양쪽 대학을 경기별로 선택</span>' + rows + '</div>';
   }).join("");
@@ -402,11 +478,12 @@ function renderPlayoffs() {
 
   knockoutGrid.innerHTML = orderedStages.map((stage) => {
     const fixtures = (state.playoffs?.[stage.key] || []).map((fixture, index) => {
-      const home = fixture.home || "왼쪽 대학 미정";
-      const away = fixture.away || "오른쪽 대학 미정";
+      const teams = playoffFixtureTeams(fixture);
+      const home = teams.home || "왼쪽 대학 미정";
+      const away = teams.away || "오른쪽 대학 미정";
       const today = isToday(fixture.date);
-      const disabled = !fixture.home || !fixture.away;
-      const matchupTitle = fixtureMatchupTitle(stage.title, index, fixture);
+      const disabled = !isResolvedPlayoffTeam(teams.home) || !isResolvedPlayoffTeam(teams.away);
+      const matchupTitle = fixtureMatchupTitle(stage.title, index, { ...fixture, ...teams });
       return [
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-playoff="' + stage.key + '" data-fixture="' + index + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
@@ -481,7 +558,10 @@ groupEditor.addEventListener("change", (event) => {
 playoffEditor.addEventListener("change", (event) => {
   const field = event.target.closest("[data-playoff-field][data-stage][data-index]");
   if (!field) return;
-  state.playoffs[field.dataset.stage][Number(field.dataset.index)][field.dataset.playoffField] = field.value;
+  const fixture = state.playoffs[field.dataset.stage][Number(field.dataset.index)];
+  const fieldName = field.dataset.playoffField;
+  fixture[fieldName] = field.value;
+  if (fieldName === "home" || fieldName === "away") fixture[fieldName + "Source"] = null;
 });
 
 cupAdminSave.addEventListener("click", () => {
