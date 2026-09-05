@@ -284,6 +284,29 @@ function fixtureMatchupTitle(stage, index, fixture) {
     .join("\n");
 }
 
+function fixtureMatchupPopover(stage, index, fixture) {
+  const home = String(fixture?.home || "").trim();
+  const away = String(fixture?.away || "").trim();
+  const heading = fixtureStageName(stage) + " " + (index + 1) + "경기";
+  if (!home || !away) {
+    return '<span class="fixture-matchup-popover" role="tooltip"><strong>' + escapeHtml(heading) + '</strong><p>대학 대진이 아직 정해지지 않았습니다.</p></span>';
+  }
+  const matchups = fixtureTierTooltipCache.get(fixtureTierKey(fixture));
+  const rows = !matchups
+    ? '<p>티어별 출전자를 불러오는 중입니다.</p>'
+    : !matchups.length
+    ? '<p>같은 티어 대진이 없습니다.</p>'
+    : matchups.map((matchup) => {
+      const tier = typeof matchup === "string" ? matchup : matchup.tier;
+      const homePlayers = typeof matchup === "string" ? "선수 미정" : ((matchup.homePlayers || []).join(", ") || "선수 미정");
+      const awayPlayers = typeof matchup === "string" ? "선수 미정" : ((matchup.awayPlayers || []).join(", ") || "선수 미정");
+      return '<div class="fixture-matchup-row"><span class="fixture-matchup-tier">' + escapeHtml(tierLabel(tier)) + '</span>' +
+        '<div class="fixture-matchup-team is-home"><b>' + escapeHtml(home) + '</b><span>' + escapeHtml(homePlayers) + '</span></div>' +
+        '<i>VS</i><div class="fixture-matchup-team is-away"><b>' + escapeHtml(away) + '</b><span>' + escapeHtml(awayPlayers) + '</span></div></div>';
+    }).join("");
+  return '<span class="fixture-matchup-popover" role="tooltip"><strong>' + escapeHtml(heading) + '</strong><div class="fixture-matchup-title"><b>' + escapeHtml(home) + '</b><span>VS</span><b>' + escapeHtml(away) + '</b></div><div class="fixture-matchup-rows">' + rows + '</div></span>';
+}
+
 async function loadFixtureTierTooltips() {
   const fixtures = GROUPS.flatMap((group) => state.fixtures?.[group] || [])
     .concat(PLAYOFFS.flatMap((stage) => (state.playoffs?.[stage.key] || []).map((fixture) => ({ ...fixture, ...playoffFixtureTeams(fixture) }))))
@@ -312,13 +335,14 @@ function renderGroups() {
       const away = fixture.away || "오른쪽 대학 미정";
       const fixtureDate = formatGroupDate(fixture.date);
       const matchupTitle = fixtureMatchupTitle(group, index, fixture);
+      const matchupPopover = fixtureMatchupPopover(group, index, fixture);
       const today = isToday(fixture.date);
       const disabled = !fixture.home || !fixture.away;
       return [
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time title="' + escapeHtml(matchupTitle) + '" aria-label="' + escapeHtml(matchupTitle) + '">' + escapeHtml(fixtureDate) +
+        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><span class="fixture-date-trigger" tabindex="0" aria-label="' + escapeHtml(matchupTitle) + '"><time>' + escapeHtml(fixtureDate) + '</time>' + matchupPopover + '</span>' +
           '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
@@ -484,10 +508,11 @@ function renderPlayoffs() {
       const today = isToday(fixture.date);
       const disabled = !isResolvedPlayoffTeam(teams.home) || !isResolvedPlayoffTeam(teams.away);
       const matchupTitle = fixtureMatchupTitle(stage.title, index, { ...fixture, ...teams });
+      const matchupPopover = fixtureMatchupPopover(stage.title, index, { ...fixture, ...teams });
       return [
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-playoff="' + stage.key + '" data-fixture="' + index + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><time title="' + escapeHtml(matchupTitle) + '" aria-label="' + escapeHtml(matchupTitle) + '">' + escapeHtml(formatGroupDate(fixture.date)) + '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
+        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><span class="fixture-date-trigger" tabindex="0" aria-label="' + escapeHtml(matchupTitle) + '"><time>' + escapeHtml(formatGroupDate(fixture.date)) + '</time>' + matchupPopover + '</span>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-playoff="' + stage.key + '" data-fixture="' + index + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
         "</div>"
       ].join("");

@@ -353,6 +353,135 @@ select {
   letter-spacing: -0.02em;
 }
 
+.fixture-date-trigger {
+  position: relative;
+  display: block;
+  cursor: help;
+  outline: none;
+}
+
+.fixture-date-trigger:focus-visible > time {
+  border-radius: 4px;
+  outline: 2px solid var(--cup-green);
+  outline-offset: 3px;
+}
+
+.fixture-matchup-popover {
+  width: min(570px, calc(100vw - 34px));
+  padding: 13px;
+  display: none;
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px solid #b8c462;
+  border-radius: 9px;
+  color: var(--cup-navy);
+  background: #fffefa;
+  box-shadow: 0 16px 34px rgba(23, 33, 58, .22);
+  text-align: left;
+}
+
+.fixture-date-trigger:hover .fixture-matchup-popover,
+.fixture-date-trigger:focus .fixture-matchup-popover {
+  display: block;
+}
+
+.fixture-matchup-popover > strong {
+  display: block;
+  color: var(--cup-green);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .06em;
+}
+
+.fixture-matchup-popover > p {
+  margin: 9px 0 1px;
+  color: var(--cup-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.fixture-matchup-title {
+  margin: 8px 0 10px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  color: var(--cup-navy);
+  font-size: 14px;
+  text-align: center;
+}
+
+.fixture-matchup-title span,
+.fixture-matchup-row > i {
+  color: var(--cup-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.fixture-matchup-rows {
+  display: grid;
+  gap: 7px;
+}
+
+.fixture-matchup-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 30px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 6px;
+}
+
+.fixture-matchup-tier {
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: #65700f;
+  background: #f0f5c7;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.fixture-matchup-team {
+  min-width: 0;
+  padding: 7px 8px;
+  display: grid;
+  gap: 3px;
+  border-radius: 5px;
+}
+
+.fixture-matchup-team.is-home { background: #edf4ff; }
+.fixture-matchup-team.is-away { background: #fff0f2; }
+
+.fixture-matchup-team b {
+  overflow: hidden;
+  color: var(--cup-navy);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fixture-matchup-team span {
+  color: #465068;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.fixture-matchup-row > i {
+  display: grid;
+  place-items: center;
+}
+
+/* 날짜 위 대진 카드가 카드 바깥에서도 잘리지 않도록 합니다. */
+.group-card,
+.knockout-card {
+  overflow: visible;
+}
+
 .today-badge {
   width: max-content;
   margin: 6px auto 0;
