@@ -901,14 +901,34 @@ function apiMatchRows(matches, playerId) {
   }).filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.date));
 }
 
+async function fetchAllApiMatches(playerId) {
+  const matches = [];
+  const seen = new Set();
+  const limit = 200;
+  for (let offset = 0; ; offset += limit) {
+    const page = await fetchEloApi("/matches", { player_id: playerId, limit, offset });
+    if (!Array.isArray(page)) throw new Error("ELOBoard 경기 목록 응답 형식이 올바르지 않습니다.");
+    let added = 0;
+    for (const match of page) {
+      const key = String(match.id || JSON.stringify(match));
+      if (seen.has(key)) continue;
+      seen.add(key);
+      matches.push(match);
+      added += 1;
+    }
+    if (page.length < limit) return matches;
+    if (!added) throw new Error("ELOBoard 이전 경기 페이지가 반복되어 전체 전적을 확인하지 못했습니다.");
+  }
+}
+
 async function loadApiProfile(playerId, force = false) {
   const cacheKey = "api:" + String(playerId);
   const cached = profileCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
   const [player, matches, rivals] = await Promise.all([
     fetchEloApi("/players/" + encodeURIComponent(playerId)),
-    // 현재 ELOBoard API의 한 번 요청 최대치는 200경기입니다.
-    fetchEloApi("/matches", { player_id: playerId, limit: 200, offset: 0 }),
+    // 200경기씩 이전 페이지까지 가져와 모든 연도·월의 전적을 제공합니다.
+    fetchAllApiMatches(playerId),
     fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals").catch(() => [])
   ]);
   if (!player?.id || !String(player.name || "").trim()) throw new Error("ELOBoard 선수 정보를 확인하지 못했습니다.");
