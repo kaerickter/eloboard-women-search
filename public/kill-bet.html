@@ -284,6 +284,124 @@
       padding: 2px 2px 8px;
     }
 
+    /* 4인 킬내기는 참고 화면처럼 한 장의 세로형 소형 점수판으로 표시합니다. */
+    .mode-section.one-team-mode {
+      width: 250px;
+      padding: 8px;
+    }
+
+    .one-team-mode .team-grid,
+    .one-team-mode .team-column,
+    .one-team-mode .team-label,
+    .one-team-mode .score-panel {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .one-team-mode .team-grid {
+      display: block;
+      overflow: visible;
+      padding: 0;
+    }
+
+    .one-team-mode .team-column {
+      gap: 7px;
+    }
+
+    .one-team-mode .team-label {
+      min-height: 36px;
+      padding: 3px 5px 3px 8px;
+      font-size: 18px;
+    }
+
+    .one-team-mode .team-label-input {
+      height: 27px;
+      padding-block: 0;
+    }
+
+    .one-team-mode .team-time {
+      min-width: 82px;
+      min-height: 28px;
+      padding: 2px 5px;
+      font-size: 17px;
+    }
+
+    .one-team-mode .score-panel {
+      padding: 10px 7px;
+      border-width: 2px;
+      box-shadow: 0 8px 18px rgba(112, 72, 0, 0.18);
+    }
+
+    .one-team-mode .title-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 4px;
+      margin-bottom: 9px;
+    }
+
+    .one-team-mode .title-main {
+      font-size: 20px;
+    }
+
+    .one-team-mode .total-count {
+      min-width: 46px;
+      text-align: center;
+    }
+
+    .one-team-mode .panel-chicken-field {
+      height: 27px;
+      gap: 2px;
+      margin-right: 0;
+      padding-inline: 4px;
+      font-size: 15px;
+    }
+
+    .one-team-mode .panel-chicken-input {
+      width: 30px;
+      height: 23px;
+      font-size: 13px;
+    }
+
+    .one-team-mode .reset-button {
+      width: 42px;
+      height: 27px;
+      font-size: 12px;
+    }
+
+    .one-team-mode .rows {
+      gap: 7px;
+    }
+
+    .one-team-mode .counter-row {
+      grid-template-columns: minmax(54px, 1fr) 24px 27px 27px 36px 36px;
+      gap: 2px;
+      min-height: 31px;
+    }
+
+    .one-team-mode .name-input {
+      width: 100%;
+      min-width: 0;
+      padding: 2px 1px 3px;
+      font-size: 16px;
+    }
+
+    .one-team-mode .count {
+      font-size: 17px;
+    }
+
+    .one-team-mode .step-button {
+      width: 27px;
+      height: 27px;
+      font-size: 18px;
+    }
+
+    .one-team-mode .fail-button,
+    .one-team-mode .cancel-button {
+      width: 36px;
+      height: 27px;
+      padding: 0 2px;
+      font-size: 12px;
+    }
+
     .mode-section.two-team-mode {
       transform: translateX(-6px);
     }
@@ -764,6 +882,7 @@
         section.className = [
           "mode-section",
           mode.wide ? "wide" : "",
+          mode.teams.length === 1 ? "one-team-mode" : "",
           mode.teams.length === 2 ? "two-team-mode" : "",
           mode.teams.length === 3 ? "three-team-mode" : "",
           mode.teams.length === 4 ? "four-team-mode" : "",
