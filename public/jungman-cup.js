@@ -11,6 +11,8 @@ const PLAYOFFS = [
 const STORAGE_KEY = "jungman-cup-preview-v2";
 const PREVIOUS_STORAGE_KEY = "jungman-cup-preview-v1";
 const PLAYOFF_SCHEDULE_VERSION = 1;
+const SHARED_STATE_URL = "/api/jungman-cup-state";
+const SHARED_POLL_MS = 2000;
 
 const groupGrid = document.getElementById("groupGrid");
 const knockoutGrid = document.getElementById("knockoutGrid");
@@ -33,6 +35,12 @@ const cupStatsEmpty = document.getElementById("cupStatsEmpty");
 const authenticated = true;
 let selectedMatch = null;
 let state = readState();
+let sharedVersion = 0;
+let sharedReady = false;
+let sharedSaveTimer = null;
+let sharedSaveInFlight = false;
+let sharedSaveQueued = false;
+let lastUploadedState = "";
 const fixtureTierTooltipCache = new Map();
 PLAYOFFS.forEach((stage) => {
   if (!Array.isArray(state.playoffs?.[stage.key])) state.playoffs[stage.key] = emptyPlayoffs()[stage.key];
@@ -61,7 +69,8 @@ function readState() {
       playoffs: saved.playoffs && typeof saved.playoffs === "object" ? saved.playoffs : emptyPlayoffs(),
       matches: saved.matches && typeof saved.matches === "object"
         ? saved.matches
-        : (previous.matches && typeof previous.matches === "object" ? previous.matches : {})
+        : (previous.matches && typeof previous.matches === "object" ? previous.matches : {}),
+      playoffScheduleVersion: Math.max(0, Number(saved.playoffScheduleVersion) || 0)
     };
   } catch {
     return { fixtures: emptyFixtures(), playoffs: emptyPlayoffs(), matches: {} };
@@ -70,6 +79,117 @@ function readState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleSharedSave();
+}
+
+function normalizeSharedState(raw) {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const fixtures = source.fixtures && typeof source.fixtures === "object" ? source.fixtures : emptyFixtures();
+  const playoffs = source.playoffs && typeof source.playoffs === "object" ? source.playoffs : emptyPlayoffs();
+  PLAYOFFS.forEach((stage) => {
+    if (!Array.isArray(playoffs[stage.key])) playoffs[stage.key] = emptyPlayoffs()[stage.key];
+  });
+  return {
+    fixtures,
+    playoffs,
+    matches: source.matches && typeof source.matches === "object" ? source.matches : {},
+    playoffScheduleVersion: Math.max(0, Number(source.playoffScheduleVersion) || 0)
+  };
+}
+
+function stateHasRecords(value) {
+  if (Object.keys(value?.matches || {}).length) return true;
+  const fixtures = GROUPS.flatMap((group) => value?.fixtures?.[group] || []);
+  const playoffs = PLAYOFFS.flatMap((stage) => value?.playoffs?.[stage.key] || []);
+  return fixtures.concat(playoffs).some((fixture) => fixture?.date || fixture?.home || fixture?.away);
+}
+
+function renderSharedState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (selectedMatch && !state.matches?.[selectedMatch]) selectedMatch = null;
+  renderGroups();
+  renderPlayoffs();
+  renderMatchPanel();
+  fixtureTierTooltipCache.clear();
+  void loadFixtureTierTooltips();
+}
+
+function scheduleSharedSave() {
+  if (!sharedReady) return;
+  window.clearTimeout(sharedSaveTimer);
+  sharedSaveTimer = window.setTimeout(pushSharedState, 300);
+}
+
+async function pushSharedState() {
+  sharedSaveTimer = null;
+  if (!sharedReady) return;
+  if (sharedSaveInFlight) {
+    sharedSaveQueued = true;
+    return;
+  }
+  const snapshot = JSON.stringify(state);
+  if (snapshot === lastUploadedState) return;
+  sharedSaveInFlight = true;
+  try {
+    const response = await fetch(SHARED_STATE_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ state })
+    });
+    if (!response.ok) throw new Error("중만컵 공용 저장 응답 오류");
+    const result = await response.json();
+    sharedVersion = Math.max(sharedVersion, Number(result.version) || 0);
+    lastUploadedState = snapshot;
+  } catch (error) {
+    console.error(error);
+  } finally {
+    sharedSaveInFlight = false;
+    if (sharedSaveQueued || JSON.stringify(state) !== snapshot) {
+      sharedSaveQueued = false;
+      scheduleSharedSave();
+    }
+  }
+}
+
+async function refreshSharedState() {
+  if (sharedSaveInFlight || sharedSaveTimer || cupAdminDialog.open) return;
+  try {
+    const response = await fetch(SHARED_STATE_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error("중만컵 공용 불러오기 응답 오류");
+    const result = await response.json();
+    const version = Number(result.version) || 0;
+    if (!result.state || version <= sharedVersion) return;
+    state = normalizeSharedState(result.state);
+    sharedVersion = version;
+    lastUploadedState = JSON.stringify(state);
+    renderSharedState();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function initializeSharedState() {
+  try {
+    const response = await fetch(SHARED_STATE_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error("중만컵 공용 불러오기 응답 오류");
+    const result = await response.json();
+    const version = Number(result.version) || 0;
+    if (result.state && version > 0) {
+      state = normalizeSharedState(result.state);
+      sharedVersion = version;
+      lastUploadedState = JSON.stringify(state);
+      renderSharedState();
+    } else if (stateHasRecords(state)) {
+      sharedReady = true;
+      await pushSharedState();
+    }
+  } catch (error) {
+    console.error(error);
+  } finally {
+    sharedReady = true;
+    window.setInterval(refreshSharedState, SHARED_POLL_MS);
+  }
 }
 
 function applyKnownPlayoffSchedule() {
@@ -647,3 +767,4 @@ renderGroups();
 renderPlayoffs();
 renderMatchPanel();
 void loadFixtureTierTooltips();
+void initializeSharedState();
