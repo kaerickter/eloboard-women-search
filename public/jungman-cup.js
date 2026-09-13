@@ -70,7 +70,8 @@ function readState() {
       matches: saved.matches && typeof saved.matches === "object"
         ? saved.matches
         : (previous.matches && typeof previous.matches === "object" ? previous.matches : {}),
-      playoffScheduleVersion: Math.max(0, Number(saved.playoffScheduleVersion) || 0)
+      playoffScheduleVersion: Math.max(0, Number(saved.playoffScheduleVersion) || 0),
+      recoveryVersion: Math.max(0, Number(saved.recoveryVersion) || 0)
     };
   } catch {
     return { fixtures: emptyFixtures(), playoffs: emptyPlayoffs(), matches: {} };
@@ -93,7 +94,8 @@ function normalizeSharedState(raw) {
     fixtures,
     playoffs,
     matches: source.matches && typeof source.matches === "object" ? source.matches : {},
-    playoffScheduleVersion: Math.max(0, Number(source.playoffScheduleVersion) || 0)
+    playoffScheduleVersion: Math.max(0, Number(source.playoffScheduleVersion) || 0),
+    recoveryVersion: Math.max(0, Number(source.recoveryVersion) || 0)
   };
 }
 
@@ -175,7 +177,7 @@ async function initializeSharedState() {
     if (!response.ok) throw new Error("중만컵 공용 불러오기 응답 오류");
     const result = await response.json();
     const version = Number(result.version) || 0;
-    if (result.state && version > 0) {
+    if (result.state) {
       state = normalizeSharedState(result.state);
       sharedVersion = version;
       lastUploadedState = JSON.stringify(state);
