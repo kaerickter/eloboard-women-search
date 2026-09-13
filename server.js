@@ -199,7 +199,7 @@ async function loadScoreboardState() {
       "SELECT state, version, updated_at FROM scoreboard_state WHERE id = $1",
       ["main"]
     );
-    if (!result.rows[0]) return { state: null, version: 0, updatedAt: null };
+    if (!result.rows[0]) return { state: sanitizeJungmanCupState({}), version: 0, updatedAt: null };
     return {
       state: sanitizeScoreboardState(result.rows[0].state),
       version: Number(result.rows[0].version),
@@ -213,7 +213,7 @@ async function loadScoreboardState() {
       state: sanitizeScoreboardState(saved.state)
     };
   } catch (error) {
-    if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
+    if (error.code === "ENOENT") return { state: sanitizeJungmanCupState({}), version: 0, updatedAt: null };
     throw error;
   }
 }
@@ -251,6 +251,68 @@ async function saveScoreboardState(state) {
   await fs.promises.writeFile(tempFile, JSON.stringify(saved, null, 2));
   await fs.promises.rename(tempFile, SCOREBOARD_STATE_FILE);
   return { version: saved.version, updatedAt: saved.updatedAt };
+}
+
+const JUNGMAN_CUP_RECOVERY_VERSION = 1;
+
+function recoveredJungmanCupPlayoffs() {
+  return {
+    quarterfinals: [
+      { date: "2026-09-03", home: "흑카데미", away: "JSA", homeSource: null, awaySource: null },
+      { date: "2026-09-04", home: "캄몬스타즈", away: "케이대", homeSource: null, awaySource: null },
+      { date: "2026-09-05", home: "뉴캣슬", away: "수술대", homeSource: null, awaySource: null },
+      { date: "2026-09-06", home: "DM", away: "엠비대", homeSource: null, awaySource: null }
+    ],
+    semifinals: [
+      { date: "2026-09-12", home: "JSA", away: "케이대", homeSource: null, awaySource: null },
+      { date: "2026-09-13", home: "", away: "", homeSource: { stage: "quarterfinals", index: 2 }, awaySource: { stage: "quarterfinals", index: 3 } }
+    ],
+    final: [
+      { date: "2026-09-19", home: "", away: "", homeSource: { stage: "semifinals", index: 0 }, awaySource: { stage: "semifinals", index: 1 } }
+    ]
+  };
+}
+
+function recoveredJungmanCupMatches() {
+  const makeMatch = (group, home, away, fixtureIndex, fixtureDate, rows) => ({
+    group, home, away, fixtureIndex, fixtureDate,
+    games: Array.from({ length: 9 }, (_, index) => {
+      const row = rows[index] || [];
+      return { homePlayer: row[0] || "", awayPlayer: row[1] || "", mapName: row[2] || "", winner: row[3] || "" };
+    })
+  });
+  return {
+    "8강::흑카데미::JSA": makeMatch("8강", "흑카데미", "JSA", 0, "2026-09-03", [
+      ["메옹", "려원님", "애티튜드", "away"], ["히엉", "하블리", "오디세이", "away"],
+      ["경콩이", "백원이야", "오디세이", "away"], ["오세은", "미진이", "라데온", "away"],
+      ["갱이다", "쟈닌", "녹아웃", "home"], ["나예리", "라미", "녹아웃", "away"],
+      ["유승곤", "구성훈", "백룸", ""]
+    ]),
+    "8강::캄몬스타즈::케이대": makeMatch("8강", "캄몬스타즈", "케이대", 1, "2026-09-04", [
+      ["햇살", "늑대채린", "오디세이", "home"], ["비타밍", "박하악", "다레온", "away"],
+      ["아리송이", "냥수디", "녹아웃", "away"], ["치리", "내가먼지", "녹아웃", "away"],
+      ["김민철", "장윤철", "오디세이", "away"], ["찌킹", "링고", "녹아웃", "away"],
+      ["남덕선", "슬돌이", "애티튜드", ""], ["임조이", "정서린", "애티튜드", ""]
+    ]),
+    "8강::뉴캣슬::수술대": makeMatch("8강", "뉴캣슬", "수술대", 2, "2026-09-05", [
+      ["", "", "", "home"], ["이아깽", "2라니", "라데온", "away"],
+      ["진유성", "핑핑이", "오디세이", "home"], ["키링", "몽순", "라데온", "away"],
+      ["막내현진", "면추가", "녹아웃", "away"], ["백갑숙", "깨림이", "애티튜드", "home"],
+      ["박듀듀", "공다츠", "애티튜드", "home"], ["유즈", "헤요이", "녹아웃", "away"],
+      ["키링", "몽순", "애티튜드", "home"]
+    ]),
+    "8강::DM::엠비대": makeMatch("8강", "DM", "엠비대", 3, "2026-09-06", [
+      ["빵리나", "구보라", "녹아웃", "home"], ["임진묵", "이영한", "오디세이", "home"],
+      ["수니양", "김채이", "애티튜드", "home"], ["은서", "정다닝", "오디세이", "home"],
+      ["다나짱", "카히리", "라데온", "away"], ["은조", "요구리", "오디세이", "home"]
+    ]),
+    "4강::JSA::케이대": makeMatch("4강", "JSA", "케이대", 0, "2026-09-12", [
+      ["조기석", "정영재", "애티튜드", "home"], ["려원님", "박하악", "애티튜드", "away"],
+      ["나린", "링고", "라데온", "away"], ["백원이야", "냥수디", "애티튜드", "home"],
+      ["미진이", "단비송", "녹아웃", "away"], ["홍구", "장윤철", "녹아웃", "home"],
+      ["하블리", "슬돌이", "오디세이", "away"], ["홍구", "장윤철", "녹아웃", "away"]
+    ])
+  };
 }
 
 function sanitizeJungmanCupState(value) {
@@ -319,11 +381,26 @@ function sanitizeJungmanCupState(value) {
       games
     };
   }
+  const recoveryVersion = Math.max(0, Number(source.recoveryVersion) || 0);
+  if (recoveryVersion < JUNGMAN_CUP_RECOVERY_VERSION) {
+    const recoveredPlayoffs = recoveredJungmanCupPlayoffs();
+    for (const [stage, rows] of Object.entries(recoveredPlayoffs)) {
+      rows.forEach((row, index) => {
+        const current = playoffs[stage][index];
+        const hasCurrentValue = current.date || current.home || current.away || current.homeSource || current.awaySource;
+        if (!hasCurrentValue) playoffs[stage][index] = row;
+      });
+    }
+    for (const [key, match] of Object.entries(recoveredJungmanCupMatches())) {
+      if (!matches[key]) matches[key] = match;
+    }
+  }
   return {
     fixtures,
     playoffs,
     matches,
-    playoffScheduleVersion: Math.max(0, Number(source.playoffScheduleVersion) || 0)
+    playoffScheduleVersion: Math.max(1, Number(source.playoffScheduleVersion) || 0),
+    recoveryVersion: Math.max(JUNGMAN_CUP_RECOVERY_VERSION, recoveryVersion)
   };
 }
 
@@ -334,7 +411,7 @@ async function loadJungmanCupState() {
       "SELECT state, version, updated_at FROM scoreboard_state WHERE id = $1",
       ["jungman-cup"]
     );
-    if (!result.rows[0]) return { state: null, version: 0, updatedAt: null };
+    if (!result.rows[0]) return { state: sanitizeJungmanCupState({}), version: 0, updatedAt: null };
     return {
       state: sanitizeJungmanCupState(result.rows[0].state),
       version: Number(result.rows[0].version),
@@ -345,7 +422,7 @@ async function loadJungmanCupState() {
     const saved = JSON.parse(await fs.promises.readFile(JUNGMAN_CUP_STATE_FILE, "utf8"));
     return { ...saved, state: sanitizeJungmanCupState(saved.state) };
   } catch (error) {
-    if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
+    if (error.code === "ENOENT") return { state: sanitizeJungmanCupState({}), version: 0, updatedAt: null };
     throw error;
   }
 }
