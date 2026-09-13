@@ -256,18 +256,39 @@ async function saveScoreboardState(state) {
 function sanitizeJungmanCupState(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const shortText = (input, limit = 100) => String(input || "").trim().slice(0, limit);
+  const playoffStages = {
+    quarterfinals: 4,
+    semifinals: 2,
+    final: 1
+  };
+  const sanitizeSource = (rawSource) => {
+    if (!rawSource || typeof rawSource !== "object" || Array.isArray(rawSource)) return null;
+    const stage = shortText(rawSource.stage, 20);
+    const count = playoffStages[stage];
+    if (!count) return null;
+    return { stage, index: Math.max(0, Math.min(count - 1, Number(rawSource.index) || 0)) };
+  };
+  const sanitizeFixture = (rawFixture) => {
+    const row = rawFixture && typeof rawFixture === "object" && !Array.isArray(rawFixture) ? rawFixture : {};
+    const date = shortText(row.date, 10);
+    return {
+      date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "",
+      home: shortText(row.home),
+      away: shortText(row.away),
+      homeSource: sanitizeSource(row.homeSource),
+      awaySource: sanitizeSource(row.awaySource)
+    };
+  };
   const fixtures = {};
   for (const group of ["A", "B", "C", "D"]) {
     const rows = Array.isArray(source.fixtures?.[group]) ? source.fixtures[group] : [];
-    fixtures[group] = Array.from({ length: 3 }, (_, index) => {
-      const row = rows[index] && typeof rows[index] === "object" ? rows[index] : {};
-      const date = shortText(row.date, 10);
-      return {
-        date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "",
-        home: shortText(row.home),
-        away: shortText(row.away)
-      };
-    });
+    fixtures[group] = Array.from({ length: 3 }, (_, index) => sanitizeFixture(rows[index]));
+  }
+
+  const playoffs = {};
+  for (const [stage, count] of Object.entries(playoffStages)) {
+    const rows = Array.isArray(source.playoffs?.[stage]) ? source.playoffs[stage] : [];
+    playoffs[stage] = Array.from({ length: count }, (_, index) => sanitizeFixture(rows[index]));
   }
 
   const matches = {};
@@ -290,15 +311,20 @@ function sanitizeJungmanCupState(value) {
     });
     while (games.length < 9) games.push({ homePlayer: "", awayPlayer: "", mapName: "", winner: "" });
     matches[key] = {
-      group: ["A", "B", "C", "D"].includes(rawMatch.group) ? rawMatch.group : "",
+      group: ["A", "B", "C", "D", "8강", "4강", "결승"].includes(rawMatch.group) ? rawMatch.group : "",
       home: shortText(rawMatch.home),
       away: shortText(rawMatch.away),
-      fixtureIndex: Math.max(0, Math.min(2, Number(rawMatch.fixtureIndex) || 0)),
+      fixtureIndex: Math.max(0, Math.min(3, Number(rawMatch.fixtureIndex) || 0)),
       fixtureDate: /^\d{4}-\d{2}-\d{2}$/.test(shortText(rawMatch.fixtureDate, 10)) ? shortText(rawMatch.fixtureDate, 10) : "",
       games
     };
   }
-  return { fixtures, matches };
+  return {
+    fixtures,
+    playoffs,
+    matches,
+    playoffScheduleVersion: Math.max(0, Number(source.playoffScheduleVersion) || 0)
+  };
 }
 
 async function loadJungmanCupState() {
