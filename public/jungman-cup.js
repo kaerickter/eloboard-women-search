@@ -324,13 +324,15 @@ function playoffSourceLabel(source) {
 
 function playoffWinner(stageKey, index) {
   const fixture = state.playoffs?.[stageKey]?.[index];
-  if (!fixture?.home || !fixture?.away) return "";
-  const key = matchKey(PLAYOFFS.find((item) => item.key === stageKey)?.title || stageKey, fixture.home, fixture.away);
+  if (!fixture) return "";
+  const teams = playoffFixtureTeams(fixture);
+  if (!isResolvedPlayoffTeam(teams.home) || !isResolvedPlayoffTeam(teams.away)) return "";
+  const key = matchKey(PLAYOFFS.find((item) => item.key === stageKey)?.title || stageKey, teams.home, teams.away);
   const match = state.matches?.[key];
   if (!match) return "";
   const score = matchScore(match);
-  if (score.home === 5) return fixture.home;
-  if (score.away === 5) return fixture.away;
+  if (score.home === 5) return teams.home;
+  if (score.away === 5) return teams.away;
   return "";
 }
 
@@ -612,8 +614,9 @@ function renderPlayoffEditor() {
 
 function renderPlayoffs() {
   const stageCompleted = (stage) => (state.playoffs?.[stage.key] || []).every((fixture, index) => {
+    const teams = playoffFixtureTeams(fixture);
     const result = getPlayoffMatch(stage.key, index);
-    if (!fixture.home || !fixture.away || !result) return false;
+    if (!isResolvedPlayoffTeam(teams.home) || !isResolvedPlayoffTeam(teams.away) || !result) return false;
     const score = matchScore(result.match);
     return score.home === 5 || score.away === 5;
   });
@@ -672,6 +675,7 @@ matchPanel.addEventListener("click", (event) => {
   game.winner = game.winner === winner.dataset.winner ? "" : winner.dataset.winner;
   saveState();
   renderMatchPanel();
+  renderPlayoffs();
 });
 
 cupAdminOpen.addEventListener("click", () => {
