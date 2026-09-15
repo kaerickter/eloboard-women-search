@@ -122,6 +122,29 @@ function candidateFromMatch(playerName, match, roster) {
   };
 }
 
+function selectAutoSyncCandidates({ matches, roster, playerName, autoMatchWindow }) {
+  const candidates = [];
+  const sourceKeys = new Set();
+  for (const [profilePosition, match] of (Array.isArray(matches) ? matches : []).entries()) {
+    const candidate = candidateFromMatch(playerName, match, roster);
+    if (!candidate.matchDate || !candidate.opponent || sourceKeys.has(candidate.sourceKey)) continue;
+    sourceKeys.add(candidate.sourceKey);
+    candidate.profilePosition = profilePosition;
+    candidates.push(candidate);
+  }
+
+  const latestProfileDate = candidates
+    .map((candidate) => candidate.matchDate)
+    .sort()
+    .at(-1) || "";
+
+  return candidates.filter((candidate) => {
+    const isRecent = candidate.matchDate >= autoMatchWindow.from
+      && candidate.matchDate <= autoMatchWindow.to;
+    return isRecent || candidate.matchDate === latestProfileDate;
+  });
+}
+
 function duplicateSignature(entry) {
   const date = entry?.match_date instanceof Date
     ? entry.match_date.toISOString().slice(0, 10)
@@ -199,17 +222,13 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
   if (!pool) return { enabled: false, error: "스폰일지 저장소가 연결되지 않았습니다." };
   const matches = Array.isArray(profile?.matches) ? profile.matches : [];
   const playerKey = compactName(playerName);
-  const uniqueCandidates = [];
-  const sourceKeys = new Set();
   const autoMatchWindow = recentAutoMatchWindow();
-  for (const [profilePosition, match] of matches.entries()) {
-    const candidate = candidateFromMatch(playerName, match, roster);
-    if (!candidate.matchDate || !candidate.opponent || sourceKeys.has(candidate.sourceKey)) continue;
-    if (candidate.matchDate < autoMatchWindow.from || candidate.matchDate > autoMatchWindow.to) continue;
-    sourceKeys.add(candidate.sourceKey);
-    candidate.profilePosition = profilePosition;
-    uniqueCandidates.push(candidate);
-  }
+  const uniqueCandidates = selectAutoSyncCandidates({
+    matches,
+    roster,
+    playerName,
+    autoMatchWindow,
+  });
 
   let client;
   try {
@@ -220,8 +239,16 @@ async function syncSpawnDiaryFromProfile({ pool, profile, roster, playerName = A
       DELETE FROM spawn_diary_auto_seen
       WHERE player_key = $1
         AND imported_entry_id IS NULL
-        AND match_date BETWEEN $2 AND $3
-    `, [playerKey, autoMatchWindow.from, autoMatchWindow.to]);
+        AND (
+          match_date BETWEEN $2 AND $3
+          OR source_key = ANY($4::text[])
+        )
+    `, [
+      playerKey,
+      autoMatchWindow.from,
+      autoMatchWindow.to,
+      uniqueCandidates.map((candidate) => candidate.sourceKey),
+    ]);
     await client.query(`
       DELETE FROM spawn_diary_auto_seen AS seen
       WHERE seen.player_key = $1
@@ -410,6 +437,7 @@ module.exports = {
   recentAutoMatchWindow,
   opponentIdentity,
   resultFromElo,
+  selectAutoSyncCandidates,
   sourceKeyForMatch,
   syncSpawnDiaryFromProfile,
   tierSnapshot,
