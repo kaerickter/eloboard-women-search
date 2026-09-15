@@ -199,7 +199,7 @@ async function loadScoreboardState() {
       "SELECT state, version, updated_at FROM scoreboard_state WHERE id = $1",
       ["main"]
     );
-    if (!result.rows[0]) return { state: sanitizeJungmanCupState({}), version: 0, updatedAt: null };
+    if (!result.rows[0]) return { state: null, version: 0, updatedAt: null };
     return {
       state: sanitizeScoreboardState(result.rows[0].state),
       version: Number(result.rows[0].version),
@@ -213,7 +213,7 @@ async function loadScoreboardState() {
       state: sanitizeScoreboardState(saved.state)
     };
   } catch (error) {
-    if (error.code === "ENOENT") return { state: sanitizeJungmanCupState({}), version: 0, updatedAt: null };
+    if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
     throw error;
   }
 }
