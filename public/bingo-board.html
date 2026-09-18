@@ -1331,7 +1331,7 @@
   <main class="app">
     <section class="broadcast" aria-label="방송 송출용 빙고판">
       <div class="stage" id="stage">
-        <div class="territory-scorebar" id="territoryScorebar" hidden aria-label="점수 땅따먹기 점수판">
+        <div class="territory-scorebar" id="territoryScorebar" hidden aria-label="땅따먹기 팀별 지운 칸 수">
           <div class="territory-score-team" id="team1ScoreCard"><span id="team1ScoreName">1팀</span><strong id="team1ScoreValue">0</strong></div>
           <div class="territory-score-center"><span id="territoryScoreCenter">빙고</span><span class="score-chicken" aria-hidden="true">🍗 <strong id="territoryChickenCount">0</strong></span></div>
           <div class="territory-score-team" id="team2ScoreCard"><span id="team2ScoreName">2팀</span><strong id="team2ScoreValue">0</strong></div>
@@ -1444,14 +1444,15 @@
       </section>
 
       <section class="section">
-        <div class="label">랜덤 숫자 채우기</div>
+        <div class="label">랜덤 숫자 / 알파벳 채우기</div>
         <div class="row">
           <input class="field number-field" id="rangeStart" type="number" value="1" aria-label="시작 숫자">
           <span>~</span>
           <input class="field number-field" id="rangeEnd" type="number" value="30" aria-label="끝 숫자">
-          <button class="button primary" id="randomFill" type="button">랜덤 채우기</button>
+          <button class="button primary" id="randomFill" type="button">숫자 채우기</button>
+          <button class="button" id="alphabetFill" type="button">A~Z 채우기</button>
         </div>
-        <div class="status" id="status">예: 1 ~ 30 입력 후 랜덤 채우기</div>
+        <div class="status" id="status">숫자 범위를 입력하거나 A~Z 채우기를 선택하세요.</div>
       </section>
 
       <section class="section">
@@ -1778,8 +1779,8 @@
       const team2Highlighted = new Set(team2Lines.flat());
       const grid = `repeat(${state.size}, minmax(0, 1fr))`;
 
-      timerDisplay.hidden = isScoreTerritory || !timerVisible;
-      bingoHeading.hidden = isScoreTerritory || timerVisible;
+      timerDisplay.hidden = isTerritory || !timerVisible;
+      bingoHeading.hidden = isTerritory || timerVisible;
 
       bingoTitleText.textContent = state.title;
       bingoChickenCount.textContent = state.chickenCount;
@@ -1854,7 +1855,7 @@
       scoreTerritoryButton.classList.toggle("mode-active", isScoreTerritory);
       territoryControls.hidden = !isTerritory;
       scoreBingoSetting.hidden = !isScoreTerritory;
-      territoryScorebar.hidden = !isScoreTerritory;
+      territoryScorebar.hidden = !isTerritory;
       territoryBingoPoints.value = String(state.territoryBingoPoints);
       teamButtons.forEach(button => {
         const team = Number(button.dataset.team);
@@ -1870,10 +1871,11 @@
       teamNameInputs.forEach((input, index) => { input.value = teamNames[index]; });
       teamColorInputs.forEach((input, index) => { input.value = state.teamColors[index]; });
 
-      if (isScoreTerritory) {
+      if (isTerritory) {
         const scores = [[1, team1Lines.length], [2, team2Lines.length]].map(([team, lines]) => ({
           team,
-          points: board.owners.filter(owner => owner === team).length + (lines * state.territoryBingoPoints)
+          points: board.owners.filter(owner => owner === team).length
+            + (isScoreTerritory ? lines * state.territoryBingoPoints : 0)
         }));
         scores.forEach(({ team, points }) => {
           const index = team - 1;
@@ -1931,6 +1933,7 @@
       state.chickenCount = Math.max(0, state.chickenCount + change);
       bingoChickenCount.textContent = state.chickenCount;
       timerChickenCount.textContent = state.chickenCount;
+      territoryChickenCount.textContent = state.chickenCount;
       chickenEditorCount.textContent = `🍗 ${state.chickenCount}`;
       realtimeRoom?.increment("chickenCount", change);
       save();
@@ -1939,6 +1942,7 @@
     bingoTitleInput.addEventListener("input", event => {
       state.title = event.target.value.slice(0, 20) || "빙고";
       bingoTitleText.textContent = state.title;
+      if (isTerritoryMode() && !timerVisible) territoryScoreCenter.textContent = state.title;
       realtimeRoom?.sendSet("title", state.title);
       save();
     });
@@ -2013,6 +2017,20 @@
       render();
     }
 
+    function alphabetFill() {
+      const count = activeCount();
+      const alphabet = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index));
+      const board = currentBoard();
+      shuffle(alphabet).slice(0, count).forEach((value, index) => {
+        board.cells[index] = value;
+        board.checked[index] = false;
+        board.owners[index] = 0;
+      });
+      shareBoards();
+      status.textContent = `A ~ Z 중 ${count}개를 랜덤으로 넣었습니다.`;
+      render();
+    }
+
     function openBroadcastWindow() {
       const popup = window.open("", "bingoBroadcast", "width=1100,height=900");
       if (!popup) {
@@ -2069,10 +2087,10 @@
 
     function renderTimer() {
       timerValue.textContent = formatTime(timerRemaining);
-      const isScoreTerritory = state.mode === "score-territory";
-      if (isScoreTerritory) territoryScoreCenter.textContent = timerVisible ? formatTime(timerRemaining) : state.title;
-      timerDisplay.hidden = isScoreTerritory || !timerVisible;
-      bingoHeading.hidden = isScoreTerritory || timerVisible;
+      const isTerritory = isTerritoryMode();
+      if (isTerritory) territoryScoreCenter.textContent = timerVisible ? formatTime(timerRemaining) : state.title;
+      timerDisplay.hidden = isTerritory || !timerVisible;
+      bingoHeading.hidden = isTerritory || timerVisible;
     }
 
     function stopTimer() {
@@ -2457,6 +2475,7 @@ const cannonBall = document.getElementById("cannonBall");
     restoreCannonState();
 
     document.getElementById("randomFill").addEventListener("click", randomFill);
+    document.getElementById("alphabetFill").addEventListener("click", alphabetFill);
     document.getElementById("clearMarks").addEventListener("click", () => {
       const board = currentBoard();
       if (isTerritoryMode()) {
