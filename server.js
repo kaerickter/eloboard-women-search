@@ -26,6 +26,7 @@ const ELOBOARD_API_URL = "https://eloboard.com/api";
 const SSUSTAR_Iakkang_GAMES_URL = "https://ssustar.iwinv.net/recent_games_embed.php?player=%EC%9D%B4%EC%95%84%EA%B9%BD_T_780";
 const IAKKANG_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/11PQGexmMtcaOJlcfyAKg6tLsDDjbijMK_6crKta2RFM/export?format=csv&gid=540473952";
 const IAKKANG_WR_ID = "780";
+const IAKKANG_API_ID = "627";
 const MATCHUP_LIST_URL = "https://eloboard.com/women/bbs/board.php?bo_table=search_list";
 const MATCHUP_SEARCH_URL = "https://eloboard.com/women/bbs/search_bj_list.php";
 const MEN_LIST_URL = "https://eloboard.com/men/bbs/board.php?bo_table=search_list";
@@ -947,6 +948,61 @@ function apiRecord(wins, losses, games) {
   return { label: "총전적", games: safeGames, wins: safeWins, losses: safeLosses, rate: safeGames ? Math.round((safeWins / safeGames) * 1000) / 10 : 0 };
 }
 
+const API_CATEGORY_LABELS = {
+  pro_league: "프로리그",
+  team_event: "팀리그",
+  college_event: "대학리그",
+  college_war: "대학대전",
+  college_mini: "미니대전",
+  solo_event: "개인리그",
+  sponsored: "스폰"
+};
+
+function apiDetailedRecord(name, wins, losses, url, extra = {}) {
+  const record = apiRecord(wins, losses, Number(wins || 0) + Number(losses || 0));
+  return { name, ...record, url, ...extra };
+}
+
+function apiStageRecords(matches, playerId) {
+  const totals = new Map();
+  for (const match of Array.isArray(matches) ? matches : []) {
+    const category = String(match.category || "").trim();
+    if (!API_CATEGORY_LABELS[category]) continue;
+    const mine = (Array.isArray(match.participants) ? match.participants : [])
+      .find((item) => String(item.player_id) === String(playerId));
+    if (!mine || !["win", "loss"].includes(mine.result)) continue;
+    const current = totals.get(category) || { wins: 0, losses: 0 };
+    current[mine.result === "win" ? "wins" : "losses"] += 1;
+    totals.set(category, current);
+  }
+  return Object.keys(API_CATEGORY_LABELS).filter((category) => totals.has(category)).map((category) => {
+    const record = totals.get(category);
+    return apiDetailedRecord(
+      API_CATEGORY_LABELS[category], record.wins, record.losses,
+      apiPlayerUrl(playerId) + "?tab=matches&category=" + encodeURIComponent(category),
+      { category }
+    );
+  });
+}
+
+function apiCollegeRecords(matches, playerId) {
+  const totals = new Map();
+  for (const match of Array.isArray(matches) ? matches : []) {
+    const mine = (Array.isArray(match.participants) ? match.participants : [])
+      .find((item) => String(item.player_id) === String(playerId));
+    const collegeId = String(mine?.team_college_id || "").trim();
+    if (!collegeId || !["win", "loss"].includes(mine.result)) continue;
+    const current = totals.get(collegeId) || { name: String(mine.team_name || "대학 " + collegeId), wins: 0, losses: 0 };
+    current[mine.result === "win" ? "wins" : "losses"] += 1;
+    totals.set(collegeId, current);
+  }
+  return [...totals.entries()].map(([collegeId, record]) => apiDetailedRecord(
+    record.name, record.wins, record.losses,
+    "https://eloboard.com/colleges/" + encodeURIComponent(collegeId),
+    { collegeId }
+  )).sort((a, b) => b.games - a.games || b.wins - a.wins || a.name.localeCompare(b.name, "ko"));
+}
+
 function apiImageUrl(value) {
   const path = String(value || "").trim();
   if (!path) return "";
@@ -1045,7 +1101,9 @@ async function loadApiProfile(playerId, force = false) {
     records: [], raceTotals: { women: {}, mixed: {}, combined: {} }, recent30: null,
     mostMatches: (Array.isArray(rivals) ? rivals : []).slice(0, 7).map((item) => ({ name: item.name, wins: Number(item.wins || 0), losses: Number(item.losses || 0), wrId: String(item.player_id || ""), url: item.player_id ? apiPlayerUrl(item.player_id) : "" })),
     rivals: Array.isArray(rivals) ? rivals : [],
-    matches: mergeProfileRows(apiMatchRows(matches, player.id))
+    matches: mergeProfileRows(apiMatchRows(matches, player.id)),
+    stageRecords: apiStageRecords(matches, player.id),
+    collegeRecords: apiCollegeRecords(matches, player.id)
   };
   profile.recent30 = inferRecent30(profile.matches);
   profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
@@ -1549,6 +1607,8 @@ async function saveIakkangRecordState(state) {
   `, ["iakkang", JSON.stringify(payload)]);
   iakkangRecordMemory = payload;
   profileCache.delete(IAKKANG_WR_ID);
+  profileCache.delete(IAKKANG_API_ID);
+  profileCache.delete("api:" + IAKKANG_API_ID);
   return payload;
 }
 
@@ -1579,10 +1639,10 @@ function iakkangProfileFromState(state) {
   }
   const matches = mergeProfileRows(state.matches);
   return {
-    wrId: IAKKANG_WR_ID,
+    wrId: IAKKANG_API_ID,
     name: "이아깽",
     race: "테란",
-    url: "https://eloboard.com/women/bbs/board.php?bo_table=bj_list&wr_id=780",
+    url: apiPlayerUrl(IAKKANG_API_ID),
     image: "https://profile.img.sooplive.co.kr/LOGO/2a/2ahgo1203/2ahgo1203.jpg",
     broadcastId: "2ahgo1203",
     broadcastUrl: "https://play.sooplive.co.kr/2ahgo1203",
@@ -4133,11 +4193,18 @@ const server = http.createServer(async (req, res) => {
       }
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
-        const profile = String(requestedWrId) === IAKKANG_WR_ID
-          ? await loadStoredIakkangProfile()
-          : url.searchParams.get("division") === "men"
-          ? await loadMenProfile(requestedWrId, force, query)
-          : await loadProfile(requestedWrId, force);
+        // 현재 /players/{id} 번호는 성별과 관계없이 새 API에서 직접 읽습니다.
+        // 예전 여성 게시판 캐시가 같은 숫자 키로 남아 있어도 섞이지 않게 합니다.
+        let profile;
+        try {
+          profile = await loadApiProfile(requestedWrId, force);
+        } catch (apiError) {
+          profile = String(requestedWrId) === IAKKANG_WR_ID
+            ? await loadStoredIakkangProfile()
+            : url.searchParams.get("division") === "men"
+            ? await loadMenProfile(requestedWrId, force, query)
+            : await loadProfile(requestedWrId, force);
+        }
         const autoDiarySync = await syncSpawnDiaryNow(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
@@ -4177,9 +4244,11 @@ const server = http.createServer(async (req, res) => {
         }
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
         if (selected?.wrId) {
-          profile = selected.division === "men" || /\/men\//i.test(String(selected.url || ""))
-            ? await loadMenProfile(selected.wrId, force, selected.name)
-            : await loadProfile(selected.wrId, force);
+          profile = selected.source === "eloboard-api" || /\/players\//i.test(String(selected.url || ""))
+            ? await loadApiProfile(selected.wrId, force)
+            : selected.division === "men" || /\/men\//i.test(String(selected.url || ""))
+              ? await loadMenProfile(selected.wrId, force, selected.name)
+              : await loadProfile(selected.wrId, force);
         }
         if (!profile) {
           const cachedProfile = await cachedProfileForName(query);
