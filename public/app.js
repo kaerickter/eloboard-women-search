@@ -486,6 +486,8 @@ function renderProfile(data) {
   const profile = data.profile;
   if (!state.query.trim() || !profile) {
     $("profileLink").innerHTML = "";
+    renderIakkangMatchupPanel(null);
+    renderProfileSourceStats(null);
     if (cleanName(state.query) === cleanName(DEFAULT_NAME)) {
       $("profile").innerHTML = '<div class="empty">선수 전적을 찾지 못했습니다.</div>';
     } else {
@@ -554,6 +556,39 @@ function renderProfile(data) {
     '<div class="profile-section profile-period-section"><h3>' + periodTitle + '</h3><div class="profile-table">' + matchHeader + rows + '</div></div>';
   bindImageFallbacks($("profile"));
   renderIakkangMatchupPanel(profile);
+  renderProfileSourceStats(profile);
+}
+
+function renderProfileSourceStats(profile) {
+  const panel = $("profileSourceStatsPanel");
+  const sourceLink = $("profileSourceStatsLink");
+  const stageRoot = $("profileStageRecords");
+  const collegeRoot = $("profileCollegeRecords");
+  if (!panel || !sourceLink || !stageRoot || !collegeRoot) return;
+  const stageRecords = Array.isArray(profile?.stageRecords) ? profile.stageRecords : [];
+  const collegeRecords = Array.isArray(profile?.collegeRecords) ? profile.collegeRecords : [];
+  panel.hidden = !profile?.wrId || (!stageRecords.length && !collegeRecords.length);
+  if (panel.hidden) {
+    sourceLink.removeAttribute("href");
+    stageRoot.innerHTML = "";
+    collegeRoot.innerHTML = "";
+    return;
+  }
+  const profileUrl = safeExternalUrl(profile.url);
+  if (profileUrl) sourceLink.href = profileUrl;
+  else sourceLink.removeAttribute("href");
+  const renderRecords = (records) => records.length ? records.map((record) => {
+    const recordUrl = safeExternalUrl(record.url);
+    const rate = Math.max(0, Math.min(100, Number(record.rate) || 0));
+    const content = '<span class="profile-source-record-head"><strong>' + escapeHtml(record.name || "-") + '</strong><b>' + rate.toFixed(1) + '%</b></span>'
+      + '<span class="profile-source-record-detail">' + Number(record.wins || 0) + '승 ' + Number(record.losses || 0) + '패 · ' + Number(record.games || 0) + '경기</span>'
+      + '<span class="profile-source-progress" aria-hidden="true"><i style="width:' + rate + '%"></i></span>';
+    return recordUrl
+      ? '<a class="profile-source-record" href="' + escapeHtml(recordUrl) + '" target="_blank" rel="noreferrer">' + content + '</a>'
+      : '<div class="profile-source-record">' + content + '</div>';
+  }).join("") : '<div class="profile-source-empty">데이터 없음</div>';
+  stageRoot.innerHTML = renderRecords(stageRecords);
+  collegeRoot.innerHTML = renderRecords(collegeRecords);
 }
 
 function renderIakkangMatchupPanel(profile) {
