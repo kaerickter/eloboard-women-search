@@ -1080,12 +1080,28 @@ async function fetchAllApiMatches(playerId) {
   }
 }
 
-async function loadApiProfile(playerId, force = false) {
+async function loadApiPlayer(playerId, playerName = "") {
+  try {
+    return await fetchEloApi("/players/" + encodeURIComponent(playerId));
+  } catch (detailError) {
+    // 일부 선수는 ELOBoard의 상세 API만 500을 반환하지만 검색 API에는
+    // 동일한 프로필 정보가 정상 제공됩니다. 선수 번호를 다시 확인한 뒤 재사용합니다.
+    const query = String(playerName || "").trim();
+    if (!query) throw detailError;
+    const candidates = await fetchEloApi("/players", { q: query });
+    const matched = (Array.isArray(candidates) ? candidates : [])
+      .find((item) => String(item.id) === String(playerId));
+    if (!matched) throw detailError;
+    return matched;
+  }
+}
+
+async function loadApiProfile(playerId, force = false, playerName = "") {
   const cacheKey = "api:" + String(playerId);
   const cached = profileCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
   const [player, matches, rivals] = await Promise.all([
-    fetchEloApi("/players/" + encodeURIComponent(playerId)),
+    loadApiPlayer(playerId, playerName),
     // 200경기씩 이전 페이지까지 가져와 모든 연도·월의 전적을 제공합니다.
     fetchAllApiMatches(playerId),
     fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals").catch(() => [])
@@ -4197,7 +4213,7 @@ const server = http.createServer(async (req, res) => {
         // 예전 여성 게시판 캐시가 같은 숫자 키로 남아 있어도 섞이지 않게 합니다.
         let profile;
         try {
-          profile = await loadApiProfile(requestedWrId, force);
+          profile = await loadApiProfile(requestedWrId, force, query);
         } catch (apiError) {
           profile = String(requestedWrId) === IAKKANG_WR_ID
             ? await loadStoredIakkangProfile()
@@ -4245,7 +4261,7 @@ const server = http.createServer(async (req, res) => {
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
         if (selected?.wrId) {
           profile = selected.source === "eloboard-api" || /\/players\//i.test(String(selected.url || ""))
-            ? await loadApiProfile(selected.wrId, force)
+            ? await loadApiProfile(selected.wrId, force, selected.name || query)
             : selected.division === "men" || /\/men\//i.test(String(selected.url || ""))
               ? await loadMenProfile(selected.wrId, force, selected.name)
               : await loadProfile(selected.wrId, force);
