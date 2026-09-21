@@ -811,11 +811,11 @@ function render() {
 
 function scrollToInitialTier() {
   if (!initialTierScrollPending) return;
-  if (scrollToTierSix()) initialTierScrollPending = false;
+  if (scrollToTierFive()) initialTierScrollPending = false;
 }
 
-function scrollToTierSix() {
-  const tierHeading = document.getElementById("tier-6");
+function scrollToTierFive() {
+  const tierHeading = document.getElementById("tier-5티어") || document.getElementById("tier-5");
   const tierRow = tierHeading?.closest(".tier-row");
   if (!tierRow) return false;
 
@@ -1235,7 +1235,7 @@ liveOnlyToggle.addEventListener("click", () => {
   saveTierViewState();
   closeOpenCard();
   render();
-  scrollToTierSix();
+  scrollToTierFive();
 });
 divisionFilters.addEventListener("click", (event) => {
   const button = event.target.closest("[data-division-filter]");
