@@ -337,7 +337,8 @@ h1 {
   top: 50%;
   left: 50%;
   width: min(680px, calc(100% - 28px));
-  max-height: min(820px, calc(100vh - 28px));
+  height: min(900px, calc(100vh - 28px));
+  max-height: min(940px, calc(100vh - 28px));
   margin: 0;
   padding: 0;
   overflow: auto;
@@ -616,12 +617,12 @@ h1 {
 
 .tier-admin-player-settings {
   display: grid;
-  grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 125px) minmax(0, 125px) minmax(210px, 1fr);
   align-items: stretch;
   gap: 10px;
 }
 
-.tier-admin-player-settings > label:first-child {
+.tier-admin-player-settings > label:not(.tier-admin-promotion) {
   display: grid;
   gap: 7px;
 }
@@ -1317,6 +1318,46 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}
+
+.tier-admin-current-university {
+  display: grid;
+  gap: 7px;
+}
+
+.tier-admin-inline-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.tier-admin-inline-editor input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--theme-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--theme-ink);
+  font: inherit;
+}
+
+.tier-admin-inline-editor button {
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--theme-ink);
+  border-radius: 8px;
+  background: var(--theme-ink);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tier-admin-promotion {
+  grid-column: 1 / -1;
 }
 
 .tier-admin-actions .tier-admin-delete {

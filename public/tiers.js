@@ -31,6 +31,9 @@ const tierAdminNewBroadcastId = document.getElementById("tierAdminNewBroadcastId
 const tierAdminCreateConfirm = document.getElementById("tierAdminCreateConfirm");
 const tierAdminCreateCancel = document.getElementById("tierAdminCreateCancel");
 const tierAdminTier = document.getElementById("tierAdminTier");
+const tierAdminRace = document.getElementById("tierAdminRace");
+const tierAdminCurrentUniversity = document.getElementById("tierAdminCurrentUniversity");
+const tierAdminUniversityChange = document.getElementById("tierAdminUniversityChange");
 const tierAdminPromotion = document.getElementById("tierAdminPromotion");
 const tierAdminMemberships = document.getElementById("tierAdminMemberships");
 const tierAdminUniversity = document.getElementById("tierAdminUniversity");
@@ -511,11 +514,17 @@ function renderTierAdminMemberships() {
   const player = adminSelectedPlayer();
   if (!player) {
     tierAdminTier.disabled = true;
+    tierAdminRace.disabled = true;
+    tierAdminCurrentUniversity.disabled = true;
+    tierAdminUniversityChange.disabled = true;
     tierAdminPromotion.disabled = true;
     tierAdminMemberships.innerHTML = '<span class="tier-admin-fa-label">선수를 선택해 주세요.</span>';
     return;
   }
   tierAdminTier.disabled = false;
+  tierAdminRace.disabled = false;
+  tierAdminCurrentUniversity.disabled = false;
+  tierAdminUniversityChange.disabled = false;
   const tierOptions = player.division === "men"
     ? [["갓", "갓티어"], ["킹", "킹티어"], ["잭", "잭티어"], ["조커", "조커티어"], ["스페이드", "스페이드티어"], ["FA", "FA"]]
     : [...Array.from({ length: 10 }, (_, tier) => [String(tier), tier + "티어"]), ["FA", "FA"]];
@@ -523,10 +532,14 @@ function renderTierAdminMemberships() {
     '<option value="' + escapeHtml(value) + '">' + escapeHtml(label) + "</option>"
   ).join("");
   tierAdminTier.value = String(player.tier || "FA");
+  tierAdminRace.value = ["T", "P", "Z"].includes(String(player.race || "").toUpperCase())
+    ? String(player.race).toUpperCase()
+    : "T";
   tierAdminPromotion.checked = Boolean(player.promotionLight);
   tierAdminPromotion.disabled = tierAdminTier.value === "FA";
   tierAdminRevert.textContent = player.customPlayer ? "등록 선수 삭제" : "모든 변경 원본으로 되돌리기";
   const universities = playerUniversities(player);
+  tierAdminCurrentUniversity.value = universities[0] || "";
   tierAdminMemberships.innerHTML = universities.length
     ? universities.map((university) => [
         '<span class="tier-admin-membership">',
@@ -549,6 +562,9 @@ function setTierAdminControlsDisabled(disabled) {
     tierAdminCreateConfirm,
     tierAdminCreateCancel,
     tierAdminTier,
+    tierAdminRace,
+    tierAdminCurrentUniversity,
+    tierAdminUniversityChange,
     tierAdminPromotion,
     tierAdminUniversity,
     tierAdminAdd,
@@ -633,7 +649,13 @@ async function saveTierAdminPlayer(changes, successMessage) {
         "Content-Type": "application/json",
         "X-CSRF-Token": tierAdminCsrf
       },
-      body: JSON.stringify({ playerName, universities, tier, promotionLight })
+      body: JSON.stringify({
+        playerName,
+        universities,
+        tier,
+        promotionLight,
+        race: changes.race ?? player.race
+      })
     });
     const data = await readAdminResponse(response);
     updateTierAdminStorage(data.storage);
@@ -1350,6 +1372,35 @@ tierAdminTier.addEventListener("change", () => {
     { tier, promotionLight: tier === "FA" ? false : tierAdminPromotion.checked },
     player.name + " 선수를 " + (tier === "FA" ? "FA" : tier + "티어") + "로 변경했습니다."
   );
+});
+tierAdminRace.addEventListener("change", () => {
+  const player = adminSelectedPlayer();
+  if (!player) return;
+  const race = tierAdminRace.value;
+  const raceLabel = ({ T: "테란", P: "프로토스", Z: "저그" })[race] || race;
+  saveTierAdminPlayer(
+    { race },
+    player.name + " 선수의 종족을 " + raceLabel + "으로 변경했습니다."
+  );
+});
+tierAdminUniversityChange.addEventListener("click", () => {
+  const player = adminSelectedPlayer();
+  if (!player) return;
+  const university = String(tierAdminCurrentUniversity.value || "").replace(/\s+/g, " ").trim();
+  if (university === "연합팀") {
+    tierAdminStatus.textContent = "대학 이름을 정확히 입력하거나 비워서 FA로 변경해 주세요.";
+    return;
+  }
+  const universities = university && university !== "FA" ? [university] : [];
+  saveTierAdminPlayer(
+    { universities },
+    player.name + " 선수의 대학을 " + (universities[0] || "FA") + "로 변경했습니다."
+  );
+});
+tierAdminCurrentUniversity.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  tierAdminUniversityChange.click();
 });
 tierAdminPromotion.addEventListener("change", () => {
   const player = adminSelectedPlayer();

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>티어표 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./tiers.css?v=20260823-player-delete">
+    <link rel="stylesheet" href="./tiers.css?v=20260921-admin-race-university">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   </head>
   <body class="tiers-page">
@@ -189,6 +189,21 @@
                 <option value="FA">FA</option>
               </select>
             </label>
+            <label for="tierAdminRace">
+              <span>종족</span>
+              <select id="tierAdminRace">
+                <option value="T">테란</option>
+                <option value="P">프로토스</option>
+                <option value="Z">저그</option>
+              </select>
+            </label>
+            <label class="tier-admin-current-university" for="tierAdminCurrentUniversity">
+              <span>대학 이름 변경</span>
+              <span class="tier-admin-inline-editor">
+                <input id="tierAdminCurrentUniversity" type="text" list="tierAdminUniversityOptions" maxlength="40" placeholder="비워두면 FA">
+                <button id="tierAdminUniversityChange" type="button">변경</button>
+              </span>
+            </label>
             <label class="tier-admin-promotion">
               <input id="tierAdminPromotion" type="checkbox">
               <span><strong>승급불 지정</strong><small>사진 테두리에 붉은 네온을 표시합니다.</small></span>
@@ -221,6 +236,6 @@
       </dialog>
     </main>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="./tiers.js?v=20260829-profile-retry"></script>
+    <script src="./tiers.js?v=20260921-admin-race-university"></script>
   </body>
 </html>
