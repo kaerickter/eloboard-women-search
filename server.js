@@ -94,6 +94,11 @@ const PINNED_SOOP_ALIASES = {
     broadcastId: "chchchshai",
     searchName: "유이",
     stationNames: ["유이"]
+  },
+  "유즈": {
+    broadcastId: "yuzzzz",
+    searchName: "유즈",
+    stationNames: ["유즈"]
   }
 };
 const PINNED_TIER_DISPLAY_NAMES = {};
@@ -3841,7 +3846,7 @@ const server = http.createServer(async (req, res) => {
           ? Boolean(currentPlayer.promotionLight)
           : body.promotionLight === true,
         isCustom: Boolean(currentPlayer.customPlayer),
-        race: currentPlayer.race,
+        race: body.race == null ? currentPlayer.race : body.race,
         broadcastId: currentPlayer.broadcastId
       });
       return send(res, 200, JSON.stringify({
