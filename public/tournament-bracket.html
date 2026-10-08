@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080c25">
+    <title>대진표 · ELO Kitten</title>
+    <link rel="stylesheet" href="./common-theme.css">
+    <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
+    <link rel="stylesheet" href="./tournament-bracket.css?v=20261009">
+    <script defer src="./tournament-nav.js?v=20261009"></script>
+    <script defer src="./tournament-bracket.js?v=20261009"></script>
+  </head>
+  <body class="tournament-bracket-page">
+    <nav class="site-nav" aria-label="페이지 이동">
+      <a class="site-tab" href="./tiers.html">티어표</a>
+      <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+      <a class="site-tab" href="./index.html">전적검색</a>
+      <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+      <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+      <a class="site-tab" href="./scoreboard.html">스코어보드</a>
+      <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+      <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+      <a class="site-tab" href="./match-scoreboard.html">점수계산기</a>
+      <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+      <a class="site-tab cup-tab" href="./jungman-cup.html">K-중만컵</a>
+    </nav>
+
+    <main class="bracket-shell">
+      <header class="bracket-hero">
+        <div class="hero-orbit hero-orbit-left" aria-hidden="true"></div>
+        <div class="hero-orbit hero-orbit-right" aria-hidden="true"></div>
+        <div class="bracket-hero-copy">
+          <p class="bracket-kicker">ELO KITTEN · TOURNAMENT</p>
+          <h1 id="tournamentTitle">대진표</h1>
+          <p id="tournamentSubtitle">16명이 결승까지 올라가는 토너먼트</p>
+        </div>
+        <div class="hero-actions">
+          <span id="bracketStatus" class="bracket-status" role="status">대진표를 불러오는 중…</span>
+          <button id="editBracket" class="bracket-button" type="button" aria-expanded="false" aria-controls="bracketEditor">대진표 관리</button>
+        </div>
+      </header>
+
+      <section id="bracketEditor" class="bracket-editor" aria-label="대진표 편집" hidden>
+        <div class="editor-heading"><div><span>BRACKET CONTROL</span><h2>대회 정보와 선수 입력</h2></div><p>이름을 저장한 뒤 대진표에서 승리 선수를 누르면 다음 라운드로 올라갑니다.</p></div>
+        <div class="editor-titles">
+          <label>대회 이름<input id="titleInput" maxlength="48" placeholder="예: 낭니컵" autocomplete="off"></label>
+          <label>설명 문구<input id="subtitleInput" maxlength="80" placeholder="예: 16강 토너먼트" autocomplete="off"></label>
+        </div>
+        <div class="editor-sides"><div><h3>왼쪽 8명</h3><div id="leftPlayers" class="player-editor-list"></div></div><div><h3>오른쪽 8명</h3><div id="rightPlayers" class="player-editor-list"></div></div></div>
+        <div class="editor-actions"><span id="editStatus" role="status">변경 내용을 저장해 주세요.</span><button id="saveBracket" class="bracket-button save" type="button">변경 내용 저장</button></div>
+      </section>
+
+      <section class="bracket-arena" aria-label="16강 토너먼트 대진표">
+        <div class="arena-heading"><span>ROUND OF SIXTEEN</span><strong>16강 → 8강 → 4강 → 결승</strong><span>CHAMPION</span></div>
+        <div class="bracket-scroll"><div id="bracketGrid" class="bracket-grid" aria-live="polite"></div></div>
+        <p class="bracket-hint">왼쪽과 오른쪽 각각 8명이 시작합니다. 승자는 대진표 관리 중에 선택할 수 있습니다.</p>
+      </section>
+      <section class="champion-section" aria-label="우승자"><span>CHAMPION</span><strong id="championName">우승자 미정</strong></section>
+    </main>
+  </body>
+</html>
