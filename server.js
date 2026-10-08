@@ -42,6 +42,7 @@ const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
 const MEN_TIER_FALLBACK_FILE = path.join(ROOT, "data", "men-tier-fallback.json");
 const SCOREBOARD_STATE_FILE = path.join(ROOT, "data", "scoreboard-state.json");
 const JUNGMAN_CUP_STATE_FILE = path.join(ROOT, "data", "jungman-cup-state.json");
+const TOURNAMENT_BRACKET_STATE_FILE = path.join(ROOT, "data", "tournament-bracket-state.json");
 const BUNDLED_YT_DLP = path.join(ROOT, "vendor", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
 const MAX_SCOREBOARD_STATE_SIZE = 200000;
 const PINNED_SOOP_ALIASES = {
@@ -256,6 +257,71 @@ async function saveScoreboardState(state) {
   const tempFile = SCOREBOARD_STATE_FILE + ".tmp";
   await fs.promises.writeFile(tempFile, JSON.stringify(saved, null, 2));
   await fs.promises.rename(tempFile, SCOREBOARD_STATE_FILE);
+  return { version: saved.version, updatedAt: saved.updatedAt };
+}
+
+function cleanTournamentBracketState(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const text = (item, limit) => String(item ?? "").trim().slice(0, limit);
+  const winners = source.winners && typeof source.winners === "object" ? source.winners : {};
+  const choices = (key, length) => Array.from({ length }, (_, index) =>
+    winners[key]?.[index] === 0 || winners[key]?.[index] === 1 ? winners[key][index] : null);
+  return {
+    title: text(source.title, 48),
+    subtitle: text(source.subtitle, 80),
+    players: Array.from({ length: 16 }, (_, index) => text(source.players?.[index], 32)),
+    winners: { r16: choices("r16", 8), qf: choices("qf", 4), sf: choices("sf", 2), final: choices("final", 1) }
+  };
+}
+
+async function loadTournamentBracketState() {
+  if (tierAdmin.pool) {
+    await ensureScoreboardStateTable();
+    const result = await tierAdmin.pool.query(
+      "SELECT state, version, updated_at FROM scoreboard_state WHERE id=$1", ["tournament-bracket"]
+    );
+    const row = result.rows[0];
+    return row ? { state: cleanTournamentBracketState(row.state), version: Number(row.version), updatedAt: row.updated_at }
+      : { state: null, version: 0, updatedAt: null };
+  }
+  try {
+    const saved = JSON.parse(await fs.promises.readFile(TOURNAMENT_BRACKET_STATE_FILE, "utf8"));
+    return { ...saved, state: saved.state ? cleanTournamentBracketState(saved.state) : null };
+  } catch (error) {
+    if (error.code === "ENOENT") return { state: null, version: 0, updatedAt: null };
+    throw error;
+  }
+}
+
+async function saveTournamentBracketState(value, expectedVersion) {
+  const state = cleanTournamentBracketState(value);
+  const stateJson = JSON.stringify(state);
+  if (stateJson.length > 10000) throw new Error("대진표 정보가 너무 큽니다.");
+  if (tierAdmin.pool) {
+    await ensureScoreboardStateTable();
+    const result = expectedVersion === 0
+      ? await tierAdmin.pool.query(`
+          INSERT INTO scoreboard_state (id, state, version, updated_at)
+          VALUES ($1, $2::jsonb, 1, NOW())
+          ON CONFLICT (id) DO NOTHING
+          RETURNING version, updated_at
+        `, ["tournament-bracket", stateJson])
+      : await tierAdmin.pool.query(`
+          UPDATE scoreboard_state
+          SET state=$2::jsonb, version=version+1, updated_at=NOW()
+          WHERE id=$1 AND version=$3
+          RETURNING version, updated_at
+        `, ["tournament-bracket", stateJson, expectedVersion]);
+    if (!result.rows[0]) return null;
+    return { version: Number(result.rows[0].version), updatedAt: result.rows[0].updated_at };
+  }
+  const current = await loadTournamentBracketState();
+  if (current.version !== expectedVersion) return null;
+  const saved = { state, version: current.version + 1, updatedAt: new Date().toISOString() };
+  await fs.promises.mkdir(path.dirname(TOURNAMENT_BRACKET_STATE_FILE), { recursive: true });
+  const tempFile = TOURNAMENT_BRACKET_STATE_FILE + ".tmp";
+  await fs.promises.writeFile(tempFile, JSON.stringify(saved, null, 2));
+  await fs.promises.rename(tempFile, TOURNAMENT_BRACKET_STATE_FILE);
   return { version: saved.version, updatedAt: saved.updatedAt };
 }
 
@@ -3385,6 +3451,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(await loadJungmanCupState()), "application/json; charset=utf-8", { "Cache-Control": "no-store" });
     } catch (error) {
       return send(res, 500, JSON.stringify({ error: error.message || "공용 중만컵 정보를 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/tournament-bracket-state" && req.method === "GET") {
+    try {
+      return send(res, 200, JSON.stringify(await loadTournamentBracketState()), "application/json; charset=utf-8", { "Cache-Control": "no-store" });
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ error: error.message || "대진표를 불러오지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
+  if (url.pathname === "/api/tournament-bracket-state" && req.method === "PUT") {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.state || typeof body.state !== "object" || Array.isArray(body.state) ||
+          !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 0) {
+        return send(res, 400, JSON.stringify({ error: "저장할 대진표 정보가 올바르지 않습니다." }), "application/json; charset=utf-8");
+      }
+      const saved = await saveTournamentBracketState(body.state, body.expectedVersion);
+      if (!saved) return send(res, 409, JSON.stringify({ error: "다른 화면에서 대진표를 먼저 수정했습니다." }), "application/json; charset=utf-8");
+      return send(res, 200, JSON.stringify(saved), "application/json; charset=utf-8", { "Cache-Control": "no-store" });
+    } catch (error) {
+      return send(res, 500, JSON.stringify({ error: error.message || "대진표를 저장하지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/jungman-cup-state" && req.method === "PUT") {
