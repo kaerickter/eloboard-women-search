@@ -305,6 +305,14 @@ class TierAdmin {
     return { ...player, university: universities[0] || "연합팀", universities, universityOverride: true };
   }
 
+  universityMembers(players, name) {
+    const university = normalizeUniversities([name])[0];
+    if (!university) return [];
+    return this.applyOverrides(players).filter((player) =>
+      normalizeUniversities(Array.isArray(player.universities) && player.universities.length
+        ? player.universities : [player.university]).includes(university));
+  }
+
   async changeUniversityName(players, oldName, replacement, expectedCount, expectedPlayers) {
     this.assertWritableStorage();
     const oldUniversity = normalizeUniversities([oldName])[0];
@@ -312,11 +320,7 @@ class TierAdmin {
     if (!oldUniversity || (replacement !== null && (!newUniversity || newUniversity === oldUniversity))) {
       throw new Error("변경할 대학과 새 이름을 확인해 주세요.");
     }
-    const visible = this.applyOverrides(players);
-    const affectedPlayers = visible.filter((player) =>
-      normalizeUniversities(Array.isArray(player.universities) && player.universities.length
-        ? player.universities : [player.university])
-        .includes(oldUniversity));
+    const affectedPlayers = this.universityMembers(players, oldUniversity);
     const affected = affectedPlayers.length;
     if (!affected) {
       const error = new Error("현재 티어표에서 해당 대학 소속 선수를 찾지 못했습니다.");

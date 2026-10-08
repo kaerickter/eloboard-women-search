@@ -3845,6 +3845,20 @@ const server = http.createServer(async (req, res) => {
       storage: tierAdmin.storageStatus
     }), "application/json; charset=utf-8");
   }
+  if (url.pathname === "/api/admin/tier-universities" && req.method === "GET") {
+    if (!tierAdmin.session(req)) {
+      return send(res, 401, JSON.stringify({ error: "관리자 로그인이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const name = String(url.searchParams.get("name") || "").trim();
+      const members = tierAdmin.universityMembers(await loadTierRoster(false), name);
+      return send(res, 200, JSON.stringify({
+        name, count: members.length, players: members.map((player) => player.name)
+      }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, error.statusCode || 502, JSON.stringify({ error: error.message || "대학 소속을 확인하지 못했습니다." }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/tier-universities" && (req.method === "PUT" || req.method === "DELETE")) {
     if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
       return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
@@ -3981,9 +3995,12 @@ const server = http.createServer(async (req, res) => {
         race: body.race == null ? currentPlayer.race : body.race,
         broadcastId: currentPlayer.broadcastId
       });
+      const player = tierAdmin.applyOverrides(sourcePlayers).find((item) =>
+        normalizeName(item.name) === normalizeName(playerName));
       return send(res, 200, JSON.stringify({
         ok: true,
         override,
+        player,
         storage: tierAdmin.storageStatus
       }), "application/json; charset=utf-8");
     } catch (error) {
