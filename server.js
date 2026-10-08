@@ -6,7 +6,7 @@ const { execFile } = require("node:child_process");
 const { Server: SocketIOServer } = require("socket.io");
 const { setupCollaboration } = require("./collaboration-server");
 const { normalizeBjListPlayerText } = require("./eloboard-utils");
-const { TierAdmin } = require("./tier-admin");
+const { TierAdmin, normalizeBroadcastId, normalizeRace, normalizeTier, normalizeUniversities } = require("./tier-admin");
 const { SpawnDiaryAdmin } = require("./spawn-diary-admin");
 const { PlayerAnalysisStore, analyzePlayer } = require("./player-analysis");
 const {
@@ -692,6 +692,25 @@ function soopChannelFromHtml(html) {
 }
 function normalizeName(name) {
   return String(name || "").replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function adminPlayerSnapshot(value, playerName) {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      normalizeName(value.name) !== normalizeName(playerName)) return null;
+  const tier = normalizeTier(value.tier);
+  const race = normalizeRace(value.race);
+  if (!tier || !race) return null;
+  const universities = normalizeUniversities(value.universities);
+  return {
+    name: playerName,
+    tier,
+    race,
+    universities,
+    university: universities[0] || "연합팀",
+    broadcastId: normalizeBroadcastId(value.broadcastId),
+    promotionLight: Boolean(value.promotionLight),
+    customPlayer: true
+  };
 }
 function diaryTierLabel(value) {
   const rawTier = String(value || "").replace(/\s+/g, " ").trim().slice(0, 40);
@@ -3826,6 +3845,27 @@ const server = http.createServer(async (req, res) => {
       storage: tierAdmin.storageStatus
     }), "application/json; charset=utf-8");
   }
+  if (url.pathname === "/api/admin/tier-universities" && (req.method === "PUT" || req.method === "DELETE")) {
+    if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
+      return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
+    }
+    try {
+      const body = await readJsonBody(req);
+      if (!Array.isArray(body.expectedPlayers)) {
+        return send(res, 400, JSON.stringify({ error: "변경 대상 선수를 다시 확인해 주세요." }), "application/json; charset=utf-8");
+      }
+      const sourcePlayers = await loadTierRoster(false);
+      const changed = await tierAdmin.changeUniversityName(
+        sourcePlayers, body.oldName, req.method === "DELETE" ? null : body.newName,
+        body.expectedCount, body.expectedPlayers
+      );
+      return send(res, 200, JSON.stringify({ ok: true, ...changed, storage: tierAdmin.storageStatus }), "application/json; charset=utf-8");
+    } catch (error) {
+      return send(res, error.statusCode || 400, JSON.stringify({
+        error: error.message || "대학 이름을 변경하지 못했습니다."
+      }), "application/json; charset=utf-8");
+    }
+  }
   if (url.pathname === "/api/admin/tier-players" && req.method === "POST") {
     if (!requestIsSameOrigin(req) || !tierAdmin.authorize(req)) {
       return send(res, 403, JSON.stringify({ error: "관리자 인증이 필요합니다." }), "application/json; charset=utf-8");
@@ -3876,7 +3916,8 @@ const server = http.createServer(async (req, res) => {
       const playerName = String(body.playerName || "").replace(/\s+/g, " ").trim().slice(0, 40);
       const sourcePlayers = await loadTierRoster(false);
       const currentPlayer = tierAdmin.applyOverrides(sourcePlayers).find((player) =>
-        normalizeName(player.name) === normalizeName(playerName));
+        normalizeName(player.name) === normalizeName(playerName)) ||
+        adminPlayerSnapshot(body.playerSnapshot, playerName);
       if (!currentPlayer) {
         return send(res, 404, JSON.stringify({ error: "현재 티어 명단에서 선수를 찾지 못했습니다." }), "application/json; charset=utf-8");
       }
@@ -3914,11 +3955,15 @@ const server = http.createServer(async (req, res) => {
       const playerName = String(body.playerName || "").trim();
       const sourcePlayers = await loadTierRoster(false);
       const currentPlayer = tierAdmin.applyOverrides(sourcePlayers).find((player) =>
-        normalizeName(player.name) === normalizeName(playerName));
+        normalizeName(player.name) === normalizeName(playerName)) ||
+        adminPlayerSnapshot(body.playerSnapshot, playerName);
       if (!currentPlayer) {
         return send(res, 404, JSON.stringify({ error: "현재 티어 명단에서 선수를 찾지 못했습니다." }), "application/json; charset=utf-8");
       }
       if (req.method === "DELETE") {
+        if (!tierAdmin.getOverride(playerName)) {
+          return send(res, 409, JSON.stringify({ error: "원본 명단에서 빠진 선수입니다. 수정해 등록하거나 새로고침 후 확인해 주세요." }), "application/json; charset=utf-8");
+        }
         await tierAdmin.deleteOverride(playerName);
         return send(res, 200, JSON.stringify({
           ok: true,

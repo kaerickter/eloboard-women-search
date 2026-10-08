@@ -24,8 +24,8 @@ function normalizeUniversities(values) {
 }
 
 function normalizeTier(value) {
-  const tier = String(value ?? "").trim().toUpperCase();
-  return /^(?:[0-9]|FA|갓|킹|잭|조커|스페이드)$/.test(tier) ? tier : "";
+  const tier = String(value ?? "").trim().toUpperCase().replace(/^([0-9])티어$/, "$1");
+  return /^(?:[0-9]|FA|갓|킹|잭|조커|스페이드|베이비)$/.test(tier) ? tier : "";
 }
 
 function normalizeRace(value) {
@@ -66,6 +66,8 @@ class TierAdmin {
     this.password = options.password ?? process.env.TIER_ADMIN_PASSWORD ?? "";
     this.filePath = options.filePath || process.env.TIER_OVERRIDE_FILE ||
       path.join(__dirname, "data", "tier-university-overrides.json");
+    this.universityNamesFilePath = options.universityNamesFilePath ||
+      this.filePath.replace(/\.json$/, "") + ".university-names.json";
     const databaseUrl = options.databaseUrl ??
       process.env.TIER_ADMIN_DATABASE_URL ??
       process.env.DATABASE_URL ??
@@ -87,6 +89,7 @@ class TierAdmin {
     this.databaseReady = false;
     this.databaseError = "";
     this.overrides = new Map();
+    this.universityNameChanges = new Map();
     this.sessions = new Map();
     this.loginAttempts = new Map();
     this.fileWrite = Promise.resolve();
@@ -150,6 +153,11 @@ class TierAdmin {
         );
         await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS race TEXT");
         await this.pool.query("ALTER TABLE tier_university_overrides ADD COLUMN IF NOT EXISTS broadcast_id TEXT");
+        await this.pool.query(`CREATE TABLE IF NOT EXISTS tier_university_name_changes (
+          id TEXT PRIMARY KEY,
+          changes JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
         await initializeSpawnDiaryAutoSyncSchema(this.pool);
         const result = await this.pool.query(
           `SELECT player_key, player_name, universities, tier, promotion_light,
@@ -170,6 +178,10 @@ class TierAdmin {
             updatedAt: row.updated_at
           });
         }
+        const universityNames = await this.pool.query(
+          "SELECT changes FROM tier_university_name_changes WHERE id=$1", ["current"]
+        );
+        this.universityNameChanges = this.parseUniversityNameChanges(universityNames.rows[0]?.changes);
         this.databaseReady = true;
         this.databaseError = "";
         console.log("Tier university overrides: PostgreSQL persistence enabled");
@@ -200,6 +212,12 @@ class TierAdmin {
     } catch (error) {
       if (error.code !== "ENOENT") console.warn("Could not read tier overrides:", error.message);
     }
+    try {
+      const saved = JSON.parse(await fs.promises.readFile(this.universityNamesFilePath, "utf8"));
+      this.universityNameChanges = this.parseUniversityNameChanges(saved);
+    } catch (error) {
+      if (error.code !== "ENOENT") console.warn("Could not read university names:", error.message);
+    }
     console.log("Tier university overrides: local JSON persistence at " + this.filePath);
   }
 
@@ -228,7 +246,7 @@ class TierAdmin {
         profileUrl: override.broadcastId
           ? "https://play.sooplive.co.kr/" + encodeURIComponent(override.broadcastId)
           : player.profileUrl,
-        customPlayer: Boolean(override.isCustom),
+        customPlayer: false,
         universityOverride: true,
         tierOverride: Boolean(override.tier)
       });
@@ -239,7 +257,7 @@ class TierAdmin {
       result.push({
         name: override.playerName,
         tier: override.tier || "FA",
-        division: /^(?:갓|킹|잭|조커|스페이드)$/.test(override.tier || "") ? "men" : "women",
+        division: /^(?:갓|킹|잭|조커|스페이드|베이비)$/.test(override.tier || "") ? "men" : "women",
         race: override.race || "T",
         university: universities[0] || "연합팀",
         universities,
@@ -259,13 +277,88 @@ class TierAdmin {
       ["킹", 1],
       ["잭", 2],
       ["조커", 3],
-      ["스페이드", 4],
-      ...Array.from({ length: 10 }, (_, index) => [String(index), index + 5]),
-      ["FA", 15]
+      ["스페이드", 4], ["베이비", 5],
+      ...Array.from({ length: 10 }, (_, index) => [String(index), index + 6]),
+      ["FA", 16]
     ]);
     const tierRank = (tier) => tierOrder.get(tier) ?? Number.MAX_SAFE_INTEGER;
-    return result.sort((playerA, playerB) =>
+    return result.map((player) => this.applyUniversityNameChanges(player)).sort((playerA, playerB) =>
       tierRank(playerA.tier) - tierRank(playerB.tier) || playerA.name.localeCompare(playerB.name, "ko"));
+  }
+
+  parseUniversityNameChanges(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return new Map(Object.entries(source).filter(([name, replacement]) =>
+      normalizeUniversities([name]).length === 1 &&
+      (replacement === null || normalizeUniversities([replacement]).length === 1))
+      .map(([name, replacement]) => [name, replacement]));
+  }
+
+  applyUniversityNameChanges(player) {
+    const original = normalizeUniversities(
+      Array.isArray(player.universities) && player.universities.length ? player.universities : [player.university]
+    );
+    if (!original.length || !original.some((name) => this.universityNameChanges.has(name))) return player;
+    const universities = original.some((name) => this.universityNameChanges.get(name) === null)
+      ? []
+      : normalizeUniversities(original.map((name) => this.universityNameChanges.get(name) || name));
+    return { ...player, university: universities[0] || "연합팀", universities, universityOverride: true };
+  }
+
+  async changeUniversityName(players, oldName, replacement, expectedCount, expectedPlayers) {
+    this.assertWritableStorage();
+    const oldUniversity = normalizeUniversities([oldName])[0];
+    const newUniversity = replacement === null ? null : normalizeUniversities([replacement])[0];
+    if (!oldUniversity || (replacement !== null && (!newUniversity || newUniversity === oldUniversity))) {
+      throw new Error("변경할 대학과 새 이름을 확인해 주세요.");
+    }
+    const visible = this.applyOverrides(players);
+    const affectedPlayers = visible.filter((player) =>
+      normalizeUniversities(Array.isArray(player.universities) && player.universities.length
+        ? player.universities : [player.university])
+        .includes(oldUniversity));
+    const affected = affectedPlayers.length;
+    if (!affected) {
+      const error = new Error("현재 티어표에서 해당 대학 소속 선수를 찾지 못했습니다.");
+      error.statusCode = 404;
+      throw error;
+    }
+    if (!Number.isSafeInteger(expectedCount) || expectedCount !== affected) {
+      const error = new Error("대학 소속 인원이 변경되었습니다. 티어표를 새로고침한 뒤 다시 확인해 주세요.");
+      error.statusCode = 409;
+      throw error;
+    }
+    if (expectedPlayers) {
+      const actualKeys = affectedPlayers.map((player) => playerKey(player.name)).sort();
+      const expectedKeys = Array.isArray(expectedPlayers)
+        ? expectedPlayers.map(playerKey).sort() : [];
+      if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) {
+        const error = new Error("대학 소속 선수가 변경되었습니다. 티어표를 새로고침한 뒤 다시 확인해 주세요.");
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+    const next = new Map(this.universityNameChanges);
+    if (newUniversity && next.has(newUniversity)) {
+      throw new Error("이미 변경되거나 삭제된 대학 이름은 새 이름으로 사용할 수 없습니다.");
+    }
+    for (const [source, target] of next) {
+      if (target === oldUniversity) next.set(source, newUniversity);
+    }
+    next.set(oldUniversity, newUniversity);
+    const serialized = JSON.stringify(Object.fromEntries(next));
+    if (this.pool) {
+      await this.pool.query(`INSERT INTO tier_university_name_changes(id, changes, updated_at)
+        VALUES($1, $2::jsonb, NOW()) ON CONFLICT(id) DO UPDATE SET
+        changes=EXCLUDED.changes, updated_at=NOW()`, ["current", serialized]);
+    } else {
+      await fs.promises.mkdir(path.dirname(this.universityNamesFilePath), { recursive: true });
+      const temporary = this.universityNamesFilePath + ".tmp";
+      await fs.promises.writeFile(temporary, JSON.stringify(Object.fromEntries(next), null, 2), "utf8");
+      await fs.promises.rename(temporary, this.universityNamesFilePath);
+    }
+    this.universityNameChanges = next;
+    return { affected, oldName: oldUniversity, newName: newUniversity };
   }
 
   listOverrides() {
@@ -287,7 +380,7 @@ class TierAdmin {
     const payload = Array.isArray(values) ? { universities: values } : (values || {});
     const tier = payload.tier == null || payload.tier === "" ? null : normalizeTier(payload.tier);
     if (payload.tier != null && payload.tier !== "" && !tier) {
-      throw new Error("티어는 0~9, 갓, 킹, 잭, 조커, 스페이드 또는 FA 중에서 선택해 주세요.");
+      throw new Error("티어는 0~9, 갓, 킹, 잭, 조커, 스페이드, 베이비 또는 FA 중에서 선택해 주세요.");
     }
     const current = this.overrides.get(key);
     const isCustom = payload.isCustom == null ? Boolean(current?.isCustom) : Boolean(payload.isCustom);
