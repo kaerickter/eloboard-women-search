@@ -707,6 +707,15 @@ async function saveTierAdminPlayer(changes, successMessage) {
     });
     const data = await readAdminResponse(response);
     updateTierAdminStorage(data.storage);
+    if (!data.player || JSON.stringify(playerUniversities(data.player).sort()) !==
+      JSON.stringify([...universities].sort())) {
+      throw new Error("저장 후 서버 명단에서 변경 결과를 확인하지 못했습니다. 다시 확인해 주세요.");
+    }
+    state.players = state.players.filter((item) => keyOf(item.name) !== keyOf(playerName));
+    state.players.push(data.player);
+    saveTierRoster();
+    render();
+    renderTierAdminEditor(playerName);
     await loadRoster(false);
     renderTierAdminEditor(playerName);
     tierAdminStatus.textContent = savedAdminMessage(successMessage);
@@ -730,8 +739,6 @@ async function changeTierAdminUniversity(remove) {
   if (tierAdminSaving) return;
   const oldName = tierAdminGlobalUniversity.value;
   const selected = globalUniversityOptions().find((item) => item.name === oldName);
-  const expectedPlayers = state.players.filter((player) => playerUniversities(player).includes(oldName))
-    .map((player) => keyOf(player.name)).sort();
   const newName = String(tierAdminGlobalNewName.value || "").replace(/\s+/g, " ").trim();
   if (!selected) {
     tierAdminStatus.textContent = "변경할 대학을 선택해 주세요.";
@@ -741,15 +748,25 @@ async function changeTierAdminUniversity(remove) {
     tierAdminStatus.textContent = "새 대학 이름을 정확히 입력해 주세요.";
     return;
   }
-  const action = remove
-    ? `${oldName} 소속 ${selected.count}명을 전부 FA로 바꿀까요? 기존 선수 기록은 삭제되지 않습니다.`
-    : `${oldName} 소속 ${selected.count}명의 대학 이름을 ${newName}(으)로 바꿀까요?`;
-  if (!window.confirm(action)) return;
-  const wasSelected = state.selectedUniversity === oldName;
   tierAdminSaving = true;
   setTierAdminControlsDisabled(true);
-  tierAdminStatus.textContent = "대학 소속을 전체 변경하고 있습니다.";
+  tierAdminStatus.textContent = "서버에 저장된 대학 소속을 확인하고 있습니다.";
   try {
+    const previewResponse = await fetch("/api/admin/tier-universities?name=" + encodeURIComponent(oldName), {
+      headers: { "Accept": "application/json" }, cache: "no-store"
+    });
+    const preview = await readAdminResponse(previewResponse);
+    if (!preview.count) throw new Error("서버 명단에서 해당 대학 소속 선수를 찾지 못했습니다. 티어표를 새로고침해 주세요.");
+    const names = preview.players.join(", ");
+    const action = remove
+      ? `${oldName} 소속 ${preview.count}명(${names})을 전부 FA로 바꿀까요? 기존 선수 기록은 삭제되지 않습니다.`
+      : `${oldName} 소속 ${preview.count}명(${names})의 대학 이름을 ${newName}(으)로 바꿀까요?`;
+    if (!window.confirm(action)) {
+      tierAdminStatus.textContent = "대학 변경을 취소했습니다.";
+      return;
+    }
+    const wasSelected = state.selectedUniversity === oldName;
+    tierAdminStatus.textContent = "대학 소속을 전체 변경하고 있습니다.";
     const response = await fetch("/api/admin/tier-universities", {
       method: remove ? "DELETE" : "PUT",
       headers: {
@@ -757,7 +774,7 @@ async function changeTierAdminUniversity(remove) {
         "Content-Type": "application/json",
         "X-CSRF-Token": tierAdminCsrf
       },
-      body: JSON.stringify({ oldName, newName, expectedCount: selected.count, expectedPlayers })
+      body: JSON.stringify({ oldName, newName, expectedCount: preview.count, expectedPlayers: preview.players })
     });
     const data = await readAdminResponse(response);
     updateTierAdminStorage(data.storage);
