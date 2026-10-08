@@ -766,6 +766,56 @@ h1 {
   color: var(--theme-ink);
 }
 
+.tier-admin-university-manager {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 16px;
+  border: 1px solid var(--theme-line);
+  border-radius: 12px;
+  background: var(--theme-surface-soft);
+}
+.tier-admin-university-heading { display: grid; gap: 4px; }
+.tier-admin-university-heading strong { font-size: 15px; }
+.tier-admin-university-heading span { color: var(--theme-muted); font-size: 12px; }
+.tier-admin-university-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tier-admin-university-fields label { display: grid; gap: 6px; font-size: 12px; font-weight: 900; }
+.tier-admin-university-fields input,
+.tier-admin-university-fields select {
+  min-width: 0;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--theme-line);
+  border-radius: 8px;
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+}
+.tier-admin-university-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tier-admin-university-actions button {
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--theme-ink);
+  border-radius: 8px;
+  background: var(--theme-ink);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+.tier-admin-university-actions #tierAdminGlobalRename {
+  border-color: #253455 !important;
+  background: #253455 !important;
+}
+.tier-admin-university-actions #tierAdminGlobalDelete {
+  border-color: #a84b55 !important;
+  background: #a84b55 !important;
+}
+@media (max-width: 520px) {
+  .tier-admin-university-fields { grid-template-columns: 1fr; }
+}
+
 .tier-admin-status {
   min-height: 20px;
   margin: 0;

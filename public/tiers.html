@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#17213a">
     <title>티어표 · ELO Kitten</title>
     <link rel="stylesheet" href="./common-theme.css">
-    <link rel="stylesheet" href="./tiers.css?v=20260921-admin-race-university">
+    <link rel="stylesheet" href="./tiers.css?v=20261009-university-manager">
     <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
     <script defer src="./tournament-nav.js?v=20261009"></script>
   </head>
@@ -142,6 +142,7 @@
                   <option value="잭">잭티어</option>
                   <option value="조커">조커티어</option>
                   <option value="스페이드">스페이드티어</option>
+                  <option value="베이비">베이비티어</option>
                   <option value="FA">FA</option>
                 </select>
               </label>
@@ -187,6 +188,7 @@
                 <option value="잭">잭티어</option>
                 <option value="조커">조커티어</option>
                 <option value="스페이드">스페이드티어</option>
+                <option value="베이비">베이비티어</option>
                 <option value="FA">FA</option>
               </select>
             </label>
@@ -199,7 +201,7 @@
               </select>
             </label>
             <label class="tier-admin-current-university" for="tierAdminCurrentUniversity">
-              <span>대학 이름 변경</span>
+              <span>이 선수의 소속 변경</span>
               <span class="tier-admin-inline-editor">
                 <input id="tierAdminCurrentUniversity" type="text" list="tierAdminUniversityOptions" maxlength="40" placeholder="비워두면 FA">
                 <button id="tierAdminUniversityChange" type="button">변경</button>
@@ -232,11 +234,30 @@
             <button id="tierAdminDelete" class="tier-admin-delete" type="button">선수 삭제</button>
             <button id="tierAdminLogout" type="button">로그아웃</button>
           </div>
+
+          <section class="tier-admin-university-manager" aria-label="대학 전체 관리">
+            <div class="tier-admin-university-heading">
+              <strong>대학 전체 관리</strong>
+              <span>선택한 대학의 모든 선수에게 적용됩니다.</span>
+            </div>
+            <div class="tier-admin-university-fields">
+              <label for="tierAdminGlobalUniversity">변경할 대학
+                <select id="tierAdminGlobalUniversity"></select>
+              </label>
+              <label for="tierAdminGlobalNewName">새 대학 이름
+                <input id="tierAdminGlobalNewName" type="text" maxlength="40" placeholder="새 이름을 입력하세요">
+              </label>
+            </div>
+            <div class="tier-admin-university-actions">
+              <button id="tierAdminGlobalRename" type="button">대학 이름 전체 변경</button>
+              <button id="tierAdminGlobalDelete" type="button">대학 삭제 · 학생 전원 FA</button>
+            </div>
+          </section>
         </section>
         <p id="tierAdminStatus" class="tier-admin-status" role="status"></p>
       </dialog>
     </main>
     <script src="/socket.io/socket.io.js"></script>
-  <script src="./tiers.js?v=20260921-initial-tier-five-fix"></script>
+  <script src="./tiers.js?v=20261009-university-manager"></script>
   </body>
 </html>

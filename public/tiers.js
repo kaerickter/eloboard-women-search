@@ -43,6 +43,10 @@ const tierAdminMakeFa = document.getElementById("tierAdminMakeFa");
 const tierAdminRevert = document.getElementById("tierAdminRevert");
 const tierAdminDelete = document.getElementById("tierAdminDelete");
 const tierAdminLogout = document.getElementById("tierAdminLogout");
+const tierAdminGlobalUniversity = document.getElementById("tierAdminGlobalUniversity");
+const tierAdminGlobalNewName = document.getElementById("tierAdminGlobalNewName");
+const tierAdminGlobalRename = document.getElementById("tierAdminGlobalRename");
+const tierAdminGlobalDelete = document.getElementById("tierAdminGlobalDelete");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
 const LIVE_SHARED_SYNC_MS = 1000;
@@ -128,6 +132,10 @@ function restoreTierRoster() {
 
 function keyOf(value) {
   return String(value || "").replace(/\s+/g, "").toLowerCase();
+}
+
+function tierAdminCode(value) {
+  return String(value || "FA").trim().replace(/^([0-9])티어$/, "$1");
 }
 
 function escapeHtml(value) {
@@ -508,6 +516,27 @@ function renderTierAdminEditor(preferredName = "") {
     '<option value="' + escapeHtml(item.value) + '"></option>'
   ).join("");
   renderTierAdminMemberships();
+  renderTierAdminGlobalUniversities();
+}
+
+function globalUniversityOptions() {
+  const names = [...new Set(state.players.flatMap(playerUniversities))]
+    .sort((nameA, nameB) => nameA.localeCompare(nameB, "ko"));
+  return names.map((name) => ({
+    name,
+    count: state.players.filter((player) => playerUniversities(player).includes(name)).length
+  }));
+}
+
+function renderTierAdminGlobalUniversities(preferredName = "") {
+  const previous = preferredName || tierAdminGlobalUniversity.value;
+  const options = globalUniversityOptions();
+  tierAdminGlobalUniversity.innerHTML = options.map(({ name, count }) =>
+    '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + ' · ' + count + '명</option>'
+  ).join("");
+  if (options.some((item) => item.name === previous)) tierAdminGlobalUniversity.value = previous;
+  tierAdminGlobalRename.disabled = !options.length;
+  tierAdminGlobalDelete.disabled = !options.length;
 }
 
 function renderTierAdminMemberships() {
@@ -526,12 +555,12 @@ function renderTierAdminMemberships() {
   tierAdminCurrentUniversity.disabled = false;
   tierAdminUniversityChange.disabled = false;
   const tierOptions = player.division === "men"
-    ? [["갓", "갓티어"], ["킹", "킹티어"], ["잭", "잭티어"], ["조커", "조커티어"], ["스페이드", "스페이드티어"], ["FA", "FA"]]
+    ? [["갓", "갓티어"], ["킹", "킹티어"], ["잭", "잭티어"], ["조커", "조커티어"], ["스페이드", "스페이드티어"], ["베이비", "베이비티어"], ["FA", "FA"]]
     : [...Array.from({ length: 10 }, (_, tier) => [String(tier), tier + "티어"]), ["FA", "FA"]];
   tierAdminTier.innerHTML = tierOptions.map(([value, label]) =>
     '<option value="' + escapeHtml(value) + '">' + escapeHtml(label) + "</option>"
   ).join("");
-  tierAdminTier.value = String(player.tier || "FA");
+  tierAdminTier.value = tierAdminCode(player.tier);
   tierAdminRace.value = ["T", "P", "Z"].includes(String(player.race || "").toUpperCase())
     ? String(player.race).toUpperCase()
     : "T";
@@ -570,7 +599,11 @@ function setTierAdminControlsDisabled(disabled) {
     tierAdminAdd,
     tierAdminMakeFa,
     tierAdminRevert,
-    tierAdminDelete
+    tierAdminDelete,
+    tierAdminGlobalUniversity,
+    tierAdminGlobalNewName,
+    tierAdminGlobalRename,
+    tierAdminGlobalDelete
   ].forEach((control) => { control.disabled = disabled; });
   tierAdminPlayerSuggestions.querySelectorAll("button").forEach((button) => {
     button.disabled = disabled;
@@ -578,7 +611,10 @@ function setTierAdminControlsDisabled(disabled) {
   tierAdminMemberships.querySelectorAll("button").forEach((button) => {
     button.disabled = disabled;
   });
-  if (!disabled) renderTierAdminMemberships();
+  if (!disabled) {
+    renderTierAdminMemberships();
+    renderTierAdminGlobalUniversities();
+  }
 }
 
 async function readAdminResponse(response) {
@@ -601,6 +637,17 @@ function savedAdminMessage(message) {
   return tierAdminStorage.durable
     ? message + " PostgreSQL에 영구 저장했습니다."
     : message;
+}
+
+function adminPlayerSnapshot(player) {
+  return {
+    name: player.name,
+    tier: player.tier,
+    race: player.race,
+    universities: playerUniversities(player),
+    broadcastId: player.broadcastId || "",
+    promotionLight: Boolean(player.promotionLight)
+  };
 }
 
 async function checkTierAdminSession() {
@@ -633,7 +680,7 @@ async function saveTierAdminPlayer(changes, successMessage) {
   const player = adminSelectedPlayer();
   if (!player || tierAdminSaving) return;
   const playerName = player.name;
-  const tier = changes.tier ?? String(player.tier || "FA");
+  const tier = changes.tier ?? tierAdminCode(player.tier);
   const promotionLight = tier === "FA"
     ? false
     : (changes.promotionLight ?? Boolean(player.promotionLight));
@@ -651,6 +698,7 @@ async function saveTierAdminPlayer(changes, successMessage) {
       },
       body: JSON.stringify({
         playerName,
+        playerSnapshot: adminPlayerSnapshot(player),
         universities,
         tier,
         promotionLight,
@@ -676,6 +724,62 @@ async function saveTierAdminPlayer(changes, successMessage) {
 
 function saveTierAdminMemberships(universities, successMessage) {
   return saveTierAdminPlayer({ universities }, successMessage);
+}
+
+async function changeTierAdminUniversity(remove) {
+  if (tierAdminSaving) return;
+  const oldName = tierAdminGlobalUniversity.value;
+  const selected = globalUniversityOptions().find((item) => item.name === oldName);
+  const expectedPlayers = state.players.filter((player) => playerUniversities(player).includes(oldName))
+    .map((player) => keyOf(player.name)).sort();
+  const newName = String(tierAdminGlobalNewName.value || "").replace(/\s+/g, " ").trim();
+  if (!selected) {
+    tierAdminStatus.textContent = "변경할 대학을 선택해 주세요.";
+    return;
+  }
+  if (!remove && (!newName || newName === oldName || newName === "FA" || newName === "연합팀")) {
+    tierAdminStatus.textContent = "새 대학 이름을 정확히 입력해 주세요.";
+    return;
+  }
+  const action = remove
+    ? `${oldName} 소속 ${selected.count}명을 전부 FA로 바꿀까요? 기존 선수 기록은 삭제되지 않습니다.`
+    : `${oldName} 소속 ${selected.count}명의 대학 이름을 ${newName}(으)로 바꿀까요?`;
+  if (!window.confirm(action)) return;
+  const wasSelected = state.selectedUniversity === oldName;
+  tierAdminSaving = true;
+  setTierAdminControlsDisabled(true);
+  tierAdminStatus.textContent = "대학 소속을 전체 변경하고 있습니다.";
+  try {
+    const response = await fetch("/api/admin/tier-universities", {
+      method: remove ? "DELETE" : "PUT",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-CSRF-Token": tierAdminCsrf
+      },
+      body: JSON.stringify({ oldName, newName, expectedCount: selected.count, expectedPlayers })
+    });
+    const data = await readAdminResponse(response);
+    updateTierAdminStorage(data.storage);
+    const refreshed = await loadRoster(false);
+    if (wasSelected) {
+      state.selectedUniversity = remove ? FREE_AGENTS : newName;
+      saveTierViewState();
+      render();
+    }
+    renderTierAdminEditor(tierAdminSelectedName);
+    renderTierAdminGlobalUniversities(remove ? "" : newName);
+    tierAdminGlobalNewName.value = "";
+    tierAdminStatus.textContent = savedAdminMessage(
+      remove ? `${oldName} 대학을 삭제하고 ${data.affected}명을 FA로 표시했습니다.`
+        : `${oldName} 대학 이름을 ${newName}(으)로 바꾸고 ${data.affected}명에게 적용했습니다.`
+    ) + (refreshed ? "" : " 화면을 새로고침해 표시를 확인해 주세요.");
+  } catch (error) {
+    tierAdminStatus.textContent = error.message;
+  } finally {
+    tierAdminSaving = false;
+    if (!tierAdminManager.hidden) setTierAdminControlsDisabled(false);
+  }
 }
 
 async function createTierAdminPlayer() {
@@ -739,7 +843,7 @@ async function revertTierAdminMembership() {
         "Content-Type": "application/json",
         "X-CSRF-Token": tierAdminCsrf
       },
-      body: JSON.stringify({ playerName })
+      body: JSON.stringify({ playerName, playerSnapshot: adminPlayerSnapshot(player) })
     });
     const data = await readAdminResponse(response);
     updateTierAdminStorage(data.storage);
@@ -964,6 +1068,7 @@ async function loadRoster(force = false) {
       await loadLive();
     }
     if (data.refreshing) await syncDailyRoster();
+    return true;
   } catch (error) {
     if (!state.players.length) {
       board.innerHTML = '<div class="empty-card">' + escapeHtml(error.message) + "</div>";
@@ -971,6 +1076,7 @@ async function loadRoster(force = false) {
     } else {
       statusLine.textContent = "이전에 보던 티어표와 LIVE 표시를 유지하고 있습니다.";
     }
+    return false;
   } finally {
     refreshButton.disabled = false;
   }
@@ -1073,7 +1179,7 @@ async function deleteTierAdminPlayer() {
         "Content-Type": "application/json",
         "X-CSRF-Token": tierAdminCsrf
       },
-      body: JSON.stringify({ playerName })
+      body: JSON.stringify({ playerName, playerSnapshot: adminPlayerSnapshot(player) })
     });
     const data = await readAdminResponse(response);
     updateTierAdminStorage(data.storage);
@@ -1434,6 +1540,8 @@ tierAdminMakeFa.addEventListener("click", () => {
   const player = adminSelectedPlayer();
   if (player) saveTierAdminMemberships([], player.name + " 선수를 FA로 변경했습니다.");
 });
+tierAdminGlobalRename.addEventListener("click", () => { void changeTierAdminUniversity(false); });
+tierAdminGlobalDelete.addEventListener("click", () => { void changeTierAdminUniversity(true); });
 tierAdminRevert.addEventListener("click", revertTierAdminMembership);
 tierAdminDelete.addEventListener("click", deleteTierAdminPlayer);
 tierAdminLogout.addEventListener("click", async () => {
