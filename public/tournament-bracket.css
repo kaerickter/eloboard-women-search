@@ -1,4 +1,5 @@
 * { box-sizing: border-box; }
+html:has(body.tournament-bracket-page) { background: #080c25 !important; }
 body.tournament-bracket-page { background: #080c25 !important; color: #edf0ff; }
 body.tournament-bracket-page::before { background: linear-gradient(90deg, #5546d2, #9eb8ff, #5546d2) !important; }
 button, input { font: inherit; }
@@ -45,6 +46,11 @@ button, input { font: inherit; }
 .round-column.final-column > h2 { color: #ffe2a5; }
 .match { position: absolute; z-index: 2; left: 0; width: 100%; padding: 4px; transform: translateY(-50%); border: 1px solid #8695d4; border-radius: 11px; background: #0b1235eb; box-shadow: 0 0 0 2px #302c7859, 0 8px 20px #03081b99; }
 .match.is-final { border-color: #cfb981; box-shadow: 0 0 0 2px #9e814845, 0 0 26px #b4955948; }
+#bracketGrid .match {
+  border-color: #7182b0 !important;
+  background: linear-gradient(145deg, #2b3854, #1d2945) !important;
+}
+#bracketGrid .match.is-final { border-color: #cfb981 !important; }
 .match-slot { width: 100%; height: 39px; padding: 0 7px; display: flex; align-items: center; justify-content: space-between; gap: 4px; border: 0; border-radius: 6px; background: transparent; color: #e6ebff; cursor: default; text-align: left; }
 .match-slot + .match-slot { border-top: 1px solid #4a5288; border-radius: 0 0 6px 6px; }
 .match-slot span { overflow: hidden; font-size: clamp(14px, 1.1vw, 20px); font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
