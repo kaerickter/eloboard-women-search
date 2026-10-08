@@ -24,6 +24,45 @@
   let dirty = false;
   let saving = false;
   let pollInFlight = false;
+  let racesByName = new Map();
+
+  function nameKey(value) {
+    return String(value || '').replace(/\s+/g, '').toLowerCase();
+  }
+
+  function raceFor(name) {
+    return racesByName.get(nameKey(name)) || '';
+  }
+
+  function applyTierRaces(players) {
+    if (!Array.isArray(players)) return;
+    const next = new Map();
+    for (const player of players) {
+      const key = nameKey(player?.name);
+      const race = String(player?.race || '').toUpperCase();
+      if (!key || !['T', 'Z', 'P'].includes(race)) continue;
+      if (next.has(key) && next.get(key) !== race) next.set(key, '');
+      else if (!next.has(key)) next.set(key, race);
+    }
+    racesByName = next;
+    renderBracket();
+  }
+
+  async function loadTierRaces() {
+    try {
+      applyTierRaces(JSON.parse(sessionStorage.getItem('tier-board-roster-v1') || 'null'));
+    } catch {
+      // 브라우저 저장소를 사용할 수 없어도 서버 명단 조회는 계속합니다.
+    }
+    try {
+      const response = await fetch('/api/tiers');
+      if (!response.ok) return;
+      const result = await response.json();
+      applyTierRaces(result.players);
+    } catch {
+      // 티어 명단이 일시적으로 불가하면 종족을 추측하지 않고 이름만 표시합니다.
+    }
+  }
 
   function blankState() {
     return { title: '', subtitle: '', players: Array(16).fill(''), winners: {
@@ -77,18 +116,28 @@
         card.style.top = `${centers[column.round][visualIndex]}px`;
         for (let side = 0; side < 2; side += 1) {
           const name = playerAt(column.round, match, side);
+          const race = raceFor(name);
+          const winner = draft.winners[column.round][match];
           const slot = document.createElement('button');
           slot.type = 'button';
           slot.className = 'match-slot' + (!name ? ' is-empty' : '') +
-            (name && draft.winners[column.round][match] === side ? ' is-winner' : '');
+            (race ? ` race-${race.toLowerCase()}` : '') +
+            (name && winner === side ? ' is-winner' : '') +
+            (name && winner !== null && winner !== side ? ' is-loser' : '');
           slot.disabled = editor.hidden || !name;
-          slot.setAttribute('aria-label', `${column.label} ${match + 1}경기 ${name || '선수 미정'}${name ? ' 승리 선택' : ''}`);
+          slot.setAttribute('aria-label', `${column.label} ${match + 1}경기 ${name || '선수 미정'}${race ? ` ${race}` : ''}${name && winner === side ? ' 승리' : name ? ' 승리 선택' : ''}`);
+          if (race) {
+            const raceBadge = document.createElement('small');
+            raceBadge.className = 'race-badge';
+            raceBadge.textContent = race;
+            slot.append(raceBadge);
+          }
           const playerName = document.createElement('span');
           playerName.textContent = name || '선수 미정';
           slot.append(playerName);
-          if (name && draft.winners[column.round][match] === side) {
+          if (name && winner === side) {
             const crown = document.createElement('b');
-            crown.textContent = '✦';
+            crown.textContent = '승';
             crown.setAttribute('aria-hidden', 'true');
             slot.append(crown);
           }
@@ -253,5 +302,6 @@
   createPlayerInputs();
   renderView();
   void loadState(true);
+  void loadTierRaces();
   window.setInterval(() => { void loadState(); }, 3000);
 })();

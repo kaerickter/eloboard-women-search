@@ -53,6 +53,58 @@ button, input { font: inherit; }
 .bracket-editor:not([hidden]) ~ .bracket-arena .match-slot:not(:disabled) { cursor: pointer; }
 .bracket-editor:not([hidden]) ~ .bracket-arena .match-slot:not(:disabled):hover { background: #4d4ca0; color: #fff; }
 .match-slot:focus-visible { outline: 2px solid #ddd2ff; outline-offset: -2px; }
+#bracketGrid .match-slot {
+  min-width: 0;
+  justify-content: flex-start;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #e6ebff !important;
+}
+#bracketGrid .match-slot + .match-slot { border-top-color: #4a5288 !important; }
+.match-slot .race-badge {
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+  height: 22px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 950;
+}
+.match-slot.race-t .race-badge { background: #377beb; box-shadow: 0 0 9px #4da3ff70; }
+.match-slot.race-z .race-badge { background: #db3954; box-shadow: 0 0 9px #ff4d5e70; }
+.match-slot.race-p .race-badge { background: #db812b; box-shadow: 0 0 9px #ff9b3d70; }
+#bracketGrid .match-slot.race-t:not(.is-winner):not(.is-loser) span { color: #72b5ff; }
+#bracketGrid .match-slot.race-z:not(.is-winner):not(.is-loser) span { color: #ff8290; }
+#bracketGrid .match-slot.race-p:not(.is-winner):not(.is-loser) span { color: #ffc080; }
+.match-slot span { min-width: 0; flex: 1 1 auto; }
+#bracketGrid .match-slot.is-winner {
+  border-color: #f7d475 !important;
+  background: linear-gradient(90deg, #826224 0%, #4d3b2b 58%, #2a2440 100%) !important;
+  box-shadow: inset 0 0 0 1px #ffebaa8c, 0 0 16px #f5cd6880 !important;
+  color: #fff5d9 !important;
+}
+#bracketGrid .match-slot.is-winner span { color: #fff5d9 !important; text-shadow: 0 0 9px #ffe3a6; }
+#bracketGrid .match-slot.is-winner b {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #ffe08a;
+  color: #31240b;
+  font-size: 13px;
+  line-height: 1.25;
+}
+#bracketGrid .match-slot.is-loser { opacity: .48; }
+.tournament-bracket-page .bracket-editor:not([hidden]) ~ .bracket-arena #bracketGrid .match-slot:not(:disabled):hover {
+  background: #434c83 !important;
+  box-shadow: inset 0 0 0 1px #aebaff !important;
+}
+.tournament-bracket-page .bracket-editor:not([hidden]) ~ .bracket-arena #bracketGrid .match-slot.is-winner:not(:disabled):hover {
+  background: linear-gradient(90deg, #90702c, #56432a) !important;
+}
 .bracket-hint { margin: 4px 0 12px; color: #9ca8d6; font-size: 14px; text-align: center; }
 .champion-section { width: min(480px, 100%); min-height: 87px; margin: -3px auto 0; padding: 13px 25px; position: relative; z-index: 2; display: grid; place-items: center; border: 2px solid #d2b67c; border-radius: 0 0 20px 20px; background: linear-gradient(#4a3e46, #18172e 29%, #111730); color: #fff; box-shadow: 0 10px 30px #0106159e, 0 0 22px #dcaf7677; }
 .champion-section span { color: #e7c882; font-size: 14px; font-weight: 900; letter-spacing: .23em; }.champion-section strong { font-size: 27px; text-shadow: 0 0 15px #f7d39288; }
