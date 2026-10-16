@@ -1,0 +1,23 @@
+.control-panel .section-label { font-size: 12px; letter-spacing: .02em; }
+.control-panel .format-card { min-height: 72px; padding: 12px 14px; }
+.control-panel .format-card strong { font-size: 15px; }
+.control-panel .format-card span { font-size: 11px; }
+.format-options, .set-format-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.035);
+}
+.set-format-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.format-options label span, .set-format-options label span { font-size: 11px; color: #c6b4d7; }
+.format-options input, .set-format-options select { min-height: 38px; font-size: 14px; }
+.format-options > strong { align-self: end; padding-bottom: 10px; color: #f2d8ff; font-size: 15px; }
+.format-help { margin: 9px 0 0; color: #c6b4d7; font-size: 12px; line-height: 1.5; }
+@media (max-width: 620px) {
+  .set-format-options { grid-template-columns: 1fr; }
+}
+.preview-only-notice{margin:0 0 12px;padding:10px 14px;border:1px solid #69d5c1;border-radius:10px;background:#103b38;color:#d6fff6;font-weight:700}
