@@ -1,5 +1,5 @@
 .control-panel .section-label { font-size: 12px; letter-spacing: .02em; }
-.control-panel .format-card { min-height: 72px; padding: 12px 14px; }
+.control-panel .format-card { min-height: 58px; padding: 9px 13px; }
 .control-panel .format-card strong { font-size: 15px; }
 .control-panel .format-card span { font-size: 11px; }
 .format-options, .set-format-options {
@@ -12,11 +12,33 @@
   border-radius: 8px;
   background: rgba(255,255,255,.035);
 }
-.set-format-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.format-options { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.format-options input { width: 100%; height: 54px; font-size: 25px; font-weight: 800; text-align: center; }
+.format-options > strong small { display: block; font-size: 10px; font-weight: 500; }
+.set-format-wrap { margin-top: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.035); }
+.set-count-control { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; font-weight: 700; }
+.set-count-control select { width: 110px; min-height: 34px; font-size: 14px; }
+.set-format-options { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0; border: 0; background: none; gap: 7px; }
+.set-format-card { display: grid; grid-template-columns: 54px minmax(0,1fr) minmax(0,1.15fr); align-items: center; gap: 6px; min-width: 0; }
+.set-format-card strong { font-size: 12px; white-space: nowrap; }
+.set-format-card select { min-width: 0; width: 100%; height: 34px; padding: 0 5px; font-size: 12px; }
 .format-options label span, .set-format-options label span { font-size: 11px; color: #c6b4d7; }
 .format-options input, .set-format-options select { min-height: 38px; font-size: 14px; }
+.control-panel .format-options input { font-size: 25px; }
+.control-panel .set-format-card select { height: 34px; min-height: 34px; font-size: 12px; }
 .format-options > strong { align-self: end; padding-bottom: 10px; color: #f2d8ff; font-size: 15px; }
 .format-help { margin: 9px 0 0; color: #c6b4d7; font-size: 12px; line-height: 1.5; }
+.control-panel .format-section { margin-bottom: 12px; }
+.control-panel .title-control { margin-bottom: 11px; }
+.control-panel .setup-macro-grid { margin-bottom: 10px; }
+.control-panel .current-match-control { margin-bottom: 10px; }
+.control-panel .match-picker button { min-height: 34px; }
+.control-panel .macro-stack .macro-output--board { height: 178px; min-height: 178px; overflow: auto; resize: vertical; }
+.control-panel .roster-workspace { padding-top: 9px; }
+.scoreboard--sets-4,.stage--clean .scoreboard--sets-4 { width: min(100%, 740px); }
+.scoreboard--sets-5,.stage--clean .scoreboard--sets-5 { width: min(100%, 925px); }
+.scoreboard--sets-4 .sets-board { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.scoreboard--sets-5 .sets-board { grid-template-columns: repeat(5,minmax(0,1fr)); }
 @media (max-width: 620px) {
   .set-format-options { grid-template-columns: 1fr; }
 }
