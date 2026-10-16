@@ -126,6 +126,8 @@ let iakkangRecordStorePromise = null;
 let iakkangRecordMemory = null;
 let universityCache = null;
 let universityRosterCache = new Map();
+const universityPlayerStatsCache = new Map();
+const universityPlayerStatsPromises = new Map();
 let tierRosterCache = null;
 let tierRosterPromise = null;
 let channelCache = new Map();
@@ -2423,7 +2425,7 @@ async function loadTierRoster(force = false) {
 // 대학대결은 별도 대학 명단이 아니라, 화면에 표시되는 티어표와 같은 명단·소속·티어를 사용합니다.
 // 따라서 선수관리에서 소속이나 티어를 바꾸면 대학대결에도 바로 같은 기준으로 반영됩니다.
 async function loadTierBasedUniversityPlayers() {
-  const players = tierAdmin.applyOverrides(await loadTierRoster(false));
+  const players = addTierCctvSources(tierAdmin.applyOverrides(await loadTierRoster(false)));
   return players.filter((player) => {
     const universities = Array.isArray(player.universities) ? player.universities : [player.university];
     return String(player.tier || "").trim() && universities.some((name) => String(name || "").trim() && String(name).trim() !== "연합팀");
@@ -2802,11 +2804,86 @@ function matchupFromMenResult(result, main, opponent) {
   };
 }
 
+function universityApiPlayerId(player) {
+  return String(player?.profileUrl || "").match(/\/players\/(\d+)(?:[/?#]|$)/i)?.[1] || "";
+}
+
+async function fetchUniversityRecentMatches(playerId) {
+  const matches = [];
+  const seen = new Set();
+  const cutoffKey = koreaDateKey(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const limit = 200;
+  for (let offset = 0; ; offset += limit) {
+    const page = await fetchEloApi("/matches", { player_id: playerId, limit, offset });
+    if (!Array.isArray(page)) throw new Error("ELOBoard 경기 목록 응답 형식이 올바르지 않습니다.");
+    let added = 0;
+    for (const match of page) {
+      const key = String(match.id || JSON.stringify(match));
+      if (seen.has(key)) continue;
+      seen.add(key);
+      added += 1;
+      if (String(match.played_on || "") >= cutoffKey) matches.push(match);
+    }
+    if (page.length < limit) return matches;
+    if (!added) throw new Error("ELOBoard 경기 페이지가 반복됩니다.");
+    // API 경기 목록은 최신순입니다. 90일보다 오래된 페이지 뒤는 읽지 않습니다.
+    if (page.every((match) => String(match.played_on || "") < cutoffKey)) return matches;
+  }
+}
+
+async function loadUniversityPlayerStats(playerId) {
+  const cached = universityPlayerStatsCache.get(playerId);
+  if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.data;
+  if (universityPlayerStatsPromises.has(playerId)) return universityPlayerStatsPromises.get(playerId);
+  const task = Promise.all([
+    fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals"),
+    fetchUniversityRecentMatches(playerId)
+  ]).then(([rivals, matches]) => {
+    if (!Array.isArray(rivals)) throw new Error("ELOBoard 상대전적 응답 형식이 올바르지 않습니다.");
+    const data = { rivals, matches: apiMatchRows(matches, playerId) };
+    universityPlayerStatsCache.set(playerId, { cacheTime: Date.now(), data });
+    if (universityPlayerStatsCache.size > 120) universityPlayerStatsCache.delete(universityPlayerStatsCache.keys().next().value);
+    return data;
+  });
+  universityPlayerStatsPromises.set(playerId, task);
+  try { return await task; }
+  finally { universityPlayerStatsPromises.delete(playerId); }
+}
+
+function universityPairRecord(stats, playerA, playerB) {
+  const opponentId = universityApiPlayerId(playerB);
+  const opponentKey = normalizeName(playerB.name);
+  const rival = stats.rivals.find((item) =>
+    (opponentId && String(item.player_id || "") === opponentId) || normalizeName(item.name) === opponentKey);
+  const directRows = stats.matches.filter((row) =>
+    (opponentId && String(row.opponentId || "") === opponentId) || normalizeName(row.opponent) === opponentKey)
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  if (!rival && directRows.length) throw new Error("상대 전체 전적 확인 필요");
+  const latest = directRows[0]?.date || rival?.last_played_on || "";
+  return {
+    main: playerA.name,
+    opponent: playerB.name,
+    total: rival ? [Number(rival.wins || 0), Number(rival.losses || 0)] : matchupTally(directRows),
+    recent: matchupTally(directRows),
+    lastPlayed: latest ? String(latest).replace(/-/g, ".") : "경기 없음",
+    maps: directRows.slice(0, 6).map((row) => ({ map: row.map || "-", result: matchupResult(row), date: matchupDateText(row.date) }))
+  };
+}
+
 async function fetchUniversityPair(pair) {
-  // 프로필·상대전적 캐시를 공유하는 같은 조회 경로를 사용합니다.
-  // 남성·여성 모두 새 API에서 가져오며 조합마다 중복 호출하지 않습니다.
   try {
-    const record = await fetchMatchup(pair.playerA.name, pair.playerB.name);
+    const playerId = universityApiPlayerId(pair.playerA);
+    let record;
+    if (playerId) {
+      try {
+        record = universityPairRecord(await loadUniversityPlayerStats(playerId), pair.playerA, pair.playerB);
+      } catch {
+        // 신규 API가 일시적으로 실패하면 기존 상대전적 조회 경로를 유지합니다.
+        record = await fetchMatchup(pair.playerA.name, pair.playerB.name);
+      }
+    } else {
+      record = await fetchMatchup(pair.playerA.name, pair.playerB.name);
+    }
     return { tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB, ...record };
   } catch (error) {
     // 새 ELOBoard로 아직 이전되지 않은 선수가 있어도 전체 대학대결을 실패시키지 않습니다.
