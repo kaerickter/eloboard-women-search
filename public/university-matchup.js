@@ -12,17 +12,36 @@ function recordText(record) {
   return record.games ? record.wins + "승 " + record.losses + "패" : "전적 없음";
 }
 
+function universityPhotoSources(player) {
+  const id = String(player?.broadcastId || "").trim();
+  const soop = /^[a-z0-9_-]{2,40}$/i.test(id)
+    ? "https://profile.img.sooplive.co.kr/LOGO/" + encodeURIComponent(id.slice(0, 2).toLowerCase()) + "/" + encodeURIComponent(id) + "/" + encodeURIComponent(id) + ".jpg"
+    : "";
+  return [...new Set([player?.tierStaticImage, soop, player?.image]
+    .map((value) => String(value || "").trim())
+    .filter((value) => /^https?:\/\//i.test(value) || value.startsWith("/")))];
+}
+
 function playerPortrait(player, side) {
   const initial = String(player?.name || "?").trim().slice(0, 1);
-  const image = player?.image
-    ? '<img src="' + universitySafe(player.image) + '" alt="' + universitySafe(player.name) + ' 프로필 사진" loading="lazy">'
+  const sources = universityPhotoSources(player);
+  const image = sources.length
+    ? '<img src="' + universitySafe(sources[0]) + '" data-fallback-src="' + universitySafe(sources[1] || "") + '" data-last-src="' + universitySafe(sources[2] || "") + '" alt="' + universitySafe(player.name) + ' 프로필 사진" loading="lazy">'
     : "";
   return '<span class="university-player-photo photo-' + side + '"><span aria-hidden="true">' + universitySafe(initial) + '</span>' + image + '</span>';
 }
 
 function bindPlayerImages() {
   universityById("tierResults").querySelectorAll(".university-player-photo img").forEach((image) => {
-    image.addEventListener("error", () => { image.hidden = true; }, { once: true });
+    const tryFallback = () => {
+      const next = image.dataset.fallbackSrc;
+      if (!next) { image.hidden = true; return; }
+      image.dataset.fallbackSrc = image.dataset.lastSrc || "";
+      image.dataset.lastSrc = "";
+      image.src = next;
+    };
+    image.addEventListener("error", tryFallback);
+    if (image.complete && !image.naturalWidth) tryFallback();
   });
 }
 
