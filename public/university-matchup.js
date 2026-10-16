@@ -78,18 +78,19 @@ function updateSearchState() {
 }
 
 function renderPair(row, universityA, universityB, partial = false) {
+  const unverified = row.pending || row.unavailable;
   const totalGames = row.total[0] + row.total[1];
   const recentGames = row.recent[0] + row.recent[1];
   const rateA = totalGames ? Math.round(row.total[0] / totalGames * 1000) / 10 : 0;
   const rateB = totalGames ? Math.round(row.total[1] / totalGames * 1000) / 10 : 0;
   const recentRate = recentGames ? Math.round(row.recent[0] / recentGames * 1000) / 10 : 0;
-  const totalA = row.pending ? "–" : row.total[0];
-  const totalB = row.pending ? "–" : row.total[1];
-  const rateAText = row.pending ? "조회 중" : rateA + "% WINS";
-  const rateBText = row.pending ? "조회 중" : rateB + "% WINS";
+  const totalA = unverified ? "–" : row.total[0];
+  const totalB = unverified ? "–" : row.total[1];
+  const rateAText = unverified ? "전적 미확인" : rateA + "% WINS";
+  const rateBText = unverified ? "전적 미확인" : rateB + "% WINS";
   const recentText = partial ? "집계 중" : row.recent[0] + "승 " + row.recent[1] + "패";
   const recentRateText = partial ? "" : recentRate + "%";
-  const totalText = row.pending ? "조회 중" : totalGames ? row.total[0] + "승 " + row.total[1] + "패" : "전적 없음";
+  const totalText = unverified ? "전적 미확인" : totalGames ? row.total[0] + "승 " + row.total[1] + "패" : "전적 없음";
   return '<article class="university-duel-card"><div class="university-duel-stage">'
     + '<div class="university-duel-side side-a"><small>' + universitySafe(universityA) + ' · ' + universitySafe(row.tier) + '티어</small>' + playerPortrait(row.playerA, "a") + '<strong class="university-player-name">' + universitySafe(row.playerA.name) + '</strong><b class="university-duel-wins">' + totalA + '</b><span>' + rateAText + '</span></div>'
     + '<div class="university-duel-center"><div class="university-vs-logo"><b>VS</b></div><div class="university-duel-recent"><span>최근 90일</span><strong>' + recentText + '</strong><em>' + recentRateText + '</em></div></div>'
@@ -100,17 +101,22 @@ function renderPair(row, universityA, universityB, partial = false) {
 function renderResults(data) {
   universityById("resultTitle").textContent = data.universityA + " vs " + data.universityB;
   universityById("resultStatus").textContent = !data.pairCount ? "두 대학 사이에 동일 티어 선수 조합이 없습니다."
+    : data.pendingPairs ? "확인된 " + (data.pairCount - data.pendingPairs) + "/" + data.pairCount + "개 조합의 전적을 표시합니다. 미확인 조합은 합계에서 제외했습니다."
     : data.partial ? "전체 전적 먼저 표시 · 최근 90일 전적 집계 중…"
     : "동일 티어 " + data.tiers.length + "개 · 선수 조합 " + data.pairCount + "개를 모두 조회했습니다.";
-  universityById("allScore").textContent = data.pendingPairs ? "일부 조회 중" : recordText(data.total);
-  universityById("allRate").textContent = data.pendingPairs ? "전적 확인 중" : "승률 " + data.total.rate + "%";
+  universityById("allScore").textContent = data.pendingPairs
+    ? (data.total.games ? recordText(data.total) : "확인된 전적 없음") + " · " + data.pendingPairs + "개 미확인"
+    : recordText(data.total);
+  universityById("allRate").textContent = data.pendingPairs ? "확인된 전적 기준 승률 " + data.total.rate + "%" : "승률 " + data.total.rate + "%";
   universityById("recentScore").textContent = data.partial ? "집계 중" : recordText(data.recent);
   universityById("recentRate").textContent = data.partial ? "잠시 후 표시됩니다" : "승률 " + data.recent.rate + "%";
   universityById("pairCount").textContent = data.pairCount + "개";
   universityById("tierCount").textContent = data.tiers.length + "개 티어";
   universityById("tierResults").innerHTML = data.tiers.length ? data.tiers.map((tier) => {
     const rows = data.rows.filter((row) => row.tier === tier.tier);
-    return '<article class="tier-card"><header class="tier-head"><span class="tier-badge">' + universitySafe(tier.tier) + '</span><div><h3>' + universitySafe(tier.tier) + '티어 대결</h3><small>' + tier.pairCount + '개 교차 조합</small></div><div class="tier-totals"><span>총 전적<b>' + (rows.some((row) => row.pending) ? "일부 조회 중" : recordText(tier.total)) + '</b></span><span>최근 90일<b>' + (data.partial ? "집계 중" : recordText(tier.recent)) + '</b></span></div></header><div class="university-duel-list">' + rows.map((row) => renderPair(row, data.universityA, data.universityB, data.partial)).join("") + '</div></article>';
+    const missing = rows.filter((row) => row.pending || row.unavailable).length;
+    const totalText = missing ? (tier.total.games ? recordText(tier.total) : "확인된 전적 없음") + " · " + missing + "개 미확인" : recordText(tier.total);
+    return '<article class="tier-card"><header class="tier-head"><span class="tier-badge">' + universitySafe(tier.tier) + '</span><div><h3>' + universitySafe(tier.tier) + '티어 대결</h3><small>' + tier.pairCount + '개 교차 조합</small></div><div class="tier-totals"><span>총 전적<b>' + totalText + '</b></span><span>최근 90일<b>' + (data.partial ? "집계 중" : recordText(tier.recent)) + '</b></span></div></header><div class="university-duel-list">' + rows.map((row) => renderPair(row, data.universityA, data.universityB, data.partial)).join("") + '</div></article>';
   }).join("") : '<div class="university-empty">동일 티어 선수 조합이 없습니다.</div>';
   bindPlayerImages();
 }
