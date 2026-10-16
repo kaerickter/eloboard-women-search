@@ -128,8 +128,13 @@ let universityCache = null;
 let universityRosterCache = new Map();
 const universityPlayerStatsCache = new Map();
 const universityPlayerStatsPromises = new Map();
-const universityRivalsCache = new Map();
-const universityRivalsPromises = new Map();
+const universityTargetRivalsCache = new Map();
+const universityTargetRivalsPromises = new Map();
+let universityApiCollegesCache = null;
+let universityApiCollegesPromise = null;
+const universityApiMembersCache = new Map();
+const universityApiMembersPromises = new Map();
+const universityApiPlayerIdsCache = new Map();
 let tierRosterCache = null;
 let tierRosterPromise = null;
 let channelCache = new Map();
@@ -2810,6 +2815,81 @@ function universityApiPlayerId(player) {
   return String(player?.profileUrl || "").match(/\/players\/(\d+)(?:[/?#]|$)/i)?.[1] || "";
 }
 
+async function loadUniversityApiCollegeMembers(university) {
+  const key = normalizeName(university);
+  const cached = universityApiMembersCache.get(key);
+  if (cached && Date.now() - cached.cacheTime < CACHE_MS * 10) return cached.members;
+  if (universityApiMembersPromises.has(key)) return universityApiMembersPromises.get(key);
+  const task = (async () => {
+    let colleges = universityApiCollegesCache;
+    if (!colleges || Date.now() - colleges.cacheTime >= CACHE_MS * 10) {
+      if (!universityApiCollegesPromise) {
+        universityApiCollegesPromise = fetchEloApi("/colleges").then((items) => {
+          if (!Array.isArray(items)) throw new Error("ELOBoard 대학 목록 형식이 올바르지 않습니다.");
+          universityApiCollegesCache = { cacheTime: Date.now(), items };
+          return universityApiCollegesCache;
+        }).finally(() => { universityApiCollegesPromise = null; });
+      }
+      colleges = await universityApiCollegesPromise;
+    }
+    const college = colleges.items.find((item) => normalizeName(item.name) === key);
+    if (!college?.id) return [];
+    const detail = await fetchEloApi("/colleges/" + encodeURIComponent(college.id));
+    const members = Array.isArray(detail?.members) ? detail.members : [];
+    universityApiMembersCache.set(key, { cacheTime: Date.now(), members });
+    return members;
+  })();
+  universityApiMembersPromises.set(key, task);
+  try { return await task; }
+  finally { universityApiMembersPromises.delete(key); }
+}
+
+function universityExactApiPlayer(candidates, player, names) {
+  for (const name of names) {
+    const exact = candidates.filter((item) => normalizeName(item.name) === normalizeName(name));
+    if (exact.length === 1) return exact[0];
+    const division = exact.filter((item) => item.division === player.division);
+    if (division.length === 1) return division[0];
+  }
+  return null;
+}
+
+async function resolveUniversityApiPlayers(players, university) {
+  if (players.every((player) => universityApiPlayerId(player))) return players;
+  let members = [];
+  try { members = await loadUniversityApiCollegeMembers(university); }
+  catch (error) { console.warn("ELOBoard college member lookup unavailable:", error.message); }
+  return mapConcurrent(players, 4, async (player) => {
+    if (universityApiPlayerId(player)) return player;
+    const menRecord = player.division === "men" ? menBroadcastRecord(player.name) : null;
+    const names = [...new Set([player.realName, menRecord?.realName, player.name]
+      .map((value) => String(value || "").trim()).filter(Boolean))];
+    const cacheKey = player.division + ":" + normalizeName(names[0]);
+    const cached = universityApiPlayerIdsCache.get(cacheKey);
+    let id = cached && Date.now() - cached.cacheTime < CACHE_MS * 10 ? cached.id : "";
+    let apiName = id ? cached.apiName : "";
+    if (!id) {
+      const member = universityExactApiPlayer(members, player, names);
+      id = String(member?.player_id || "");
+      apiName = String(member?.name || "");
+      for (const name of !id ? names : []) {
+        try {
+          const found = await fetchEloApi("/players", { q: name });
+          const match = universityExactApiPlayer(Array.isArray(found) ? found : [], player, [name]);
+          id = String(match?.id || "");
+          apiName = String(match?.name || "");
+          if (id) break;
+        } catch (error) {
+          console.warn("ELOBoard player ID lookup unavailable:", error.message);
+          break;
+        }
+      }
+      if (id) universityApiPlayerIdsCache.set(cacheKey, { id, apiName, cacheTime: Date.now() });
+    }
+    return id ? { ...player, profileUrl: apiPlayerUrl(id), apiName } : player;
+  });
+}
+
 async function fetchUniversityRecentMatches(playerId) {
   const matches = [];
   const seen = new Set();
@@ -2837,11 +2917,8 @@ async function loadUniversityPlayerStats(playerId) {
   const cached = universityPlayerStatsCache.get(playerId);
   if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.data;
   if (universityPlayerStatsPromises.has(playerId)) return universityPlayerStatsPromises.get(playerId);
-  const task = Promise.all([
-    loadUniversityRivals(playerId),
-    fetchUniversityRecentMatches(playerId)
-  ]).then(([rivals, matches]) => {
-    const data = { rivals, matches: apiMatchRows(matches, playerId) };
+  const task = fetchUniversityRecentMatches(playerId).then((matches) => {
+    const data = { matches: apiMatchRows(matches, playerId) };
     universityPlayerStatsCache.set(playerId, { cacheTime: Date.now(), data });
     if (universityPlayerStatsCache.size > 120) universityPlayerStatsCache.delete(universityPlayerStatsCache.keys().next().value);
     return data;
@@ -2851,22 +2928,34 @@ async function loadUniversityPlayerStats(playerId) {
   finally { universityPlayerStatsPromises.delete(playerId); }
 }
 
-async function loadUniversityRivals(playerId) {
-  const full = universityPlayerStatsCache.get(playerId);
-  if (full && Date.now() - full.cacheTime < CACHE_MS) return full.data.rivals;
-  const cached = universityRivalsCache.get(playerId);
-  if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.rivals;
-  if (universityRivalsPromises.has(playerId)) return universityRivalsPromises.get(playerId);
-  const task = fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals")
-    .then((rivals) => {
-      if (!Array.isArray(rivals)) throw new Error("ELOBoard 상대전적 응답 형식이 올바르지 않습니다.");
-      universityRivalsCache.set(playerId, { cacheTime: Date.now(), rivals });
-      if (universityRivalsCache.size > 120) universityRivalsCache.delete(universityRivalsCache.keys().next().value);
-      return rivals;
+async function loadUniversityTargetRival(playerId, opponent) {
+  const key = playerId + ":" + (universityApiPlayerId(opponent) || normalizeName(opponent.name));
+  const cached = universityTargetRivalsCache.get(key);
+  if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.rival;
+  if (universityTargetRivalsPromises.has(key)) return universityTargetRivalsPromises.get(key);
+  const queryName = opponent.apiName || opponent.realName ||
+    (opponent.division === "men" ? menBroadcastRecord(opponent.name)?.realName : "") || opponent.name;
+  const task = fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals", { q: queryName })
+    .then((items) => {
+      if (!Array.isArray(items)) throw new Error("ELOBoard 상대전적 응답 형식이 올바르지 않습니다.");
+      const opponentId = universityApiPlayerId(opponent);
+      const matches = items.filter((item) =>
+        (opponentId && String(item.player_id || "") === opponentId) ||
+        (!opponentId && normalizeName(item.name) === normalizeName(queryName)));
+      const rival = matches.length ? {
+        player_id: opponentId || matches[0].player_id,
+        name: opponent.name,
+        wins: matches.reduce((sum, item) => sum + Number(item.wins || 0), 0),
+        losses: matches.reduce((sum, item) => sum + Number(item.losses || 0), 0),
+        last_played_on: matches.reduce((latest, item) => String(item.last_played_on || "") > latest ? String(item.last_played_on) : latest, "")
+      } : null;
+      universityTargetRivalsCache.set(key, { cacheTime: Date.now(), rival });
+      if (universityTargetRivalsCache.size > 300) universityTargetRivalsCache.delete(universityTargetRivalsCache.keys().next().value);
+      return rival;
     });
-  universityRivalsPromises.set(playerId, task);
+  universityTargetRivalsPromises.set(key, task);
   try { return await task; }
-  finally { universityRivalsPromises.delete(playerId); }
+  finally { universityTargetRivalsPromises.delete(key); }
 }
 
 function universityPairRecord(stats, playerA, playerB) {
@@ -2899,9 +2988,11 @@ async function fetchUniversityPair(pair, summaryOnly = false) {
     let record;
     if (playerId) {
       try {
-        const stats = summaryOnly
-          ? { rivals: await loadUniversityRivals(playerId), matches: [] }
-          : await loadUniversityPlayerStats(playerId);
+        const [rival, recent] = await Promise.all([
+          loadUniversityTargetRival(playerId, pair.playerB),
+          summaryOnly ? Promise.resolve({ matches: [] }) : loadUniversityPlayerStats(playerId)
+        ]);
+        const stats = { rivals: rival ? [rival] : [], matches: recent.matches };
         record = universityPairRecord(stats, pair.playerA, pair.playerB);
       } catch {
         if (summaryOnly) throw new Error("전체 전적 확인 중");
@@ -4231,7 +4322,10 @@ const server = http.createServer(async (req, res) => {
       const universities = tierBasedUniversities(tierPlayers);
       const allowed = new Set(universities.map((item) => item.name));
       if (!allowed.has(universityA) || !allowed.has(universityB)) return send(res, 400, JSON.stringify({ error: "지원하는 대학을 선택해 주세요." }), "application/json; charset=utf-8");
-      const [rosterA, rosterB] = [tierBasedUniversityRoster(tierPlayers, universityA), tierBasedUniversityRoster(tierPlayers, universityB)];
+      const [rosterA, rosterB] = await Promise.all([
+        resolveUniversityApiPlayers(tierBasedUniversityRoster(tierPlayers, universityA), universityA),
+        resolveUniversityApiPlayers(tierBasedUniversityRoster(tierPlayers, universityB), universityB)
+      ]);
       const pairs = buildUniversityPairs(rosterA, rosterB);
       if (pairs.length > 200) return send(res, 400, JSON.stringify({ error: "동일 티어 대결 조합이 200개를 초과합니다." }), "application/json; charset=utf-8");
       const rows = await mapConcurrent(pairs, 4, (pair) => fetchUniversityPair(pair, summaryOnly));
@@ -4246,7 +4340,7 @@ const server = http.createServer(async (req, res) => {
         rosters: { a: rosterA, b: rosterB },
         pairCount: rows.length,
         partial: summaryOnly,
-        pendingPairs: rows.filter((row) => row.pending).length,
+        pendingPairs: rows.filter((row) => row.pending || row.unavailable).length,
         total: tallyRows(rows, "total"),
         recent: tallyRows(rows, "recent"),
         tiers,
