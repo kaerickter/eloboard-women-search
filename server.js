@@ -128,6 +128,8 @@ let universityCache = null;
 let universityRosterCache = new Map();
 const universityPlayerStatsCache = new Map();
 const universityPlayerStatsPromises = new Map();
+const universityRivalsCache = new Map();
+const universityRivalsPromises = new Map();
 let tierRosterCache = null;
 let tierRosterPromise = null;
 let channelCache = new Map();
@@ -2836,10 +2838,9 @@ async function loadUniversityPlayerStats(playerId) {
   if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.data;
   if (universityPlayerStatsPromises.has(playerId)) return universityPlayerStatsPromises.get(playerId);
   const task = Promise.all([
-    fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals"),
+    loadUniversityRivals(playerId),
     fetchUniversityRecentMatches(playerId)
   ]).then(([rivals, matches]) => {
-    if (!Array.isArray(rivals)) throw new Error("ELOBoard 상대전적 응답 형식이 올바르지 않습니다.");
     const data = { rivals, matches: apiMatchRows(matches, playerId) };
     universityPlayerStatsCache.set(playerId, { cacheTime: Date.now(), data });
     if (universityPlayerStatsCache.size > 120) universityPlayerStatsCache.delete(universityPlayerStatsCache.keys().next().value);
@@ -2848,6 +2849,24 @@ async function loadUniversityPlayerStats(playerId) {
   universityPlayerStatsPromises.set(playerId, task);
   try { return await task; }
   finally { universityPlayerStatsPromises.delete(playerId); }
+}
+
+async function loadUniversityRivals(playerId) {
+  const full = universityPlayerStatsCache.get(playerId);
+  if (full && Date.now() - full.cacheTime < CACHE_MS) return full.data.rivals;
+  const cached = universityRivalsCache.get(playerId);
+  if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.rivals;
+  if (universityRivalsPromises.has(playerId)) return universityRivalsPromises.get(playerId);
+  const task = fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals")
+    .then((rivals) => {
+      if (!Array.isArray(rivals)) throw new Error("ELOBoard 상대전적 응답 형식이 올바르지 않습니다.");
+      universityRivalsCache.set(playerId, { cacheTime: Date.now(), rivals });
+      if (universityRivalsCache.size > 120) universityRivalsCache.delete(universityRivalsCache.keys().next().value);
+      return rivals;
+    });
+  universityRivalsPromises.set(playerId, task);
+  try { return await task; }
+  finally { universityRivalsPromises.delete(playerId); }
 }
 
 function universityPairRecord(stats, playerA, playerB) {
@@ -2870,14 +2889,22 @@ function universityPairRecord(stats, playerA, playerB) {
   };
 }
 
-async function fetchUniversityPair(pair) {
+async function fetchUniversityPair(pair, summaryOnly = false) {
   try {
     const playerId = universityApiPlayerId(pair.playerA);
+    if (summaryOnly && !playerId) return {
+      tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB,
+      total: [0, 0], recent: [0, 0], lastPlayed: "조회 중", maps: [], pending: true
+    };
     let record;
     if (playerId) {
       try {
-        record = universityPairRecord(await loadUniversityPlayerStats(playerId), pair.playerA, pair.playerB);
+        const stats = summaryOnly
+          ? { rivals: await loadUniversityRivals(playerId), matches: [] }
+          : await loadUniversityPlayerStats(playerId);
+        record = universityPairRecord(stats, pair.playerA, pair.playerB);
       } catch {
+        if (summaryOnly) throw new Error("전체 전적 확인 중");
         // 신규 API가 일시적으로 실패하면 기존 상대전적 조회 경로를 유지합니다.
         record = await fetchMatchup(pair.playerA.name, pair.playerB.name);
       }
@@ -2886,6 +2913,10 @@ async function fetchUniversityPair(pair) {
     }
     return { tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB, ...record };
   } catch (error) {
+    if (summaryOnly) return {
+      tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB,
+      total: [0, 0], recent: [0, 0], lastPlayed: "조회 중", maps: [], pending: true
+    };
     // 새 ELOBoard로 아직 이전되지 않은 선수가 있어도 전체 대학대결을 실패시키지 않습니다.
     return {
       tier: pair.tier, playerA: pair.playerA, playerB: pair.playerB,
@@ -4194,6 +4225,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const universityA = String(body.universityA || "").trim();
       const universityB = String(body.universityB || "").trim();
+      const summaryOnly = body.summaryOnly === true;
       if (!universityA || !universityB || universityA === universityB) return send(res, 400, JSON.stringify({ error: "서로 다른 두 대학을 선택해 주세요." }), "application/json; charset=utf-8");
       const tierPlayers = await loadTierBasedUniversityPlayers();
       const universities = tierBasedUniversities(tierPlayers);
@@ -4202,7 +4234,7 @@ const server = http.createServer(async (req, res) => {
       const [rosterA, rosterB] = [tierBasedUniversityRoster(tierPlayers, universityA), tierBasedUniversityRoster(tierPlayers, universityB)];
       const pairs = buildUniversityPairs(rosterA, rosterB);
       if (pairs.length > 200) return send(res, 400, JSON.stringify({ error: "동일 티어 대결 조합이 200개를 초과합니다." }), "application/json; charset=utf-8");
-      const rows = await mapConcurrent(pairs, 4, fetchUniversityPair);
+      const rows = await mapConcurrent(pairs, 4, (pair) => fetchUniversityPair(pair, summaryOnly));
       const tierOrder = [...new Set(pairs.map((pair) => pair.tier))];
       const tiers = tierOrder.map((tier) => {
         const tierRows = rows.filter((row) => row.tier === tier);
@@ -4213,6 +4245,8 @@ const server = http.createServer(async (req, res) => {
         universityB,
         rosters: { a: rosterA, b: rosterB },
         pairCount: rows.length,
+        partial: summaryOnly,
+        pendingPairs: rows.filter((row) => row.pending).length,
         total: tallyRows(rows, "total"),
         recent: tallyRows(rows, "recent"),
         tiers,
