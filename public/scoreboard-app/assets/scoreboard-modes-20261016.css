@@ -49,3 +49,28 @@
   .stage:not(.stage--clean) .preview-area { position: relative; height: min(100vh,700px); min-height: 400px; }
 }
 .preview-only-notice{margin:0 0 12px;padding:10px 14px;border:1px solid #69d5c1;border-radius:10px;background:#103b38;color:#d6fff6;font-weight:700}
+.control-panel .headline-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; gap:10px; margin-bottom:12px; }
+.control-panel .headline-controls--single { grid-template-columns:1fr; }
+.control-panel .headline-controls .title-control { min-width:0; margin:0; }
+.control-panel .headline-controls .title-control input { width:100%; height:44px; }
+.headline-game-control { min-width:0; }
+.headline-game-control > span:first-child { color:#c6b4d7; font-size:11px; }
+.headline-game-input { display:flex; align-items:center; gap:8px; min-width:0; height:44px; }
+.control-panel .headline-game-input input { flex:0 0 64px; width:64px; height:44px; padding:0 5px; text-align:center; font-size:19px; font-weight:800; }
+.control-panel .headline-game-input strong { min-width:0; color:#f2d8ff; white-space:nowrap; font-size:12px; }
+.control-panel .setup-fields .team-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0 0 12px; }
+.control-panel .team-side { display:grid; gap:6px; min-width:0; }
+.control-panel .team-side .team-name-control { min-width:0; }
+.control-panel .team-side .team-name-inputs { grid-template-columns:minmax(0,1fr) 36px; gap:5px; }
+.control-panel .team-side .team-color-picker { width:36px; }
+.control-panel .team-side .score-stepper { width:100%; height:36px; grid-template-columns:32px 1fr 32px; }
+.control-panel .team-side .team-name-control input { height:40px; padding-inline:8px; font-size:13px; }
+.control-panel .team-side .team-name-control input.team-color-picker { width:36px; padding:4px; }
+.control-panel .set-format-card select,
+.control-panel .set-count-control select { color:#241b37; background:#f7f2ff; border-color:#bfa9df; font-weight:700; }
+.control-panel .set-format-card select option,
+.control-panel .set-count-control select option { color:#241b37; background:#f7f2ff; }
+.control-panel .set-format-card select:disabled { opacity:.72; }
+@media (max-width:620px) {
+  .control-panel .setup-fields .team-controls { grid-template-columns:1fr; }
+}
