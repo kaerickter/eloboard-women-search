@@ -33,13 +33,19 @@
 .control-panel .setup-macro-grid { margin-bottom: 10px; }
 .control-panel .current-match-control { margin-bottom: 10px; }
 .control-panel .match-picker button { min-height: 34px; }
-.control-panel .macro-stack .macro-output--board { height: 178px; min-height: 178px; overflow: auto; resize: vertical; }
+.control-panel .macro-stack .macro-output--board { height: 340px; min-height: 340px; overflow: auto; resize: vertical; }
 .control-panel .roster-workspace { padding-top: 9px; }
+.stage--set-edit { grid-template-columns: minmax(320px,42fr) minmax(0,58fr); }
+.stage:not(.stage--clean) .preview-area { position: sticky; top: 0; height: 100vh; min-height: 0; align-self: start; }
 .scoreboard--sets-4,.stage--clean .scoreboard--sets-4 { width: min(100%, 740px); }
 .scoreboard--sets-5,.stage--clean .scoreboard--sets-5 { width: min(100%, 925px); }
 .scoreboard--sets-4 .sets-board { grid-template-columns: repeat(4,minmax(0,1fr)); }
 .scoreboard--sets-5 .sets-board { grid-template-columns: repeat(5,minmax(0,1fr)); }
 @media (max-width: 620px) {
   .set-format-options { grid-template-columns: 1fr; }
+}
+@media (max-width: 1020px) {
+  .stage--set-edit { grid-template-columns: 1fr; }
+  .stage:not(.stage--clean) .preview-area { position: relative; height: min(100vh,700px); min-height: 400px; }
 }
 .preview-only-notice{margin:0 0 12px;padding:10px 14px;border:1px solid #69d5c1;border-radius:10px;background:#103b38;color:#d6fff6;font-weight:700}
