@@ -1,4 +1,5 @@
 ﻿const http = require("node:http");
+const soloArchive = require("./solo/integration.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
@@ -3563,6 +3564,7 @@ function lanUrls(port) {
 }
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
+  if (url.pathname === "/solo" || url.pathname.startsWith("/solo/")) return soloArchive.handle(req, res);
   const isCctvOnlyPath = /^\/cctv(?:\.(?:html|css|js)|\/)/.test(url.pathname) ||
     url.pathname === "/api/cctv" ||
     url.pathname.startsWith("/api/cctv/");

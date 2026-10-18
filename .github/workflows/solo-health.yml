@@ -1,0 +1,16 @@
+name: Check donation archive
+on:
+  schedule:
+    - cron: '3,13,23,33,43,53 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: solo-health
+  cancel-in-progress: false
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check archive availability
+        run: curl --fail --silent --show-error --retry 1 --connect-timeout 15 --max-time 75 https://elo-kitten.onrender.com/solo/healthz

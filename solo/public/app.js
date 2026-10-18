@@ -1,0 +1,54 @@
+const $=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString('ko-KR');
+const date=at=>at?new Date(at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let token='',selected='',busy=false,lastRender='',lastStatus=null;
+const koreanDay=ms=>new Date(ms+9*3600000).toISOString().slice(0,10);
+$('from').value=koreanDay(Date.now()-89*86400000);$('to').value=koreanDay(Date.now());
+function fail(e){$('error').hidden=false;$('error').textContent=e.message||String(e);}
+async function api(url,options={}){const r=await fetch("/solo"+url,{...options,headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})}});if(!r.ok){const p=await r.json();throw new Error(p.error||'요청에 실패했습니다.');}return r;}
+function query(){return new URLSearchParams({from:$('from').value,to:$('to').value,session:selected});}
+async function refresh(){
+  if(busy)return;busy=true;
+  try{
+    const [s,r]=await Promise.all([api('/api/status').then(r=>r.json()),report()]);lastStatus=s;
+    $('setup').hidden=!!s.config.target;$('name').textContent=s.config.target?.name||'이아깽';
+    const labels={unconfigured:'대상 등록 전',waiting:'방송 시작 대기',connecting:'채팅방 연결 중',connected:'LIVE · 수집 중',reconnecting:'재연결 중',error:'연결 확인 필요',paused:'자동 감시 일시정지',standby:'이전 수집기 종료 대기'};
+    $('live-status').textContent=labels[s.runtime.status]||s.runtime.status;$('live-status').className='badge'+(s.runtime.status==='connected'?' live':'');
+    const active=r.sessions.find(x=>x.id===s.runtime.sessionId);
+    $('broadcast-title').textContent=active?.title||'방송 시작을 기다리는 기록실';
+    $('connection-note').textContent=s.runtime.error||(s.config.enabled?'화면을 닫아도 감시 유지 · 방송 시작 약 30초 이내 감지 · 재접속 자동 시도':'자동 감시가 멈춰 있습니다. 다시 켜면 방송 상태를 확인합니다.');
+    $('monitor').textContent=s.config.enabled?'자동 감시 일시정지':'자동 감시 다시 켜기';
+    $('last-check').textContent='마지막 방송 확인 '+date(s.runtime.lastCheckedAt)+' · 마지막 후원 수신 '+date(s.runtime.lastEventAt);
+    $('storage-size').textContent='Neon 영구 저장 · 한국 시간 기준';
+    const sig=JSON.stringify(r);if(sig!==lastRender){lastRender=sig;render(r);}
+    $('error').hidden=true;
+  }catch(e){fail(e);$('live-status').textContent='수집기 연결 끊김';$('connection-note').textContent='화면 갱신이 중단되었습니다. 수집기 실행 상태를 확인해 주세요.';}finally{busy=false;}
+}
+function render(r){
+  $('scope').textContent=selected?'선택한 방송 회차':`${$('from').value} ~ ${$('to').value}`;
+  for(const [id,key]of [['total','total'],['regular','regularTotal'],['challenge','missionTotal'],['battle','battleTotal']])$(id).textContent=fmt(r.totals[key]);
+  $('event-count').textContent=fmt(r.totals.events)+'회 일반 후원';
+  $('sessions').className='list'+(r.sessions.length?'':' empty');
+  $('sessions').innerHTML=r.sessions.length?r.sessions.map(s=>`<div class="record"><div class="content"><strong>${esc(s.title||'방송 기록')}</strong><p>${date(s.startedAt)} · ${s.endedAt?'종료 확인 '+date(s.endedAt):'종료 미확인'} · #${esc(s.bno)}</p></div><b class="amount">${fmt(s.total)}</b><button data-session="${esc(s.id)}">상세</button></div>`).join(''):'선택한 기간에 수집한 방송이 없습니다.';
+  const feed=r.sessions.flatMap(s=>s.recent).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,35);
+  $('feed').className='list'+(feed.length?'':' empty');
+  $('feed').innerHTML=feed.length?feed.map(g=>`<div class="record"><div class="content"><strong>${esc(g.donor||g.user_nick||g.title||'도전미션')}</strong><p>${date(g.at)} · ${{regular:'일반 별풍선',battle:'대결미션 후원',challenge:'도전미션'}[g.kind]}${g.type==='CHALLENGE_SETTLE'?' 정산':''}</p></div><b class="amount">${fmt(g.count||g.gift_count||g.settle_count)}</b></div>`).join(''):'새로운 후원을 기다리고 있습니다.';
+  $('donors').innerHTML=r.donors.length?r.donors.map((d,i)=>`<tr><td class="rank">${i+1}</td><td>${esc(d.donor)}<div class="muted">${esc(d.donorId)}</div></td><td>${fmt(d.total)}</td><td>${fmt(d.regularTotal)}</td><td>${fmt(d.missionTotal)}</td><td>${fmt(d.battleTotal)}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#9ba5b7">후원 수신 후 순위가 표시됩니다.</td></tr>';
+  const missions=r.sessions.flatMap(s=>[...s.missions.map(m=>({...m,kind:'challenge'})),...s.battleGifts.map(g=>({...g,title:'대결미션 #'+g.missionId,kind:'battle'}))]);
+  $('mission-list').className=missions.length?'':'empty';
+  $('mission-list').innerHTML=missions.length?missions.map(m=>`<div class="record"><div class="content"><strong>${esc(m.title||'도전미션 #'+m.missionId)}</strong><p>${m.kind==='battle'?'대결미션 후원 · '+esc(m.donor):'도전미션 · '+esc(({pending:'미정산',success:'성공 · 정산 대기',failed:'실패',cancelled:'취소',settled:'정산 완료',unknown:'상태 확인 필요'})[m.status])}${m.kind==='challenge'?' · 참여 '+fmt(m.contributions.reduce((s,c)=>s+c.count,0))+'개':''}</p></div><span class="amount">${fmt(m.kind==='battle'?m.count:m.settled)}개</span></div>`).join(''):'아직 수신한 미션이 없습니다.';
+}
+async function action(fn){try{await fn();lastRender='';await refresh();}catch(e){fail(e);}}
+$('register').onclick=()=>action(()=>api('/api/target',{method:'POST',body:JSON.stringify({bjId:'2ahgo1203'})}));
+$('monitor').onclick=()=>action(()=>api('/api/monitor',{method:'POST',body:JSON.stringify({enabled:!lastStatus?.config.enabled})}));
+$('filter').onclick=()=>{selected='';lastRender='';refresh();};
+$('all-sessions').onclick=()=>{selected='';lastRender='';refresh();};
+$('sessions').onclick=e=>{const id=e.target.closest('[data-session]')?.dataset.session;if(id){selected=id;lastRender='';refresh();}};
+$('access').onclick=async()=>{await api('/logout',{method:'POST',body:'{}'});location.reload();};
+async function download(url,name){const response=await api(url),blob=await response.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+$('export').onclick=()=>action(()=>download('/api/export?'+query(),'starwave-records.json'));
+$('backup').onclick=()=>action(()=>download('/api/backup','starwave-all-records.json'));
+setTimeout(refresh,0);setInterval(()=>{if(!document.hidden)refresh();},5000);
+
+let reportCache=null,reportEtag='',reportQuery=''; async function report(){const q=query().toString();const r=await fetch('/solo/api/report?'+q,{headers:q===reportQuery&&reportEtag?{'if-none-match':reportEtag}:{}});if(r.status===304&&reportCache)return reportCache;if(r.status===401){location.reload();throw Error('다시 로그인해 주세요.');}if(!r.ok)throw Error('기록을 불러오지 못했습니다.');reportQuery=q;reportEtag=r.headers.get('etag')||'';reportCache=await r.json();return reportCache;}
+
