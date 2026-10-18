@@ -1,4 +1,5 @@
 const $=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString('ko-KR');
+for(const name of ['usage','manual'])$('toggle-'+name).addEventListener('click',()=>{const panel=$(name+'-box'),button=$('toggle-'+name);panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));button.textContent=button.textContent.replace(/[▾▴]$/,panel.hidden?'▾':'▴');});
 const PREVIEW=new URLSearchParams(location.search).get('preview')==='1';
 const date=at=>at?new Date(at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -23,7 +24,7 @@ async function refresh(){
     $('storage-size').textContent='Neon 영구 저장 · 한국 시간 기준';
     renderUsage(s.usage);
     $('manual-list').innerHTML=(s.manual||[]).map(m=>`<div class="record"><div class="content"><strong>${esc(m.name)} · ${esc(labels[m.status]||m.status)}</strong><p>@${esc(m.bjId)} · #${esc(m.bno)}</p></div>${m.status!=='completed'?`<button data-stop-manual="${esc(m.bjId)}">수집 종료</button>`:''}</div>`).join('');
-    if(PREVIEW){$('preview-banner').hidden=false;$('live-status').textContent='가상 기록 미리보기';$('broadcast-title').textContent='본인 방송과 합방이 함께 저장된 예시';$('connection-note').textContent='실제 후원자·후원 금액이 아닌 화면 설명용 가상 데이터입니다.';$('usage-box').hidden=true;$('manual-box').hidden=true;for(const id of ['monitor','export','backup'])$(id).disabled=true;$('last-check').textContent='예시 화면 · 실제 데이터 변경 없음';}
+    if(PREVIEW){$('tools').hidden=true;$('preview-banner').hidden=false;$('live-status').textContent='가상 기록 미리보기';$('broadcast-title').textContent='본인 방송과 합방이 함께 저장된 예시';$('connection-note').textContent='실제 후원자·후원 금액이 아닌 화면 설명용 가상 데이터입니다.';$('usage-box').hidden=true;$('manual-box').hidden=true;for(const id of ['monitor','export','backup'])$(id).disabled=true;$('last-check').textContent='예시 화면 · 실제 데이터 변경 없음';}
     const sig=JSON.stringify(r);if(sig!==lastRender){lastRender=sig;render(r);}
     $('error').hidden=true;
   }catch(e){fail(e);$('live-status').textContent='수집기 연결 끊김';$('connection-note').textContent='화면 갱신이 중단되었습니다. 수집기 실행 상태를 확인해 주세요.';}finally{busy=false;}
