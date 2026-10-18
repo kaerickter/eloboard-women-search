@@ -18,7 +18,11 @@ export class Store {
     ALTER TABLE solo_archive.sessions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'auto';
     CREATE TABLE IF NOT EXISTS solo_archive.target_leases(bj_id text PRIMARY KEY,owner text NOT NULL,expires_at timestamptz NOT NULL);
     CREATE TABLE IF NOT EXISTS solo_archive.manual_targets(bj_id text PRIMARY KEY,bno text NOT NULL,name text NOT NULL,active boolean NOT NULL DEFAULT true);
-    CREATE TABLE IF NOT EXISTS solo_archive.usage_snapshots(at timestamptz PRIMARY KEY,data jsonb NOT NULL);`);return(await this.pool.query('SELECT enabled FROM solo_archive.settings WHERE id=1')).rows[0].enabled;}
+    CREATE TABLE IF NOT EXISTS solo_archive.usage_snapshots(at timestamptz PRIMARY KEY,data jsonb NOT NULL);
+    CREATE TABLE IF NOT EXISTS solo_archive.usage_points(resource text NOT NULL,at timestamptz NOT NULL,bytes double precision NOT NULL,PRIMARY KEY(resource,at));
+    CREATE TABLE IF NOT EXISTS solo_archive.usage_baselines(month text PRIMARY KEY,at timestamptz NOT NULL,bytes double precision NOT NULL);`);
+    if(/^\d{4}-\d{2}$/.test(process.env.SOLO_BASELINE_MONTH||'')&&Number.isFinite(Number(process.env.SOLO_BASELINE_BYTES))&&process.env.SOLO_BASELINE_AT)await this.pool.query('INSERT INTO solo_archive.usage_baselines VALUES($1,$2,$3) ON CONFLICT(month) DO NOTHING',[process.env.SOLO_BASELINE_MONTH,process.env.SOLO_BASELINE_AT,Number(process.env.SOLO_BASELINE_BYTES)]);
+    return(await this.pool.query('SELECT enabled FROM solo_archive.settings WHERE id=1')).rows[0].enabled;}
   async lease(){if(this.bjId==='2ahgo1203')return(await this.pool.query(`INSERT INTO solo_archive.lease VALUES(1,$1,now()+interval '90 seconds') ON CONFLICT(id) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at WHERE solo_archive.lease.owner=$1 OR solo_archive.lease.expires_at<now() RETURNING owner`,[this.owner])).rowCount===1;return(await this.pool.query(`INSERT INTO solo_archive.target_leases VALUES($1,$2,now()+interval '90 seconds') ON CONFLICT(bj_id) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at WHERE solo_archive.target_leases.owner=$2 OR solo_archive.target_leases.expires_at<now() RETURNING owner`,[this.bjId,this.owner])).rowCount===1;}
   async release(){if(this.bjId==='2ahgo1203')await this.pool.query('UPDATE solo_archive.lease SET expires_at=now() WHERE owner=$1',[this.owner]);else await this.pool.query('UPDATE solo_archive.target_leases SET expires_at=now() WHERE bj_id=$1 AND owner=$2',[this.bjId,this.owner]);}
   async enable(value){if(this.bjId==='2ahgo1203')await this.pool.query('UPDATE solo_archive.settings SET enabled=$1 WHERE id=1',[value]);}
@@ -27,6 +31,8 @@ export class Store {
   async stopManual(bjId){await this.pool.query('UPDATE solo_archive.manual_targets SET active=false WHERE bj_id=$1',[bjId]);}
   async usageSave(data){await this.pool.query('INSERT INTO solo_archive.usage_snapshots VALUES(now(),$1)',[JSON.stringify(data)]);}
   async usageLatest(){return(await this.pool.query('SELECT data FROM solo_archive.usage_snapshots ORDER BY at DESC LIMIT 1')).rows[0]?.data||null;}
+  async usagePoints(points,start,end){if(points.length)await this.pool.query(`INSERT INTO solo_archive.usage_points SELECT resource,at,bytes FROM jsonb_to_recordset($1::jsonb) AS x(resource text,at timestamptz,bytes double precision) ON CONFLICT(resource,at) DO UPDATE SET bytes=GREATEST(solo_archive.usage_points.bytes,excluded.bytes)`,[JSON.stringify(points.map(p=>({resource:p.resource,at:new Date(p.at).toISOString(),bytes:p.bytes})))]);return(await this.pool.query('SELECT at,bytes FROM solo_archive.usage_points WHERE at>=$1 AND at<=$2',[start,end])).rows.map(p=>({at:p.at.getTime(),bytes:p.bytes}));}
+  async usageBaseline(month){const b=(await this.pool.query('SELECT * FROM solo_archive.usage_baselines WHERE month=$1',[month])).rows[0];return b?{at:b.at.getTime(),bytes:b.bytes}:null;}
   async session(info){
     const bno=String(info.BNO);
     const c=await this.pool.connect();try{await c.query('BEGIN');await c.query('UPDATE solo_archive.sessions SET ended_at=COALESCE(ended_at,now()) WHERE bj_id=$2 AND bno<>$1 AND ended_at IS NULL',[bno,this.bjId]);

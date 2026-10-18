@@ -17,6 +17,7 @@ test('무료 사용량: 단위 정규화, 일간 평균과 예측, 한도 임박
   const {normalizeBandwidth,forecastUsage,UsageMonitor}=await load('usage.mjs');const now=Date.parse('2026-10-19T03:00:00Z');
   const points=normalizeBandwidth([{unit:'GB',values:[{timestamp:'2026-10-17T01:00:00Z',value:1},{timestamp:'2026-10-18T01:00:00Z',value:1}]}]);
   const r=forecastUsage(points,now);assert.equal(r.usedBytes,2e9);assert.equal(r.yesterdayBytes,1e9);assert.equal(r.averageDailyBytes,1e9);assert.equal(r.level,'warning');assert.equal(forecastUsage([{at:now-1000,bytes:4.6e9}],now).level,'danger');
+  const anchored=forecastUsage(points,now,5e9,{at:Date.parse('2026-10-17T12:00:00Z'),bytes:600e6});assert.equal(anchored.usedBytes,1.6e9);assert.equal(forecastUsage(points,now,5e9,{at:Date.parse('2026-09-30T00:00:00Z'),bytes:600e6}).usedBytes,2e9);
   assert.throws(()=>normalizeBandwidth([{unit:'unknown',values:[]}]));
   const old=process.env.RENDER_API_KEY;process.env.RENDER_API_KEY='temporary-test-key';let stopped=0,saved;
   const store={usageSave:async x=>saved=x};const m=new UsageMonitor(store,{onDanger:async()=>stopped++,fetcher:async url=>({ok:true,json:async()=>url.includes('/services?')?[{service:{id:'srv-example',name:'example'}}]:[{unit:'GB',values:[{timestamp:new Date(Date.now()-1000).toISOString(),value:4.6}]}]})});
