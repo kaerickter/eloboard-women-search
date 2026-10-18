@@ -3,6 +3,25 @@ const {once}=require('node:events');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
 const load=name=>import(pathToFileURL(path.join(__dirname,'../solo/',name)).href);
+test('합방 주소 검증과 지난 방송 거부, 예시 데이터의 분리 및 합계',async()=>{
+  const {parseBroadcastUrl,resolveManual}=await load('manual.mjs');
+  assert.deepEqual(parseBroadcastUrl('https://play.sooplive.co.kr/guest_bj/123'),{bjId:'guest_bj',bno:'123'});
+  assert.equal(parseBroadcastUrl('https://www.sooplive.com/station/guest_bj').bjId,'guest_bj');
+  for(const url of ['http://127.0.0.1/guest','https://play.sooplive.co.kr.evil.example/x','https://evil@play.sooplive.co.kr/x','https://vod.sooplive.co.kr/player/123'])assert.throws(()=>parseBroadcastUrl(url));
+  const lookup=async()=>({BNO:124,BJNICK:'합방진행자'});
+  await assert.rejects(resolveManual('https://play.sooplive.co.kr/guest_bj/123',lookup),/다른 방송 번호/);
+  assert.equal((await resolveManual('https://play.sooplive.co.kr/guest_bj/124',lookup)).bno,'124');
+  const {previewReport}=await load('sample.mjs'),r=previewReport();assert.equal(r.totals.total,4700);assert.equal(r.totals.battleTotal,500);assert.equal(r.totals.missionTotal,1200);assert.equal(r.sessions.filter(s=>s.source==='manual').length,1);assert.equal(r.donors.reduce((s,d)=>s+d.total,0),4700);
+});
+test('무료 사용량: 단위 정규화, 일간 평균과 예측, 한도 임박 시 수집 정지 콜백',async()=>{
+  const {normalizeBandwidth,forecastUsage,UsageMonitor}=await load('usage.mjs');const now=Date.parse('2026-10-19T03:00:00Z');
+  const points=normalizeBandwidth([{unit:'GB',values:[{timestamp:'2026-10-17T01:00:00Z',value:1},{timestamp:'2026-10-18T01:00:00Z',value:1}]}]);
+  const r=forecastUsage(points,now);assert.equal(r.usedBytes,2e9);assert.equal(r.yesterdayBytes,1e9);assert.equal(r.averageDailyBytes,1e9);assert.equal(r.level,'warning');assert.equal(forecastUsage([{at:now-1000,bytes:4.6e9}],now).level,'danger');
+  assert.throws(()=>normalizeBandwidth([{unit:'unknown',values:[]}]));
+  const old=process.env.RENDER_API_KEY;process.env.RENDER_API_KEY='temporary-test-key';let stopped=0,saved;
+  const store={usageSave:async x=>saved=x};const m=new UsageMonitor(store,{onDanger:async()=>stopped++,fetcher:async url=>({ok:true,json:async()=>url.includes('/services?')?[{service:{id:'srv-example',name:'example'}}]:[{unit:'GB',values:[{timestamp:new Date(Date.now()-1000).toISOString(),value:4.6}]}]})});
+  try{await m.check(true);assert.equal(saved.level,'danger');assert.equal(stopped,1);assert.ok(!JSON.stringify(saved).includes('temporary-test-key'));}finally{m.close();if(old===undefined)delete process.env.RENDER_API_KEY;else process.env.RENDER_API_KEY=old;}
+});
 test('후원기록실 비밀번호 보호, 로그인, API, 304 응답, 로그아웃',async()=>{
   const {createApp}=await load('web.mjs');
   let reads=0;const store={revision:1,init:async()=>true,report:async()=>{reads++;return{sessions:[],donors:[],totals:{total:0}};},export:async()=>({events:[]})};
@@ -41,5 +60,7 @@ test('수집기: 오프라인 대기 → 채팅 입장 → 세 종류 후원과 
     const send=e=>peer.send(protocol.makePacket(121,[JSON.stringify(e)]));send(e);send(e);send({...e,type:'CHALLENGE_SETTLE',uuid:'b',settle_count:30});send({...e,type:'GIFT',uuid:'c',image:'mission_gift_1',gift_count:20});
     await wait(()=>rows.length===4);assert.deepEqual(rows.map(r=>r.kind),['regular','challenge','challenge','battle']);assert.equal(rows[0].p.count,10);assert.ok(c.runtime.lastEventAt);assert.ok(!JSON.stringify(rows).includes('secret'));
     await c.enable(false);assert.equal(c.runtime.status,'paused');
+    let ended=0;const guestRows=[];const guest=new Collector({...store,record:async(s,k,p)=>{guestRows.push({k,p});return true;}},{bjId:'guest_bj',bno:100,onEnd:async()=>ended++});
+    try{await guest.enable(true);await wait(()=>guest.runtime.status==='connected');send({...e,bj_id:'guest_bj',uuid:'guest-mission'});await wait(()=>guestRows.length===1);assert.equal(guestRows[0].p.bj_id,'guest_bj');live=false;peer.close();await wait(()=>guest.runtime.status==='completed');assert.equal(guest.enabled,false);assert.equal(ended,1);}finally{await guest.close();}
   }finally{await c.close();for(const client of wss.clients)client.terminate();await new Promise(r=>wss.close(r));await new Promise(r=>mock.close(r));for(const k of Object.keys(process.env))if(!(k in previous))delete process.env[k];Object.assign(process.env,previous);}
 });

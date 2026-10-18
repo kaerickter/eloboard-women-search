@@ -1,9 +1,10 @@
 const $=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString('ko-KR');
+const PREVIEW=new URLSearchParams(location.search).get('preview')==='1';
 const date=at=>at?new Date(at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let token='',selected='',busy=false,lastRender='',lastStatus=null;
 const koreanDay=ms=>new Date(ms+9*3600000).toISOString().slice(0,10);
-$('from').value=koreanDay(Date.now()-89*86400000);$('to').value=koreanDay(Date.now());
+$('from').value=PREVIEW?'2026-10-17':koreanDay(Date.now()-89*86400000);$('to').value=PREVIEW?'2026-10-18':koreanDay(Date.now());
 function fail(e){$('error').hidden=false;$('error').textContent=e.message||String(e);}
 async function api(url,options={}){const r=await fetch("/solo"+url,{...options,headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})}});if(!r.ok){const p=await r.json();throw new Error(p.error||'요청에 실패했습니다.');}return r;}
 function query(){return new URLSearchParams({from:$('from').value,to:$('to').value,session:selected});}
@@ -12,7 +13,7 @@ async function refresh(){
   try{
     const [s,r]=await Promise.all([api('/api/status').then(r=>r.json()),report()]);lastStatus=s;
     $('setup').hidden=!!s.config.target;$('name').textContent=s.config.target?.name||'이아깽';
-    const labels={unconfigured:'대상 등록 전',waiting:'방송 시작 대기',connecting:'채팅방 연결 중',connected:'LIVE · 수집 중',reconnecting:'재연결 중',error:'연결 확인 필요',paused:'자동 감시 일시정지',standby:'이전 수집기 종료 대기'};
+    const labels={unconfigured:'대상 등록 전',waiting:'방송 시작 대기',connecting:'채팅방 연결 중',connected:'LIVE · 수집 중',reconnecting:'재연결 중',error:'연결 확인 필요',paused:'자동 감시 일시정지',standby:'이전 수집기 종료 대기',completed:'해당 회차 수집 종료'};
     $('live-status').textContent=labels[s.runtime.status]||s.runtime.status;$('live-status').className='badge'+(s.runtime.status==='connected'?' live':'');
     const active=r.sessions.find(x=>x.id===s.runtime.sessionId);
     $('broadcast-title').textContent=active?.title||'방송 시작을 기다리는 기록실';
@@ -20,6 +21,9 @@ async function refresh(){
     $('monitor').textContent=s.config.enabled?'자동 감시 일시정지':'자동 감시 다시 켜기';
     $('last-check').textContent='마지막 방송 확인 '+date(s.runtime.lastCheckedAt)+' · 마지막 후원 수신 '+date(s.runtime.lastEventAt);
     $('storage-size').textContent='Neon 영구 저장 · 한국 시간 기준';
+    renderUsage(s.usage);
+    $('manual-list').innerHTML=(s.manual||[]).map(m=>`<div class="record"><div class="content"><strong>${esc(m.name)} · ${esc(labels[m.status]||m.status)}</strong><p>@${esc(m.bjId)} · #${esc(m.bno)}</p></div>${m.status!=='completed'?`<button data-stop-manual="${esc(m.bjId)}">수집 종료</button>`:''}</div>`).join('');
+    if(PREVIEW){$('preview-banner').hidden=false;$('live-status').textContent='가상 기록 미리보기';$('broadcast-title').textContent='본인 방송과 합방이 함께 저장된 예시';$('connection-note').textContent='실제 후원자·후원 금액이 아닌 화면 설명용 가상 데이터입니다.';$('usage-box').hidden=true;$('manual-box').hidden=true;for(const id of ['monitor','export','backup'])$(id).disabled=true;$('last-check').textContent='예시 화면 · 실제 데이터 변경 없음';}
     const sig=JSON.stringify(r);if(sig!==lastRender){lastRender=sig;render(r);}
     $('error').hidden=true;
   }catch(e){fail(e);$('live-status').textContent='수집기 연결 끊김';$('connection-note').textContent='화면 갱신이 중단되었습니다. 수집기 실행 상태를 확인해 주세요.';}finally{busy=false;}
@@ -29,8 +33,8 @@ function render(r){
   for(const [id,key]of [['total','total'],['regular','regularTotal'],['challenge','missionTotal'],['battle','battleTotal']])$(id).textContent=fmt(r.totals[key]);
   $('event-count').textContent=fmt(r.totals.events)+'회 일반 후원';
   $('sessions').className='list'+(r.sessions.length?'':' empty');
-  $('sessions').innerHTML=r.sessions.length?r.sessions.map(s=>`<div class="record"><div class="content"><strong>${esc(s.title||'방송 기록')}</strong><p>${date(s.startedAt)} · ${s.endedAt?'종료 확인 '+date(s.endedAt):'종료 미확인'} · #${esc(s.bno)}</p></div><b class="amount">${fmt(s.total)}</b><button data-session="${esc(s.id)}">상세</button></div>`).join(''):'선택한 기간에 수집한 방송이 없습니다.';
-  const feed=r.sessions.flatMap(s=>s.recent).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,35);
+  $('sessions').innerHTML=r.sessions.length?r.sessions.map(s=>`<div class="record"><div class="content"><strong>${esc(s.title||'방송 기록')}</strong><p>${s.source==='manual'?'합방 수동':'본인 자동'} · ${esc(s.name||s.bjId||'이아깽')} · ${date(s.startedAt)} · ${s.endedAt?'종료 확인 '+date(s.endedAt):'종료 미확인'} · #${esc(s.bno)}</p></div><b class="amount">${fmt(s.total)}</b><button data-session="${esc(s.id)}">상세</button></div>`).join(''):'선택한 기간에 수집한 방송이 없습니다.';
+  const feed=r.sessions.flatMap(s=>s.recent.map(g=>({...g,broadcastName:s.name}))).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,35);
   $('feed').className='list'+(feed.length?'':' empty');
   $('feed').innerHTML=feed.length?feed.map(g=>`<div class="record"><div class="content"><strong>${esc(g.donor||g.user_nick||g.title||'도전미션')}</strong><p>${date(g.at)} · ${{regular:'일반 별풍선',battle:'대결미션 후원',challenge:'도전미션'}[g.kind]}${g.type==='CHALLENGE_SETTLE'?' 정산':''}</p></div><b class="amount">${fmt(g.count||g.gift_count||g.settle_count)}</b></div>`).join(''):'새로운 후원을 기다리고 있습니다.';
   $('donors').innerHTML=r.donors.length?r.donors.map((d,i)=>`<tr><td class="rank">${i+1}</td><td>${esc(d.donor)}<div class="muted">${esc(d.donorId)}</div></td><td>${fmt(d.total)}</td><td>${fmt(d.regularTotal)}</td><td>${fmt(d.missionTotal)}</td><td>${fmt(d.battleTotal)}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#9ba5b7">후원 수신 후 순위가 표시됩니다.</td></tr>';
@@ -48,7 +52,12 @@ $('access').onclick=async()=>{await api('/logout',{method:'POST',body:'{}'});loc
 async function download(url,name){const response=await api(url),blob=await response.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 $('export').onclick=()=>action(()=>download('/api/export?'+query(),'starwave-records.json'));
 $('backup').onclick=()=>action(()=>download('/api/backup','starwave-all-records.json'));
-setTimeout(refresh,0);setInterval(()=>{if(!document.hidden)refresh();},5000);
+setTimeout(refresh,0);setInterval(()=>{if(!document.hidden&&!PREVIEW)refresh();},5000);
 
-let reportCache=null,reportEtag='',reportQuery=''; async function report(){const q=query().toString();const r=await fetch('/solo/api/report?'+q,{headers:q===reportQuery&&reportEtag?{'if-none-match':reportEtag}:{}});if(r.status===304&&reportCache)return reportCache;if(r.status===401){location.reload();throw Error('다시 로그인해 주세요.');}if(!r.ok)throw Error('기록을 불러오지 못했습니다.');reportQuery=q;reportEtag=r.headers.get('etag')||'';reportCache=await r.json();return reportCache;}
+let reportCache=null,reportEtag='',reportQuery=''; async function report(){const q=query().toString();const r=await fetch(PREVIEW?'/solo/api/preview':('/solo/api/report?'+q),{headers:q===reportQuery&&reportEtag?{'if-none-match':reportEtag}:{}});if(r.status===304&&reportCache)return reportCache;if(r.status===401){location.reload();throw Error('다시 로그인해 주세요.');}if(!r.ok)throw Error('기록을 불러오지 못했습니다.');reportQuery=q;reportEtag=r.headers.get('etag')||'';reportCache=await r.json();if(PREVIEW&&selected){const sessions=reportCache.sessions.filter(s=>s.id===selected);reportCache={...reportCache,sessions,donors:(sessions[0]?.donors||[]).slice().sort((a,b)=>b.total-a.total||b.battleTotal-a.battleTotal),totals:sessions.reduce((p,s)=>{for(const k of Object.keys(p))p[k]+=s[k]||0;return p;},{total:0,regularTotal:0,missionTotal:0,battleTotal:0,events:0})};}return reportCache;}
 
+
+function size(bytes){return bytes>=1e9?(bytes/1e9).toFixed(2)+' GB':(bytes/1e6).toFixed(1)+' MB';}
+function renderUsage(u){$('usage-values').hidden=!u?.configured||u.level==='unknown';if(!u?.configured||u.level==='unknown'){$('usage-message').textContent=u?.error||'사용량 API 연결 확인 중';return;}$('usage-used').textContent=size(u.usedBytes)+' / 5 GB';$('usage-left').textContent=size(u.remainingBytes);$('usage-yesterday').textContent=size(u.yesterdayBytes);$('usage-forecast').textContent=size(u.projectedBytes);$('usage-progress').value=Math.min(100,u.percent*100);$('usage-message').textContent=({ok:'무료 범위 안에서 사용 중',warning:'무료 한도 주의: 월말 예상 또는 누적 사용량을 확인해 주세요.',danger:'무료 한도 90% 이상: 자동·합방 수집이 일시정지됩니다.'})[u.level]||u.level;$('usage-basis').textContent=u.basis+' · 워크스페이스 서비스 합산 · '+date(u.checkedAt)+' 확인';$('usage-days').innerHTML=(u.daily||[]).map(d=>'<div class="record"><span class="content">'+esc(d.day)+'</span><b>'+size(d.bytes)+'</b></div>').join('');}
+$('manual-form').onsubmit=e=>{e.preventDefault();if(PREVIEW)return;action(async()=>{await api('/api/manual',{method:'POST',body:JSON.stringify({url:$('manual-url').value})});$('manual-url').value='';});};
+$('manual-list').onclick=e=>{const bjId=e.target.closest('[data-stop-manual]')?.dataset.stopManual;if(bjId&&!PREVIEW)action(()=>api('/api/manual/stop',{method:'POST',body:JSON.stringify({bjId})}));};
