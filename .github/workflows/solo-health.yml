@@ -1,7 +1,7 @@
 name: Check donation archive
 on:
   schedule:
-    - cron: '3,13,23,33,43,53 * * * *'
+    - cron: '3-58/5 * * * *'
   workflow_dispatch:
 permissions: {}
 concurrency:
@@ -10,7 +10,19 @@ concurrency:
 jobs:
   health:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 6
     steps:
       - name: Check archive availability
-        run: curl --fail --silent --show-error --retry 1 --connect-timeout 15 --max-time 75 https://elo-kitten.onrender.com/solo/healthz
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --connect-timeout 15 --max-time 75 https://elo-kitten.onrender.com/solo/healthz) || code=000
+            if [ "$code" = "204" ]; then
+              echo "Archive initialized and responding (HTTP 204)."
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $code; waiting for archive startup."
+            if [ "$attempt" -lt 4 ]; then sleep 10; fi
+          done
+          echo "::error::Archive did not return HTTP 204. Check Render availability."
+          exit 1
