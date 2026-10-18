@@ -37,7 +37,7 @@ export class Collector {
       });
       ws.on('error',e=>{if(gen===this.generation)this.status('error',e.message);});
       ws.on('close',()=>{if(gen!==this.generation)return;clearInterval(this.heartbeat);clearInterval(this.leaseTimer);this.socket=null;if(this.runtime.status!=='error')this.status('reconnecting');this.schedule(5000);});
-    }catch(e){if(gen!==this.generation)return;if(e instanceof BroadcastOfflineError){if(this.runtime.sessionId){await this.queue;await this.store.end();this.runtime.sessionId=null;await this.store.release();}if(this.expectedBno){this.enabled=false;this.status('completed');await this.onEnd?.();}else this.status('waiting');}else this.status('error',e.message);this.schedule(e instanceof BroadcastOfflineError?30000:15000);}
+    }catch(e){if(gen!==this.generation)return;if(e instanceof BroadcastOfflineError){if(this.runtime.sessionId||this.expectedBno){await this.queue;await this.store.end();this.runtime.sessionId=null;await this.store.release();}if(this.expectedBno){this.enabled=false;this.status('completed');await this.onEnd?.();}else this.status('waiting');}else this.status('error',e.message);this.schedule(e instanceof BroadcastOfflineError?30000:15000);}
     finally{this.busy=false;if(gen!==this.generation)this.schedule(100);}
   }
   async close(){this.enabled=false;this.disconnect();await this.queue;await this.store.close();}

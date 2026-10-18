@@ -21,6 +21,7 @@ jobs:
           (async()=>{
             const r=await fetch('https://elo-kitten.onrender.com/solo/usage-notice',{signal:AbortSignal.timeout(90000)});
             if(!r.ok)throw Error('Usage monitor unavailable');const state=await r.json();
+            if(!state.configured){console.log('Usage key is not connected yet');return;}
             if(state.level==='unknown')throw Error('Usage API requires attention; check the private archive dashboard');
             if(!['warning','danger'].includes(state.level))return;
             const repo=process.env.GITHUB_REPOSITORY,headers={authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json','content-type':'application/json'};
