@@ -48,7 +48,11 @@
   overflow: visible;
   padding: 0;
 }
-.kill-area .one-team-mode .team-grid,
+/* 4:4:4:4의 팀 카드 한 칸을 기준으로, 팀 수만큼만 섹션 너비를 사용합니다. */
+.kill-area .mode-section.one-team-mode { width: calc(25% + 18px); justify-self: start; }
+.kill-area .mode-section.two-team-mode { width: calc(50% + 12px); justify-self: start; }
+.kill-area .mode-section.three-team-mode { width: calc(75% + 6px); justify-self: start; }
+.kill-area .one-team-mode .team-grid { grid-template-columns: minmax(0, 1fr); }
 .kill-area .two-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .kill-area .three-team-mode .team-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .kill-area .four-team-mode .team-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -153,12 +157,16 @@
 .kill-area .score-panel .fail-button.has-fails { border-color: #e06a72 !important; background: #623c4e !important; }
 .kill-area .score-panel .cancel-button { color: #cbdaf0 !important; }
 @media (max-width: 1350px) {
+  .kill-area .mode-section.one-team-mode { width: calc(50% + 12px); }
+  .kill-area .mode-section.two-team-mode,
+  .kill-area .mode-section.three-team-mode { width: 100%; }
+  .kill-area .three-team-mode .team-grid,
   .kill-area .four-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 980px) {
-  .kill-area .three-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @media (max-width: 680px) {
+  .kill-area .mode-section.one-team-mode,
+  .kill-area .mode-section.two-team-mode,
+  .kill-area .mode-section.three-team-mode { width: 100%; }
   .kill-area .one-team-mode .team-grid,
   .kill-area .two-team-mode .team-grid,
   .kill-area .three-team-mode .team-grid,
