@@ -1,0 +1,168 @@
+/* 킬 내기 점수판 전용 레이아웃. 점수/저장/동기화 동작에는 영향을 주지 않습니다. */
+.kill-area .board {
+  width: min(100%, 1760px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.kill-area .mode-section,
+.kill-area .mode-section.wide,
+.kill-area .mode-section.one-team-mode,
+.kill-area .mode-section.two-team-mode,
+.kill-area .mode-section.three-team-mode,
+.kill-area .mode-section.four-team-mode {
+  width: 100%;
+  max-width: none;
+  grid-column: auto;
+  justify-self: stretch;
+  transform: none;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid #303e54;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #172336, #101a2a);
+  box-shadow: 0 18px 42px rgba(13, 23, 40, .22);
+}
+.kill-area .mode-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 14px;
+  color: #f6dd9a;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+.kill-area .mode-heading small { color: #a9bad0; font-size: 14px; font-weight: 700; }
+.kill-area .mode-section .team-grid,
+.kill-area .one-team-mode .team-grid,
+.kill-area .two-team-mode .team-grid,
+.kill-area .three-team-mode .team-grid,
+.kill-area .four-team-mode .team-grid {
+  width: 100%;
+  display: grid;
+  grid-auto-flow: row;
+  grid-auto-columns: auto;
+  justify-content: stretch;
+  gap: 14px;
+  overflow: visible;
+  padding: 0;
+}
+.kill-area .one-team-mode .team-grid,
+.kill-area .two-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kill-area .three-team-mode .team-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kill-area .four-team-mode .team-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kill-area .mode-section .team-column,
+.kill-area .mode-section .team-label,
+.kill-area .mode-section .score-panel {
+  width: 100%;
+  min-width: 0;
+}
+.kill-area .mode-section .team-column {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #6e552c;
+  border-radius: 12px;
+  background: #142033;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
+}
+.kill-area .mode-section .team-label {
+  min-height: 55px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid #54482f;
+  border-radius: 0;
+  background: linear-gradient(90deg, #735321, #4b3a24 46%, #263247);
+  box-shadow: none;
+}
+.kill-area .mode-section .team-label-input {
+  border: 0;
+  color: #fff1cc;
+  font-size: 22px;
+  font-weight: 900;
+  text-align: left;
+}
+.kill-area .mode-section .team-label-input:focus { outline: 2px solid #ffd678; outline-offset: 1px; }
+.kill-area .mode-section .team-time {
+  border: 1px solid #cfa85e;
+  background: #18283d;
+  color: #ffdf9a;
+  box-shadow: none;
+}
+.kill-area .mode-section .score-panel {
+  padding: 10px 12px 13px;
+  border: 0;
+  border-radius: 0;
+  background: #142033;
+  box-shadow: none;
+}
+.kill-area .mode-section .title-row {
+  min-height: 40px;
+  margin-bottom: 7px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #314056;
+}
+.kill-area .mode-section .total-count { color: #ffdb83; font-size: 25px; }
+.kill-area .mode-section .panel-chicken-field {
+  margin-right: 0;
+  border-color: #516076;
+  background: #22334b;
+  color: #ffe1a7;
+}
+.kill-area .mode-section .panel-chicken-input { color: #ffe1a7; }
+.kill-area .mode-section .rows { gap: 2px; }
+.kill-area .mode-section .counter-row,
+.kill-area .one-team-mode .counter-row,
+.kill-area .two-team-mode .counter-row,
+.kill-area .three-team-mode .counter-row,
+.kill-area .four-team-mode .counter-row {
+  grid-template-columns: minmax(0, 1fr) 58px 31px 31px 44px 44px;
+  justify-content: stretch;
+  min-height: 44px;
+  gap: 4px;
+  padding: 3px 2px;
+  border-bottom: 1px solid rgba(157, 177, 203, .16);
+}
+.kill-area .mode-section .counter-row:last-child { border-bottom: 0; }
+.kill-area .mode-section .counter-row:nth-child(even) { background: rgba(255, 255, 255, .035); }
+.kill-area .mode-section .name-input {
+  width: 100%;
+  min-width: 0;
+  border-bottom-color: #5c6d85;
+  color: #f1f5fd;
+  font-family: Arial, "Malgun Gothic", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+}
+.kill-area .mode-section .name-input::placeholder { color: #71829a; }
+.kill-area .mode-section .count { color: #ffdc82; font-size: 18px; font-variant-numeric: tabular-nums; }
+.kill-area .score-panel .reset-button,
+.kill-area .score-panel .step-button,
+.kill-area .score-panel .fail-button,
+.kill-area .score-panel .cancel-button {
+  border-color: #6a7690 !important;
+  background: #283a54 !important;
+  color: #f5f6fd !important;
+  box-shadow: none !important;
+}
+.kill-area .score-panel .step-button:hover,
+.kill-area .score-panel .reset-button:hover,
+.kill-area .score-panel .fail-button:hover,
+.kill-area .score-panel .cancel-button:hover:not(:disabled) { background: #385370 !important; }
+.kill-area .score-panel .fail-button { color: #ffc7c4 !important; }
+.kill-area .score-panel .fail-button.has-fails { border-color: #e06a72 !important; background: #623c4e !important; }
+.kill-area .score-panel .cancel-button { color: #cbdaf0 !important; }
+@media (max-width: 1350px) {
+  .kill-area .four-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 980px) {
+  .kill-area .three-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .kill-area .one-team-mode .team-grid,
+  .kill-area .two-team-mode .team-grid,
+  .kill-area .three-team-mode .team-grid,
+  .kill-area .four-team-mode .team-grid { grid-template-columns: minmax(0, 1fr); }
+  .kill-area .mode-section,
+  .kill-area .mode-section.wide { padding: 11px; }
+}

@@ -138,14 +138,21 @@ async function searchUniversities() {
   const universityB = universityById("universityB").value;
   const requestId = ++universityState.requestId;
   const cacheKey = universityA + "\u0000" + universityB;
+  const cached = universityState.results.get(cacheKey);
   setUniversityError();
   button.disabled = true;
   button.textContent = "전적 조회 중…";
   try {
-    const cached = universityState.results.get(cacheKey);
-    if (cached && Date.now() - cached.savedAt < 3 * 60 * 1000) {
+    if (cached) {
       universityState.result = cached.data;
       renderResults(cached.data);
+      if (Date.now() - cached.savedAt < 30 * 1000) return;
+      universityById("resultStatus").textContent = "이전 결과 표시 중 · 최신 전적 확인 중…";
+      const full = await requestUniversityMatchup(universityA, universityB, false);
+      if (requestId !== universityState.requestId) return;
+      universityState.result = full;
+      universityState.results.set(cacheKey, { savedAt: Date.now(), data: full });
+      renderResults(full);
       return;
     }
     universityState.result = null;
@@ -178,7 +185,9 @@ async function searchUniversities() {
   } catch (error) {
     if (requestId === universityState.requestId) {
       setUniversityError(error.message || "대학대결 전적을 불러오지 못했습니다.");
-      universityById("resultStatus").textContent = universityState.result?.partial
+      universityById("resultStatus").textContent = cached
+        ? "최신 전적 확인에 실패했습니다. 이전 결과를 표시합니다. 다시 검색해 주세요."
+        : universityState.result?.partial
         ? "전체 전적은 표시했습니다. 최근 90일 전적을 불러오지 못했습니다. 다시 검색해 주세요."
         : "조회에 실패했습니다. 잠시 후 다시 시도해 주세요.";
     }

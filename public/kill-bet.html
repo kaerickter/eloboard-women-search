@@ -719,7 +719,8 @@
       background: var(--button-hover) !important;
     }
   </style>
-    <script defer src="./tournament-nav.js?v=20261009"></script>
+  <link rel="stylesheet" href="./kill-bet-layout.css?v=20261019">
+    <script defer src="./tournament-nav.js?v=20261016-funding"></script>
   </head>
 <body>
         <nav class="site-nav" aria-label="페이지 이동">
@@ -734,7 +735,6 @@
       <a class="site-tab" href="./match-scoreboard.html">점수계산기</a>
       <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
       <a class="site-tab cup-tab" href="./jungman-cup.html">K-중만컵</a>
-      <a class="site-tab" href="/solo/">이아깽 방송기록 🔒</a>
     </nav>
 
   <main class="page-shell">
@@ -805,7 +805,7 @@
           mode.teams.length === 4 ? "four-team-mode" : "",
         ].filter(Boolean).join(" ");
         section.setAttribute("aria-label", `${mode.label} 구성`);
-        section.innerHTML = `<div class="team-grid"></div>`;
+        section.innerHTML = `<h2 class="mode-heading"><span>${mode.label}</span><small>${mode.teams.length === 1 ? "개인 대결" : `${mode.teams.length}팀 대결`}</small></h2><div class="team-grid"></div>`;
 
         const grid = section.querySelector(".team-grid");
         mode.teams.forEach((team, teamIndex) => {
