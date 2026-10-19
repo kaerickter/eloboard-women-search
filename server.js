@@ -1,8 +1,8 @@
 ﻿const http = require("node:http");
-const soloArchive = require("./solo/integration.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const zlib = require("node:zlib");
 const { execFile } = require("node:child_process");
 const { Server: SocketIOServer } = require("socket.io");
 const { setupCollaboration } = require("./collaboration-server");
@@ -131,6 +131,12 @@ const universityPlayerStatsCache = new Map();
 const universityPlayerStatsPromises = new Map();
 const universityTargetRivalsCache = new Map();
 const universityTargetRivalsPromises = new Map();
+const playerCandidateResults = new Map();
+const playerCandidateRequests = new Map();
+const matchupResults = new Map();
+const matchupRequests = new Map();
+const universityMatchupResults = new Map();
+const universityMatchupRequests = new Map();
 let universityApiCollegesCache = null;
 let universityApiCollegesPromise = null;
 const universityApiMembersCache = new Map();
@@ -600,6 +606,32 @@ function send(res, status, body, type = "text/plain; charset=utf-8", headers = {
     ...headers
   });
   res.end(body);
+}
+
+function sendRecordJson(res, body) {
+  const type = "application/json; charset=utf-8";
+  const acceptsGzip = /(?:^|,)\s*gzip\b/i.test(String(res.req?.headers?.["accept-encoding"] || ""));
+  if (typeof body === "string" && body.length >= 4096 && acceptsGzip) {
+    return send(res, 200, zlib.gzipSync(body, { level: 1 }), type,
+      { "Content-Encoding": "gzip", Vary: "Accept-Encoding" });
+  }
+  return send(res, 200, body, type);
+}
+
+async function reuseShortResult(cache, requests, key, ttlMs, work, maxEntries = 40) {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.savedAt < ttlMs) return cached.value;
+  if (requests.has(key)) return requests.get(key);
+  const task = Promise.resolve().then(work);
+  requests.set(key, task);
+  try {
+    const value = await task;
+    cache.set(key, { savedAt: Date.now(), value });
+    if (cache.size > maxEntries) cache.delete(cache.keys().next().value);
+    return value;
+  } finally {
+    requests.delete(key);
+  }
 }
 
 let soopVoteCache = { expiresAt: 0, payload: null };
@@ -1319,6 +1351,17 @@ async function searchMenPlayerDirect(name) {
 }
 
 async function searchAllPlayerCandidates(name, force = false) {
+  if (force) {
+    playerCandidateResults.delete(normalizeName(name));
+    return searchAllPlayerCandidatesUncached(name, force);
+  }
+  return reuseShortResult(
+    playerCandidateResults, playerCandidateRequests, normalizeName(name), 60 * 1000,
+    () => searchAllPlayerCandidatesUncached(name, false), 200
+  );
+}
+
+async function searchAllPlayerCandidatesUncached(name, force = false) {
   let womenPlayers = [];
   try {
     womenPlayers = await searchPlayerCandidates(name);
@@ -3564,7 +3607,6 @@ function lanUrls(port) {
 }
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (url.pathname === "/solo" || url.pathname.startsWith("/solo/")) return soloArchive.handle(req, res);
   const isCctvOnlyPath = /^\/cctv(?:\.(?:html|css|js)|\/)/.test(url.pathname) ||
     url.pathname === "/api/cctv" ||
     url.pathname.startsWith("/api/cctv/");
@@ -3734,7 +3776,7 @@ const server = http.createServer(async (req, res) => {
           CASE WHEN source_sheet_id IS DISTINCT FROM 'eloboard-auto' THEN source_row END DESC NULLS LAST,
           id DESC
       `);
-      return send(res, 200, JSON.stringify({
+      return sendRecordJson(res, JSON.stringify({
         entries: result.rows.map((entry) => ({
           ...entry,
           tier: diaryTierLabel(entry.tier),
@@ -3742,7 +3784,7 @@ const server = http.createServer(async (req, res) => {
         })),
         total: result.rowCount,
         updatedAt: new Date().toISOString()
-      }), "application/json; charset=utf-8");
+      }));
     } catch (error) {
       console.error("Spawn diary load failed:", error.code || "UNKNOWN", error.message);
       return send(res, 503, JSON.stringify({
@@ -4324,34 +4366,44 @@ const server = http.createServer(async (req, res) => {
       const universities = tierBasedUniversities(tierPlayers);
       const allowed = new Set(universities.map((item) => item.name));
       if (!allowed.has(universityA) || !allowed.has(universityB)) return send(res, 400, JSON.stringify({ error: "지원하는 대학을 선택해 주세요." }), "application/json; charset=utf-8");
-      const [rosterA, rosterB] = await Promise.all([
-        resolveUniversityApiPlayers(tierBasedUniversityRoster(tierPlayers, universityA), universityA),
-        resolveUniversityApiPlayers(tierBasedUniversityRoster(tierPlayers, universityB), universityB)
-      ]);
-      const pairs = buildUniversityPairs(rosterA, rosterB);
-      if (pairs.length > 200) return send(res, 400, JSON.stringify({ error: "동일 티어 대결 조합이 200개를 초과합니다." }), "application/json; charset=utf-8");
-      const rows = await mapConcurrent(pairs, 4, (pair) => fetchUniversityPair(pair, summaryOnly));
-      const tierOrder = [...new Set(pairs.map((pair) => pair.tier))];
-      const tiers = tierOrder.map((tier) => {
-        const tierRows = rows.filter((row) => row.tier === tier);
-        return { tier, pairCount: tierRows.length, total: tallyRows(tierRows, "total"), recent: tallyRows(tierRows, "recent") };
-      });
-      return send(res, 200, JSON.stringify({
-        universityA,
-        universityB,
-        rosters: { a: rosterA, b: rosterB },
-        pairCount: rows.length,
-        partial: summaryOnly,
-        pendingPairs: rows.filter((row) => row.pending || row.unavailable).length,
-        total: tallyRows(rows, "total"),
-        recent: tallyRows(rows, "recent"),
-        tiers,
-        rows,
-        source: "현재 티어표",
-        updatedAt: new Date().toISOString()
-      }), "application/json; charset=utf-8");
+      const listedA = tierBasedUniversityRoster(tierPlayers, universityA);
+      const listedB = tierBasedUniversityRoster(tierPlayers, universityB);
+      const rosterVersion = JSON.stringify([listedA, listedB].map((roster) => roster.map((player) =>
+        [player.name, player.tier, player.race, player.profileUrl, player.realName])));
+      const keyRoot = universityA + "\u0000" + universityB + "\u0000" + rosterVersion;
+      const fullKey = keyRoot + "\u0000full";
+      const fullCached = universityMatchupResults.get(fullKey);
+      const cacheKey = summaryOnly && fullCached && Date.now() - fullCached.savedAt < 30 * 1000
+        ? fullKey : keyRoot + (summaryOnly ? "\u0000summary" : "\u0000full");
+      const result = await reuseShortResult(universityMatchupResults, universityMatchupRequests, cacheKey, 30 * 1000, async () => {
+        const [rosterA, rosterB] = await Promise.all([
+          resolveUniversityApiPlayers(listedA, universityA),
+          resolveUniversityApiPlayers(listedB, universityB)
+        ]);
+        const pairs = buildUniversityPairs(rosterA, rosterB);
+        if (pairs.length > 200) {
+          const error = new Error("동일 티어 대결 조합이 200개를 초과합니다.");
+          error.status = 400;
+          throw error;
+        }
+        const partial = cacheKey.endsWith("summary");
+        const rows = await mapConcurrent(pairs, 4, (pair) => fetchUniversityPair(pair, partial));
+        const tierOrder = [...new Set(pairs.map((pair) => pair.tier))];
+        const tiers = tierOrder.map((tier) => {
+          const tierRows = rows.filter((row) => row.tier === tier);
+          return { tier, pairCount: tierRows.length, total: tallyRows(tierRows, "total"), recent: tallyRows(tierRows, "recent") };
+        });
+        return {
+          universityA, universityB, rosters: { a: rosterA, b: rosterB },
+          pairCount: rows.length, partial,
+          pendingPairs: rows.filter((row) => row.pending || row.unavailable).length,
+          total: tallyRows(rows, "total"), recent: tallyRows(rows, "recent"),
+          tiers, rows, source: "현재 티어표", updatedAt: new Date().toISOString()
+        };
+      }, 12);
+      return sendRecordJson(res, JSON.stringify(result));
     } catch (error) {
-      return send(res, 502, JSON.stringify({ error: error.message || "대학대결 전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
+      return send(res, error.status || 502, JSON.stringify({ error: error.message || "대학대결 전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
   if (url.pathname === "/api/men/options" && req.method === "GET") {
@@ -4426,8 +4478,12 @@ const server = http.createServer(async (req, res) => {
         }
         pairs = mains.flatMap((main) => opponents.filter((opponent) => opponent !== main).map((opponent) => ({ main, opponent })));
       }
-      const rows = await Promise.all(pairs.map(({ main, opponent }) => fetchMatchup(main, opponent)));
-      return send(res, 200, JSON.stringify({ rows, source: "eloboard.com", updatedAt: new Date().toISOString() }), "application/json; charset=utf-8");
+      const key = JSON.stringify(pairs);
+      const result = await reuseShortResult(matchupResults, matchupRequests, key, 30 * 1000, async () => ({
+        rows: await Promise.all(pairs.map(({ main, opponent }) => fetchMatchup(main, opponent))),
+        source: "eloboard.com", updatedAt: new Date().toISOString()
+      }));
+      return sendRecordJson(res, JSON.stringify(result));
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "eloboard 전적을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." }), "application/json; charset=utf-8");
     }
@@ -4586,14 +4642,14 @@ const server = http.createServer(async (req, res) => {
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
         const result = summarize([], query);
-        return send(res, 200, JSON.stringify({
+        return sendRecordJson(res, JSON.stringify({
           ...data,
           ...result,
           players,
           profile,
           autoDiarySync,
           resultState: profile ? "found" : "empty"
-        }, null, 2), "application/json; charset=utf-8");
+        }));
       }
       // 남성전적은 별도 게시판을 사용하므로 여성 게시판을 읽지 못해도 검색을 계속합니다.
       // 선수 이름 검색은 새 API의 선수·경기 정보를 사용하므로, 폐기된 게시판 전체를 함께 읽지 않습니다.
@@ -4636,7 +4692,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
       const autoDiarySync = await syncSpawnDiaryNow(query, profile);
-      return send(res, 200, JSON.stringify({
+      return sendRecordJson(res, JSON.stringify({
         ...data,
         ...result,
           players,
@@ -4647,12 +4703,12 @@ const server = http.createServer(async (req, res) => {
             ? "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다. 자동 재시도는 하지 않습니다."
             : "",
           resultState: query ? (profile ? "found" : "empty") : "found"
-      }, null, 2), "application/json; charset=utf-8");
+      }));
     } catch (error) {
       const query = String(url.searchParams.get("name") || "").trim();
       const cachedProfile = await cachedProfileForName(query);
       if (cachedProfile) {
-        return send(res, 200, JSON.stringify({
+        return sendRecordJson(res, JSON.stringify({
           source: BOARD_URL,
           fetchedAt: new Date().toISOString(),
           pagesLoaded: 0,
@@ -4664,7 +4720,7 @@ const server = http.createServer(async (req, res) => {
           cached: true,
           cacheNotice: "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다. 자동 재시도는 하지 않습니다.",
           resultState: "found"
-        }, null, 2), "application/json; charset=utf-8");
+        }));
       }
       const message = /response error:\s*403/i.test(String(error?.message || ""))
         ? "ELOBoard가 현재 서버 전적 요청을 차단하고 있습니다. 저장된 정상 전적도 없어 표시할 수 없습니다."
