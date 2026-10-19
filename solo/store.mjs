@@ -15,6 +15,7 @@ export class Store {
     CREATE INDEX IF NOT EXISTS solo_session_date ON solo_archive.sessions(started_at);
     CREATE TABLE IF NOT EXISTS solo_archive.lease(id integer PRIMARY KEY CHECK(id=1),owner text NOT NULL,expires_at timestamptz NOT NULL);
     ALTER TABLE solo_archive.sessions ADD COLUMN IF NOT EXISTS bj_id text NOT NULL DEFAULT '2ahgo1203';
+    ALTER TABLE solo_archive.sessions ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
     ALTER TABLE solo_archive.sessions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'auto';
     CREATE TABLE IF NOT EXISTS solo_archive.target_leases(bj_id text PRIMARY KEY,owner text NOT NULL,expires_at timestamptz NOT NULL);
     CREATE TABLE IF NOT EXISTS solo_archive.manual_targets(bj_id text PRIMARY KEY,bno text NOT NULL,name text NOT NULL,active boolean NOT NULL DEFAULT true);
@@ -40,8 +41,9 @@ export class Store {
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
   async end(){await this.pool.query('UPDATE solo_archive.sessions SET ended_at=now() WHERE bj_id=$1 AND ended_at IS NULL',[this.bjId]);this.changed();}
   async record(session,kind,payload,eventKey=null){const result=await this.pool.query(`INSERT INTO solo_archive.events(session_id,at,kind,event_key,payload) SELECT $1,now(),$2,$3,$4 WHERE EXISTS(SELECT 1 FROM solo_archive.lease WHERE $6='2ahgo1203' AND id=1 AND owner=$5 AND expires_at>now() UNION ALL SELECT 1 FROM solo_archive.target_leases WHERE bj_id=$6 AND owner=$5 AND expires_at>now()) ON CONFLICT(event_key) DO NOTHING`,[session.id,kind,eventKey,JSON.stringify(payload),this.owner,this.bjId]);if(result.rowCount){this.changed();return true;}if(eventKey&&(await this.pool.query('SELECT 1 FROM solo_archive.events WHERE event_key=$1',[eventKey])).rowCount)return false;throw Error('수집기 저장 잠금 만료');}
+  async deleteSession(id){const result=await this.pool.query('UPDATE solo_archive.sessions SET deleted_at=now() WHERE id=$1 AND deleted_at IS NULL RETURNING id',[id]);if(result.rowCount){this.cache.delete(id);this.changed();}return result.rowCount>0;}
   async report(from='',to='',id=''){
-    const sessions=(await this.pool.query(`SELECT s.*,COALESCE((SELECT MAX(e.id) FROM solo_archive.events e WHERE e.session_id=s.id),0)::text AS version FROM solo_archive.sessions s WHERE ($1='' OR (started_at AT TIME ZONE 'Asia/Seoul')::date >= NULLIF($1,'')::date) AND ($2='' OR (started_at AT TIME ZONE 'Asia/Seoul')::date <= NULLIF($2,'')::date) AND ($3='' OR s.id=$3) ORDER BY started_at DESC`,[from,to,id])).rows;
+    const sessions=(await this.pool.query(`SELECT s.*,COALESCE((SELECT MAX(e.id) FROM solo_archive.events e WHERE e.session_id=s.id),0)::text AS version FROM solo_archive.sessions s WHERE s.deleted_at IS NULL AND ($1='' OR (started_at AT TIME ZONE 'Asia/Seoul')::date >= NULLIF($1,'')::date) AND ($2='' OR (started_at AT TIME ZONE 'Asia/Seoul')::date <= NULLIF($2,'')::date) AND ($3='' OR s.id=$3) ORDER BY started_at DESC`,[from,to,id])).rows;
     const reports=[];
     for(const s of sessions){const bjId=s.bj_id;let r=this.cache.get(s.id);if(!r||r.version!==s.version){
       const rows=(await this.pool.query('SELECT * FROM solo_archive.events WHERE session_id=$1 ORDER BY id',[s.id])).rows;

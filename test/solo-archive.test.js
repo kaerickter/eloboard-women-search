@@ -25,7 +25,7 @@ test('무료 사용량: 단위 정규화, 일간 평균과 예측, 한도 임박
 });
 test('후원기록실 비밀번호 보호, 로그인, API, 304 응답, 로그아웃',async()=>{
   const {createApp}=await load('web.mjs');
-  let reads=0;const store={revision:1,init:async()=>true,report:async()=>{reads++;return{sessions:[],donors:[],totals:{total:0}};},export:async()=>({events:[]})};
+  let reads=0,deleted=[];const store={revision:1,deleteSession:async id=>{deleted.push(id);store.revision++;return id==='stored-session';},init:async()=>true,report:async()=>{reads++;return{sessions:[],donors:[],totals:{total:0}};},export:async()=>({events:[]})};
   const collector={runtime:{status:'waiting'},status(){},check(){},enable:async value=>{collector.enabled=value;},close:async()=>{}};
   const app=await createApp({store,collector,password:'test-password-only'}),server=http.createServer(app.handle);server.listen(0,'127.0.0.1');await once(server,'listening');
   const base='http://127.0.0.1:'+server.address().port;
@@ -40,6 +40,13 @@ test('후원기록실 비밀번호 보호, 로그인, API, 304 응답, 로그아
     assert.equal((await fetch(base+'/solo/api/report',{headers:{cookie,'if-none-match':etag}})).status,304);assert.equal(reads,1);
     assert.equal((await post('api/monitor',{enabled:false},cookie,'https://evil.example')).status,403);
     assert.equal((await post('api/monitor',{enabled:false},cookie)).status,200);assert.equal(collector.enabled,false);
+    assert.equal((await post('api/session/delete',{id:'stored-session',confirm:true})).status,401);
+    assert.equal((await post('api/session/delete',{id:'stored-session',confirm:true},cookie,'https://evil.example')).status,403);
+    assert.equal((await post('api/session/delete',{id:'stored-session'},cookie)).status,400);
+    collector.enabled=true;collector.runtime.sessionId='stored-session';assert.equal((await post('api/session/delete',{id:'stored-session',confirm:true},cookie)).status,409);assert.deepEqual(deleted,[]);
+    collector.enabled=false;assert.equal((await post('api/session/delete',{id:'stored-session',confirm:true},cookie)).status,200);assert.deepEqual(deleted,['stored-session']);
+    assert.equal((await fetch(base+'/solo/api/report',{headers:{cookie,'if-none-match':etag}})).status,304);assert.equal(reads,2);
+    assert.equal((await post('api/session/delete',{id:'missing',confirm:true},cookie)).status,404);
     assert.equal((await post('logout',{},cookie)).status,200);
     assert.equal((await fetch(base+'/solo/healthz')).status,204);
   }finally{await new Promise(r=>server.close(r));}
