@@ -1,9 +1,24 @@
 /* 킬 내기 점수판 전용 레이아웃. 점수/저장/동기화 동작에는 영향을 주지 않습니다. */
+body:has(.kill-area) {
+  background: radial-gradient(circle at 50% 8%, #fff 0, transparent 36%), linear-gradient(135deg, #f3f1ff, #e4e0fb);
+}
+.kill-area {
+  --panel: #fff;
+  --panel-edge: #a49af0;
+  --ink: #24204b;
+  --name: #38306c;
+  --score: #605ac6;
+  --fail: #bd476a;
+  --button: #ece9ff;
+  --button-edge: #8a81dc;
+  --button-hover: #dcd6ff;
+}
 .kill-area .board {
-  width: min(100%, 1760px);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
+  width: min(100%, 1880px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 22px;
 }
 .kill-area .mode-section,
 .kill-area .mode-section.wide,
@@ -18,22 +33,11 @@
   transform: none;
   padding: 18px;
   overflow: hidden;
-  border: 1px solid #303e54;
+  border: 1px solid #bab2f0;
   border-radius: 18px;
-  background: linear-gradient(145deg, #172336, #101a2a);
-  box-shadow: 0 18px 42px rgba(13, 23, 40, .22);
+  background: linear-gradient(145deg, #fbfaff, #eeeaff);
+  box-shadow: 0 14px 32px rgba(65, 51, 145, .13);
 }
-.kill-area .mode-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin: 0 0 14px;
-  color: #f6dd9a;
-  font-size: 24px;
-  font-weight: 900;
-  letter-spacing: -.02em;
-}
-.kill-area .mode-heading small { color: #a9bad0; font-size: 14px; font-weight: 700; }
 .kill-area .mode-section .team-grid,
 .kill-area .one-team-mode .team-grid,
 .kill-area .two-team-mode .team-grid,
@@ -65,97 +69,97 @@
 .kill-area .mode-section .team-column {
   gap: 0;
   overflow: hidden;
-  border: 1px solid #6e552c;
+  border: 1px solid #aaa0e7;
   border-radius: 12px;
-  background: #142033;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
+  background: #fff;
+  box-shadow: 0 9px 21px rgba(74, 60, 153, .12);
 }
 .kill-area .mode-section .team-label {
-  min-height: 55px;
-  padding: 8px 12px;
+  min-height: 60px;
+  padding: 9px 13px;
   border: 0;
-  border-bottom: 1px solid #54482f;
+  border-bottom: 1px solid #aaa0e7;
   border-radius: 0;
-  background: linear-gradient(90deg, #735321, #4b3a24 46%, #263247);
+  background: linear-gradient(105deg, #605ac6, #827cf8);
   box-shadow: none;
 }
 .kill-area .mode-section .team-label-input {
   border: 0;
-  color: #fff1cc;
-  font-size: 22px;
+  color: #fff;
+  font-size: 24px;
   font-weight: 900;
   text-align: left;
 }
-.kill-area .mode-section .team-label-input:focus { outline: 2px solid #ffd678; outline-offset: 1px; }
+.kill-area .mode-section .team-label-input:focus { outline: 2px solid #fff; outline-offset: 1px; }
 .kill-area .mode-section .team-time {
-  border: 1px solid #cfa85e;
-  background: #18283d;
-  color: #ffdf9a;
+  border: 1px solid #d7d1ff;
+  background: #f8f6ff;
+  color: #463b9f;
   box-shadow: none;
 }
 .kill-area .mode-section .score-panel {
-  padding: 10px 12px 13px;
+  padding: 12px 14px 15px;
   border: 0;
   border-radius: 0;
-  background: #142033;
+  background: #fff;
   box-shadow: none;
 }
 .kill-area .mode-section .title-row {
-  min-height: 40px;
-  margin-bottom: 7px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid #314056;
+  min-height: 44px;
+  margin-bottom: 9px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #ddd9f6;
 }
-.kill-area .mode-section .total-count { color: #ffdb83; font-size: 25px; }
+.kill-area .mode-section .total-count { color: #514ab7; font-size: 27px; }
 .kill-area .mode-section .panel-chicken-field {
   margin-right: 0;
-  border-color: #516076;
-  background: #22334b;
-  color: #ffe1a7;
+  border-color: #b4aaf0;
+  background: #f7f5ff;
+  color: #514ab7;
 }
-.kill-area .mode-section .panel-chicken-input { color: #ffe1a7; }
+.kill-area .mode-section .panel-chicken-input { color: #514ab7; }
 .kill-area .mode-section .rows { gap: 2px; }
 .kill-area .mode-section .counter-row,
 .kill-area .one-team-mode .counter-row,
 .kill-area .two-team-mode .counter-row,
 .kill-area .three-team-mode .counter-row,
 .kill-area .four-team-mode .counter-row {
-  grid-template-columns: minmax(0, 1fr) 58px 31px 31px 44px 44px;
+  grid-template-columns: minmax(0, 1fr) 62px 38px 38px 52px 52px;
   justify-content: stretch;
-  min-height: 44px;
-  gap: 4px;
-  padding: 3px 2px;
-  border-bottom: 1px solid rgba(157, 177, 203, .16);
+  min-height: 48px;
+  gap: 5px;
+  padding: 4px 2px;
+  border-bottom: 1px solid #eeeaf9;
 }
 .kill-area .mode-section .counter-row:last-child { border-bottom: 0; }
-.kill-area .mode-section .counter-row:nth-child(even) { background: rgba(255, 255, 255, .035); }
+.kill-area .mode-section .counter-row:nth-child(even) { background: #faf9ff; }
 .kill-area .mode-section .name-input {
   width: 100%;
   min-width: 0;
-  border-bottom-color: #5c6d85;
-  color: #f1f5fd;
+  border-bottom-color: #c8c0f0;
+  color: #24204b;
   font-family: Arial, "Malgun Gothic", sans-serif;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 800;
 }
-.kill-area .mode-section .name-input::placeholder { color: #71829a; }
-.kill-area .mode-section .count { color: #ffdc82; font-size: 18px; font-variant-numeric: tabular-nums; }
+.kill-area .mode-section .name-input::placeholder { color: #938bb9; }
+.kill-area .mode-section .count { color: #514ab7; font-size: 20px; font-variant-numeric: tabular-nums; }
 .kill-area .score-panel .reset-button,
 .kill-area .score-panel .step-button,
 .kill-area .score-panel .fail-button,
 .kill-area .score-panel .cancel-button {
-  border-color: #6a7690 !important;
-  background: #283a54 !important;
-  color: #f5f6fd !important;
+  border-color: #aba2e9 !important;
+  background: #eeeaff !important;
+  color: #403691 !important;
   box-shadow: none !important;
 }
 .kill-area .score-panel .step-button:hover,
 .kill-area .score-panel .reset-button:hover,
 .kill-area .score-panel .fail-button:hover,
-.kill-area .score-panel .cancel-button:hover:not(:disabled) { background: #385370 !important; }
-.kill-area .score-panel .fail-button { color: #ffc7c4 !important; }
-.kill-area .score-panel .fail-button.has-fails { border-color: #e06a72 !important; background: #623c4e !important; }
-.kill-area .score-panel .cancel-button { color: #cbdaf0 !important; }
+.kill-area .score-panel .cancel-button:hover:not(:disabled) { background: #dcd6ff !important; }
+.kill-area .score-panel .fail-button { color: #a63762 !important; }
+.kill-area .score-panel .fail-button.has-fails { border-color: #d96490 !important; background: #ffe4ef !important; }
+.kill-area .score-panel .cancel-button { color: #605a96 !important; }
 @media (max-width: 1350px) {
   .kill-area .mode-section.one-team-mode { width: calc(50% + 12px); }
   .kill-area .mode-section.two-team-mode,

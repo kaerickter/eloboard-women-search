@@ -719,7 +719,7 @@
       background: var(--button-hover) !important;
     }
   </style>
-  <link rel="stylesheet" href="./kill-bet-layout.css?v=20261019-team-width">
+  <link rel="stylesheet" href="./kill-bet-layout.css?v=20261019-newcastle-layout">
     <script defer src="./tournament-nav.js?v=20261016-funding"></script>
   </head>
 <body>
@@ -805,7 +805,7 @@
           mode.teams.length === 4 ? "four-team-mode" : "",
         ].filter(Boolean).join(" ");
         section.setAttribute("aria-label", `${mode.label} 구성`);
-        section.innerHTML = `<h2 class="mode-heading"><span>${mode.label}</span><small>${mode.teams.length === 1 ? "개인 대결" : `${mode.teams.length}팀 대결`}</small></h2><div class="team-grid"></div>`;
+        section.innerHTML = '<div class="team-grid"></div>';
 
         const grid = section.querySelector(".team-grid");
         mode.teams.forEach((team, teamIndex) => {
