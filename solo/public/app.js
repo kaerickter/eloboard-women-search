@@ -3,7 +3,7 @@ for(const name of ['usage','manual'])$('toggle-'+name).addEventListener('click',
 const PREVIEW=new URLSearchParams(location.search).get('preview')==='1';
 const date=at=>at?new Date(at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let token='',selected='',busy=false,lastRender='',lastStatus=null;
+let token='',selected='',busy=false,lastRender='',lastStatus=null,donorRows=[],sortKey='total',sortDirection=-1;
 const koreanDay=ms=>new Date(ms+9*3600000).toISOString().slice(0,10);
 $('from').value=PREVIEW?'2026-10-17':koreanDay(Date.now()-89*86400000);$('to').value=PREVIEW?'2026-10-18':koreanDay(Date.now());
 function fail(e){$('error').hidden=false;$('error').textContent=e.message||String(e);}
@@ -38,11 +38,17 @@ function render(r){
   const feed=r.sessions.flatMap(s=>s.recent.map(g=>({...g,broadcastName:s.name}))).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,35);
   $('feed').className='list'+(feed.length?'':' empty');
   $('feed').innerHTML=feed.length?feed.map(g=>`<div class="record"><div class="content"><strong>${esc(g.donor||g.user_nick||g.title||(g.kind==='battle-settle'?'대결미션 획득':'도전미션'))}</strong><p>${date(g.at)} · ${{regular:'일반 별풍선',battle:'대결미션 후원','battle-settle':'대결미션 획득',challenge:'도전미션'}[g.kind]}${g.type==='CHALLENGE_SETTLE'?' 정산':''}</p></div><b class="amount">${fmt(g.count||g.gift_count||g.settle_count)}</b></div>`).join(''):'새로운 후원을 기다리고 있습니다.';
-  $('donors').innerHTML=r.donors.length?r.donors.map((d,i)=>`<tr><td class="rank">${i+1}</td><td>${esc(d.donor)}<div class="muted">${esc(d.donorId)}</div></td><td>${fmt(d.total)}</td><td>${fmt(d.regularTotal)}</td><td>${fmt(d.missionTotal)}</td><td>${fmt(d.battleTotal)}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#9ba5b7">후원 수신 후 순위가 표시됩니다.</td></tr>';
+  donorRows=r.donors;renderDonors();
   const missions=r.sessions.flatMap(s=>[...s.missions.map(m=>({...m,kind:'challenge'})),...(s.battleSettlements||[]).map(g=>({...g,title:g.title||'대결미션 획득',kind:'battle-settle'})),...s.battleGifts.map(g=>({...g,title:'대결미션 #'+g.missionId,kind:'battle'}))]);
   $('mission-list').className=missions.length?'':'empty';
   $('mission-list').innerHTML=missions.length?missions.map(m=>`<div class="record"><div class="content"><strong>${esc(m.title||'도전미션 #'+m.missionId)}</strong><p>${m.kind==='battle'?'대결미션 후원 · '+esc(m.donor):m.kind==='battle-settle'?'스트리머 실제 획득 · 정산 반영':'도전미션 · '+esc(({pending:'미정산',success:'성공 · 정산 대기',failed:'실패',cancelled:'취소',settled:'정산 완료',unknown:'상태 확인 필요'})[m.status])}${m.kind==='challenge'?' · 참여 '+fmt(m.contributions.reduce((s,c)=>s+c.count,0))+'개':''}</p></div><span class="amount">${fmt(m.kind==='battle'||m.kind==='battle-settle'?m.count:m.settled)}개</span></div>`).join(''):'아직 수신한 미션이 없습니다.';
 }
+function sortedDonors(rows){return rows.slice().sort((a,b)=>sortDirection*((Number(a[sortKey])||0)-(Number(b[sortKey])||0))||String(a.donorId||a.donor).localeCompare(String(b.donorId||b.donor),'ko'));}
+function renderDonors(){const rows=sortedDonors(donorRows);
+  $('donors').innerHTML=rows.length?rows.map((d,i)=>`<tr><td class="rank">${i+1}</td><td>${esc(d.donor)}<div class="muted">${esc(d.donorId)}</div></td><td>${fmt(d.total)}</td><td>${fmt(d.regularTotal)}</td><td>${fmt(d.missionTotal)}</td><td>${fmt(d.battleTotal)}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#9ba5b7">후원 수신 후 순위가 표시됩니다.</td></tr>';
+  for(const button of document.querySelectorAll('[data-sort]')){const active=button.dataset.sort===sortKey;button.closest('th').setAttribute('aria-sort',active?(sortDirection===-1?'descending':'ascending'):'none');button.textContent=button.dataset.label+(active?(sortDirection===-1?' ▼':' ▲'):' ↕');}
+}
+$('ranking').addEventListener('click',e=>{const b=e.target.closest('[data-sort]');if(!b)return;sortDirection=sortKey===b.dataset.sort?-sortDirection:-1;sortKey=b.dataset.sort;renderDonors();});
 async function action(fn){try{await fn();lastRender='';await refresh();}catch(e){fail(e);}}
 $('register').onclick=()=>action(()=>api('/api/target',{method:'POST',body:JSON.stringify({bjId:'2ahgo1203'})}));
 $('monitor').onclick=()=>action(()=>api('/api/monitor',{method:'POST',body:JSON.stringify({enabled:!lastStatus?.config.enabled})}));
@@ -52,7 +58,8 @@ function confirmDelete(title){return new Promise(resolve=>{const dialog=$('delet
 $('sessions').onclick=async e=>{const button=e.target.closest('[data-delete-session]');if(button){if(PREVIEW||button.disabled)return;const id=button.dataset.deleteSession,title=button.closest('.record').querySelector('strong').textContent;if(!await confirmDelete(title))return;button.disabled=true;action(async()=>{try{await api('/api/session/delete',{method:'POST',body:JSON.stringify({id,confirm:true})});selected='';reportEtag='';reportCache=null;reportQuery='';}finally{button.disabled=false;}});return;}const id=e.target.closest('[data-session]')?.dataset.session;if(id){selected=id;lastRender='';refresh();}};
 $('access').onclick=async()=>{await api('/logout',{method:'POST',body:'{}'});location.reload();};
 async function download(url,name){const response=await api(url),blob=await response.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-$('export').onclick=()=>action(()=>download('/api/export?'+query(),'starwave-records.json'));
+function textExport(payload){const r=payload.report,clean=v=>String(v??'').replace(/[\t\r\n]+/g,' '),lines=['이아깽 방송기록','조회 기간: '+$('from').value+' ~ '+$('to').value,'정산 반영 합계: '+fmt(r.totals.total)+'개','일반: '+fmt(r.totals.regularTotal)+'개 / 도전 정산: '+fmt(r.totals.missionTotal)+'개 / 대결 획득: '+fmt(r.totals.battleEarnedTotal)+'개','대결 후원(정산 합계 제외): '+fmt(r.totals.battleTotal)+'개','','[방송 회차]'];for(const x of r.sessions)lines.push([clean(x.title),clean(x.name),date(x.startedAt),'방송번호 '+x.bno,fmt(x.total)+'개'].join(' | '));lines.push('','[후원자 순위]','순위\t후원자\t아이디\t합계\t일반\t도전 정산\t대결 후원');sortedDonors(r.donors).forEach((d,i)=>lines.push([i+1,clean(d.donor),clean(d.donorId),d.total||0,d.regularTotal||0,d.missionTotal||0,d.battleTotal||0].join('\t')));lines.push('','※ 대결 획득은 스트리머 정산액이며 후원자별로 임의 배분하지 않습니다.','','[수신 기록]');for(const e of payload.events||[]){const p=e.payload||{};lines.push([date(e.at),clean(({regular:'일반',battle:'대결 후원','battle-settle':'대결 획득',challenge:'도전미션'})[e.kind]||e.kind),clean(p.type),clean(p.donor||p.user_nick||p.donorId||p.user_id),clean(p.title),p.settle_count??p.count??p.gift_count??'',clean(p.mission_status),clean(p.key)].join(' | '));}return lines.join('\r\n');}
+$('export').onclick=()=>action(async()=>{const payload=await(await api('/api/export?'+query())).json(),session=selected&&payload.report.sessions.find(x=>x.id===selected),day=session?koreanDay(Date.parse(session.startedAt)):($('from').value===$('to').value?$('from').value:$('from').value+'_'+$('to').value),blob=new Blob(['\uFEFF'+textExport(payload)],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=day+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
 $('backup').onclick=()=>action(()=>download('/api/backup','starwave-all-records.json'));
 setTimeout(refresh,0);setInterval(()=>{if(!document.hidden&&!PREVIEW)refresh();},5000);
 
