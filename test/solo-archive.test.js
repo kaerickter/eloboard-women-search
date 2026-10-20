@@ -11,7 +11,7 @@ test('합방 주소 검증과 지난 방송 거부, 예시 데이터의 분리 �
   const lookup=async()=>({BNO:124,BJNICK:'합방진행자'});
   await assert.rejects(resolveManual('https://play.sooplive.co.kr/guest_bj/123',lookup),/다른 방송 번호/);
   assert.equal((await resolveManual('https://play.sooplive.co.kr/guest_bj/124',lookup)).bno,'124');
-  const {previewReport}=await load('sample.mjs'),r=previewReport();assert.equal(r.totals.total,4700);assert.equal(r.totals.battleTotal,500);assert.equal(r.totals.missionTotal,1200);assert.equal(r.sessions.filter(s=>s.source==='manual').length,1);assert.equal(r.donors.reduce((s,d)=>s+d.total,0),4700);
+  const {previewReport}=await load('sample.mjs'),r=previewReport();assert.equal(r.totals.total,6877);assert.equal(r.totals.battleEarnedTotal,2177);assert.equal(r.totals.battleTotal,500);assert.equal(r.totals.missionTotal,1200);assert.equal(r.sessions.filter(s=>s.source==='manual').length,1);assert.equal(r.donors.reduce((s,d)=>s+d.total,0),4700);
 });
 test('무료 사용량: 단위 정규화, 일간 평균과 예측, 한도 임박 시 수집 정지 콜백',async()=>{
   const {normalizeBandwidth,forecastUsage,UsageMonitor}=await load('usage.mjs');const now=Date.parse('2026-10-19T03:00:00Z');
@@ -66,9 +66,12 @@ test('수집기: 오프라인 대기 → 채팅 입장 → 세 종류 후원과 
     live=true;await wait(()=>c.runtime.status==='connected');peer.send(protocol.makePacket(18,['','donor','후원자','10']));
     const e={type:'CHALLENGE_GIFT',uuid:'a',key:'2',bj_id:'2ahgo1203',is_relay:false,user_id:'donor',user_nick:'후원자',gift_count:30};
     const send=e=>peer.send(protocol.makePacket(121,[JSON.stringify(e)]));send(e);send(e);send({...e,type:'CHALLENGE_SETTLE',uuid:'b',settle_count:30});send({...e,type:'GIFT',uuid:'c',image:'mission_gift_1',gift_count:20});
-    await wait(()=>rows.length===4);assert.deepEqual(rows.map(r=>r.kind),['regular','challenge','challenge','battle']);assert.equal(rows[0].p.count,10);assert.ok(c.runtime.lastEventAt);assert.ok(!JSON.stringify(rows).includes('secret'));
+    const settled={type:'SETTLE',bj_id:'2ahgo1203',uuid:'battle-paid',key:'2',settle_count:2177};send(settled);send(settled);send({...settled,bj_id:'other',uuid:'foreign'});
+    await wait(()=>rows.length===5);assert.deepEqual(rows.map(r=>r.kind),['regular','challenge','challenge','battle','battle-settle']);assert.equal(rows[4].p.settle_count,2177);assert.equal(rows[0].p.count,10);assert.ok(c.runtime.lastEventAt);assert.ok(!JSON.stringify(rows).includes('secret'));
     await c.enable(false);assert.equal(c.runtime.status,'paused');
     let ended=0;const guestRows=[];const guest=new Collector({...store,record:async(s,k,p)=>{guestRows.push({k,p});return true;}},{bjId:'guest_bj',bno:100,onEnd:async()=>ended++});
     try{await guest.enable(true);await wait(()=>guest.runtime.status==='connected');send({...e,bj_id:'guest_bj',uuid:'guest-mission'});await wait(()=>guestRows.length===1);assert.equal(guestRows[0].p.bj_id,'guest_bj');live=false;peer.close();await wait(()=>guest.runtime.status==='completed');assert.equal(guest.enabled,false);assert.equal(ended,1);}finally{await guest.close();}
   }finally{await c.close();for(const client of wss.clients)client.terminate();await new Promise(r=>wss.close(r));await new Promise(r=>mock.close(r));for(const k of Object.keys(process.env))if(!(k in previous))delete process.env[k];Object.assign(process.env,previous);}
 });
+
+test('대결 후원과 실제 획득 분리, 중복·다른 방송·잘못된 정산 거부',async()=>{const {applyBattle}=await load('battle-accounting.mjs'),{accountingView}=await load('mission-accounting.mjs');const state={broadcasts:[{bjId:'a',total:10,events:1}],donors:{a:{}},missions:{},gifts:[]};const e={type:'SETTLE',uuid:'paid',key:'1',bj_id:'a',settle_count:2177};assert.equal(applyBattle(state,'a',e),true);assert.equal(applyBattle(state,'a',e),false);for(const bad of [{...e,uuid:'bad',bj_id:'b'},{...e,uuid:'bad',settle_count:-1},{...e,uuid:'bad',is_relay:true}])assert.equal(applyBattle(state,'a',bad),false);const v=accountingView(state);assert.equal(v.broadcasts[0].total,2187);assert.equal(v.broadcasts[0].battleEarnedTotal,2177);assert.equal(v.broadcasts[0].battleTotal,0);assert.equal(Object.keys(v.donors.a).length,0);});

@@ -1,5 +1,6 @@
 // SOOP code 121 GIFT / mission_gift_* is distinct from CHALLENGE_GIFT.
 export function applyBattle(state, bjId, event, at = new Date().toISOString()) {
+  if(event?.type==='SETTLE'){if(!state.broadcasts.some(b=>b.bjId===bjId)||event.is_relay===true||(event.bj_id&&event.bj_id!==bjId)||!Number.isSafeInteger(event.settle_count)||event.settle_count<=0||(!event.uuid&&!/^\d+$/.test(String(event.key))))return false;state.battleSettlements||={};const key=bjId+':'+(event.uuid||('mission:'+event.key));if(state.battleSettlements[key])return false;state.battleSettlements[key]={key,bjId,missionId:String(event.key||''),count:event.settle_count,title:String(event.title||''),at};return true;}
   if (!state.broadcasts.some(b => b.bjId === bjId) || !event || event.type !== 'GIFT' || event.is_relay !== false || event.bj_id !== bjId || !/^mission_gift_\d+$/.test(event.image || '')) return false;
   if (!event.uuid || !/^\d+$/.test(String(event.key)) || !event.user_id || !Number.isSafeInteger(event.gift_count) || event.gift_count <= 0) return false;
   state.battleGifts ||= {};
@@ -20,7 +21,8 @@ export function battleView(state) {
       d.battleTotal += g.count;
       if (g.manual) { d.manualBattle = true; d.events++; }
     }
-    return { ...b, battleTotal: gifts.reduce((sum, g) => sum + g.count, 0) };
+    const battleEarnedTotal=Object.values(state.battleSettlements||{}).filter(x=>x.bjId===b.bjId).reduce((sum,x)=>sum+x.count,0);
+    return { ...b, total:b.total+battleEarnedTotal,battleEarnedTotal, battleTotal: gifts.reduce((sum, g) => sum + g.count, 0) };
   });
   // Never mix battle pledges into ordinary/challenge settled totals or effects.
   return { ...state, broadcasts, donors };

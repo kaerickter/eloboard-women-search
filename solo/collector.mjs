@@ -24,12 +24,13 @@ export class Collector {
         this.queue=this.queue.then(async()=>{
           let kind,payload,key=null;
           if([18,33,105].includes(p.serviceCode)){const offset=p.serviceCode===105?1:0,count=Number(p.fields[3+offset]);if(!Number.isSafeInteger(count)||count<=0)return;kind='regular';payload={donorId:String(p.fields[1+offset]||''),donor:String(p.fields[2+offset]||p.fields[1+offset]||'익명'),count,serviceCode:p.serviceCode};}
-          else if(p.serviceCode===121){let e;try{e=JSON.parse(p.fields[0]);}catch{return;}if(e.is_relay===true||(e.bj_id&&e.bj_id!==this.bjId)||!e.uuid||!/^\d+$/.test(String(e.key)))return;
+          else if(p.serviceCode===121){let e;try{e=JSON.parse(p.fields[0]);}catch{return;}if(e.is_relay===true||(e.bj_id&&e.bj_id!==this.bjId))return;
+            const earned=e.type==='SETTLE';if(earned){if((!e.uuid&&!/^\d+$/.test(String(e.key)))||!Number.isSafeInteger(e.settle_count)||e.settle_count<=0)return;}else if(!e.uuid||!/^\d+$/.test(String(e.key)))return;
             const battle=e.type==='GIFT'&&e.is_relay===false&&e.bj_id===this.bjId&&/^mission_gift_\d+$/.test(e.image||'');
-            if(!battle&&!['CHALLENGE_GIFT','CHALLENGE_NOTICE','CHALLENGE_SETTLE'].includes(e.type))return;
+            if(!earned&&!battle&&!['CHALLENGE_GIFT','CHALLENGE_NOTICE','CHALLENGE_SETTLE'].includes(e.type))return;
             if((battle||e.type==='CHALLENGE_GIFT')&&(!Number.isSafeInteger(e.gift_count)||e.gift_count<=0))return;
             if(e.type==='CHALLENGE_SETTLE'&&(!Number.isSafeInteger(e.settle_count)||e.settle_count<=0))return;
-            payload=Object.fromEntries(['type','uuid','key','bj_id','is_relay','image','user_id','user_nick','gift_count','settle_count','title','mission_status'].filter(k=>e[k]!==undefined).map(k=>[k,e[k]]));kind=battle?'battle':'challenge';key=this.bjId+':'+e.uuid;
+            payload=Object.fromEntries(['type','uuid','key','bj_id','is_relay','image','user_id','user_nick','gift_count','settle_count','title','mission_status'].filter(k=>e[k]!==undefined).map(k=>[k,e[k]]));kind=earned?'battle-settle':battle?'battle':'challenge';key=earned?this.bjId+':battle-settle:'+(e.uuid||('mission:'+e.key)):this.bjId+':'+e.uuid;
           }else return;
           let retries=0;
           for(;;){try{if(await this.store.record(session,kind,payload,key))this.runtime.lastEventAt=new Date().toISOString();break;}catch(e){this.status('error','DB 저장 재시도 중: '+e.message);ws.terminate();await new Promise(r=>setTimeout(r,Math.min(30000,1000*2**Math.min(retries++,5))));await this.store.lease().catch(()=>{});}}
