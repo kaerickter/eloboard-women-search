@@ -3,6 +3,7 @@ const DEFAULT_NAME = "\uc774\uc544\uae7d";
 // 새 ELOBoard 선수 ID: 이아깽(기존 wr_id 780 → 현재 선수 ID 627)
 const DEFAULT_WR_ID = "627";
 const SEARCH_SESSION_KEY = "record-search-session-v2";
+const SEARCH_PERSISTENT_KEY = "record-search-iakkang-result-v1";
 const state = {
   query: "",
   data: null,
@@ -15,36 +16,55 @@ const state = {
 function saveSearchSession() {
   if (!state.data) return;
   try {
-    sessionStorage.setItem(SEARCH_SESSION_KEY, JSON.stringify({
+    const saved = JSON.stringify({
       name: $("nameInput").value,
       data: state.data,
       selectedYear: state.selectedYear,
       selectedMonth: state.selectedMonth
-    }));
+    });
+    sessionStorage.setItem(SEARCH_SESSION_KEY, saved);
+    if (cleanName($("nameInput").value) === cleanName(DEFAULT_NAME) &&
+        String(state.data.profile?.wrId || "") === DEFAULT_WR_ID &&
+        saved.length < 3 * 1024 * 1024) {
+      localStorage.setItem(SEARCH_PERSISTENT_KEY, saved);
+    }
   } catch {
     // 저장 공간이 부족한 경우 검색 기능은 그대로 사용합니다.
   }
 }
 
 function restoreSearchSession() {
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(SEARCH_SESSION_KEY) || "null");
-    if (!saved || typeof saved !== "object") return false;
-    validateSearchResponse(saved.data);
-    $("nameInput").value = String(saved.name || DEFAULT_NAME);
-    state.query = $("nameInput").value.trim();
-    state.data = saved.data;
-    state.selectedYear = String(saved.selectedYear || "");
-    state.selectedMonth = String(saved.selectedMonth || "");
-    render(saved.data);
-    const savedName = String(saved.name || DEFAULT_NAME).trim();
-    setSearchState("success", "이전 검색 결과를 표시한 뒤 최신 전적을 확인합니다.");
-    // 검색했던 선수가 누구든 오래된 브라우저 저장본에 머물지 않도록 최신 API 결과로 교체합니다.
-    if (savedName) setTimeout(() => { load(savedName, true, true).catch(() => {}); }, 0);
-    return true;
-  } catch {
-    return false;
+  for (const storage of [sessionStorage, localStorage]) {
+    try {
+      const saved = JSON.parse(storage.getItem(storage === sessionStorage ? SEARCH_SESSION_KEY : SEARCH_PERSISTENT_KEY) || "null");
+      if (!saved || typeof saved !== "object") continue;
+      validateSearchResponse(saved.data);
+      $("nameInput").value = String(saved.name || DEFAULT_NAME);
+      state.query = $("nameInput").value.trim();
+      state.data = saved.data;
+      state.selectedYear = String(saved.selectedYear || "");
+      state.selectedMonth = String(saved.selectedMonth || "");
+      render(saved.data);
+      const savedName = String(saved.name || DEFAULT_NAME).trim();
+      setSearchState("success", "저장된 전적을 먼저 표시했습니다. 최신 전적을 확인하는 중입니다.");
+      // 자동 확인은 서버의 짧은 캐시를 재사용하고, 강제 갱신은 새로고침 버튼에서만 실행합니다.
+      const previewRequestId = state.requestId;
+      if (savedName) setTimeout(() => {
+        if (state.requestId === previewRequestId && $("nameInput").value.trim() === savedName) {
+          load(savedName, false, true).catch(showBackgroundRefreshError);
+        }
+      }, 0);
+      return true;
+    } catch {
+      // 손상된 저장본은 건너뛰고 다른 저장소 또는 서버 결과를 사용합니다.
+    }
   }
+  return false;
+}
+
+function showBackgroundRefreshError(error) {
+  if (error?.name === "AbortError") return;
+  if (state.data) setSearchState("error", "저장된 전적을 표시 중입니다. 최신 전적 확인에 실패했습니다. 새로고침을 눌러 다시 시도해 주세요.");
 }
 
 const TXT = {
@@ -591,16 +611,19 @@ function renderProfileSourceStats(profile) {
   collegeRoot.innerHTML = renderRecords(collegeRecords);
 }
 
+let matchupPanelGeneration = 0;
 function renderIakkangMatchupPanel(profile) {
   const panel = $("iakkangMatchupPanel");
   const input = $("iakkangOpponentInput");
   const result = $("iakkangMatchupResult");
   const title = $("iakkangMatchupTitle");
   if (!panel || !input || !result) return;
+  const generation = ++matchupPanelGeneration;
   panel.hidden = !profile?.wrId;
   if (!profile?.wrId) return;
   if (title) title.textContent = profile.name + " 상대전적";
   let requestId = 0;
+  let debounceTimer;
   const render = async () => {
     const query = cleanName(input.value);
     if (!query) {
@@ -611,7 +634,7 @@ function renderIakkangMatchupPanel(profile) {
     result.innerHTML = '상대전적을 불러오는 중입니다.';
     try {
       const payload = await requestJson('/api/player-rival?player_id=' + encodeURIComponent(profile.wrId) + '&opponent=' + encodeURIComponent(input.value.trim()));
-      if (currentRequest !== requestId) return;
+      if (currentRequest !== requestId || generation !== matchupPanelGeneration) return;
       const overall = payload.overall;
       const recent = payload.recent90 || { games: 0, wins: 0, losses: 0, rate: 0 };
       if (!overall && !recent.games) {
@@ -624,11 +647,22 @@ function renderIakkangMatchupPanel(profile) {
         '<div class="matchup-record-pairs"><div><span>전체전적</span><b>' + recordText(overall) + '</b></div><div><span>최근 90일</span><b>' + recordText(recent) + '</b></div></div>' +
         (payload.recentMatches?.length ? '<div class="iakkang-matchup-list">' + payload.recentMatches.map((match) => { const matchResult = match.result || (Number(match.elo) > 0 ? '승' : Number(match.elo) < 0 ? '패' : '무'); const resultClass = matchResult === '승' ? 'delta-plus' : matchResult === '패' ? 'delta-minus' : ''; return '<div><span>' + escapeHtml(match.date) + '</span><span class="' + resultClass + '">' + escapeHtml(matchResult) + '</span><strong>' + escapeHtml(match.map || '-') + '</strong><small>' + escapeHtml(match.format || '-') + '</small></div>'; }).join("") + '</div>' : '');
     } catch (error) {
-      if (currentRequest === requestId) result.innerHTML = '<div class="empty">' + escapeHtml(error.message || '상대전적을 불러오지 못했습니다.') + '</div>';
+      if (currentRequest === requestId && generation === matchupPanelGeneration) result.innerHTML = '<div class="empty">' + escapeHtml(error.message || '상대전적을 불러오지 못했습니다.') + '</div>';
     }
   };
   input.value = "";
-  input.oninput = render;
+  input.oninput = () => {
+    clearTimeout(debounceTimer);
+    ++requestId;
+    if (!cleanName(input.value)) return render();
+    result.innerHTML = '상대전적을 불러오는 중입니다.';
+    debounceTimer = setTimeout(render, 250);
+  };
+  input.onkeydown = (event) => {
+    if (event.key !== 'Enter') return;
+    clearTimeout(debounceTimer);
+    render();
+  };
   render();
 }
 
@@ -638,7 +672,7 @@ function render(data) {
   renderProfile(data);
 }
 
-async function load(name = "", refresh = false, silent = false) {
+async function load(name = "", refresh = false, silent = false, preview = false) {
   if (state.activeController) state.activeController.abort();
   const controller = new AbortController();
   state.activeController = controller;
@@ -652,18 +686,23 @@ async function load(name = "", refresh = false, silent = false) {
   const params = new URLSearchParams({ pages: String(pages) });
   if (name) params.set("name", name);
   if (refresh) params.set("refresh", "1");
+  if (preview) params.set("preview", "1");
   if (cleanName(name) === cleanName(DEFAULT_NAME)) {
     params.set("profileOnly", "1");
     params.set("wr_id", DEFAULT_WR_ID);
   }
 
-  const data = await fetchSearchJson("/api/data?" + params.toString(), controller.signal);
+  const data = await fetchSearchJson("/api/data?" + params.toString(), controller.signal, preview ? 1 : 2);
   if (requestId !== state.requestId) return;
 
   state.query = name;
   state.data = data;
   render(data);
   saveSearchSession();
+  if (data.preview) {
+    setSearchState("success", "저장된 전적을 먼저 표시했습니다. 최신 전적을 확인하는 중입니다.");
+    return;
+  }
   const when = new Date(data.fetchedAt).toLocaleString("ko-KR");
   if (name && (!data.profile || data.resultState === "empty")) {
     setSearchState("empty", TXT.noResult);
@@ -679,10 +718,44 @@ async function load(name = "", refresh = false, silent = false) {
   }
 }
 
-async function search(refresh = false) {
-  const expectedRequestId = state.requestId + 1;
+async function loadInitialDefault() {
+  const name = $("nameInput").value.trim();
+  const previewRequestId = state.requestId + 1;
   try {
-    await load($("nameInput").value.trim(), refresh);
+    await load(name, false, false, true);
+    if (previewRequestId !== state.requestId) return;
+    setTimeout(() => {
+      if (state.requestId === previewRequestId && $("nameInput").value.trim() === name) {
+        load(name, false, true).catch(showBackgroundRefreshError);
+      }
+    }, 0);
+  } catch (error) {
+    if (error?.name !== "AbortError" && previewRequestId === state.requestId) search(false);
+  }
+}
+
+async function search(refresh = false) {
+  const name = $("nameInput").value.trim();
+  let expectedRequestId = state.requestId + 1;
+  try {
+    if (!refresh && cleanName(name) === cleanName(DEFAULT_NAME)) {
+      try {
+        await load(name, false, false, true);
+      } catch (previewError) {
+        if (previewError?.name === "AbortError") return;
+        expectedRequestId = state.requestId + 1;
+        await load(name, false);
+        return;
+      }
+      const previewRequestId = state.requestId;
+      if (state.data?.preview) setTimeout(() => {
+        if (state.requestId === previewRequestId && $("nameInput").value.trim() === name) {
+          load(name, false, true).catch(showBackgroundRefreshError);
+        }
+      }, 0);
+    } else {
+      await load(name, refresh);
+    }
   } catch (error) {
     if (error?.name === "AbortError") return;
     if (expectedRequestId !== state.requestId) return;
@@ -717,5 +790,5 @@ $("monthSelect").addEventListener("change", (event) => {
 });
 if (!restoreSearchSession()) {
   if (!$("nameInput").value.trim()) $("nameInput").value = DEFAULT_NAME;
-  search(false);
+  loadInitialDefault();
 }
