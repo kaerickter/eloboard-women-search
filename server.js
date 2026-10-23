@@ -1,5 +1,4 @@
 ﻿const http = require("node:http");
-const soloArchive = require("./solo/integration.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
@@ -120,6 +119,8 @@ let profileCache = new Map();
 let profilePromises = new Map();
 let matchupProfileCache = new Map();
 let matchupProfilePromises = new Map();
+const playerRivalResults = new Map();
+const playerRivalRequests = new Map();
 let eloApiNextRequestAt = 0;
 const profileSnapshotMemory = new Map();
 let profileSnapshotSchemaPromise = null;
@@ -1193,12 +1194,12 @@ function apiMatchRows(matches, playerId) {
   }).filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.date));
 }
 
-async function fetchAllApiMatches(playerId) {
+async function fetchAllApiMatches(playerId, opponentId = "") {
   const matches = [];
   const seen = new Set();
   const limit = 200;
   for (let offset = 0; ; offset += limit) {
-    const page = await fetchEloApi("/matches", { player_id: playerId, limit, offset });
+    const page = await fetchEloApi("/matches", { player_id: playerId, ...(opponentId ? { opponent_id: opponentId } : {}), limit, offset });
     if (!Array.isArray(page)) throw new Error("ELOBoard 경기 목록 응답 형식이 올바르지 않습니다.");
     let added = 0;
     for (const match of page) {
@@ -1211,6 +1212,38 @@ async function fetchAllApiMatches(playerId) {
     if (page.length < limit) return matches;
     if (!added) throw new Error("ELOBoard 이전 경기 페이지가 반복되어 전체 전적을 확인하지 못했습니다.");
   }
+}
+
+function tallyRivalMatches(rows) {
+  const wins = rows.filter((row) => row.result === "승" || (!row.result && Number(row.elo) > 0)).length;
+  const losses = rows.filter((row) => row.result === "패" || (!row.result && Number(row.elo) < 0)).length;
+  const games = wins + losses;
+  return { games, wins, losses, rate: games ? Math.round(wins / games * 1000) / 10 : 0 };
+}
+
+async function loadPlayerRivalRecord(playerId, opponentQuery) {
+  const playerName = profileCache.get("api:" + playerId)?.profile?.name || "";
+  const rivals = await fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals", { q: opponentQuery });
+  const queryKey = normalizeName(opponentQuery);
+  const candidates = Array.isArray(rivals) ? rivals : [];
+  const rival = candidates.find((item) => normalizeName(item.name) === queryKey)
+    || candidates.find((item) => normalizeName(item.name).includes(queryKey));
+  if (!rival?.player_id) {
+    return { playerName, opponentName: opponentQuery, opponentRace: "", overall: null,
+      recent90: tallyRivalMatches([]), recentMatches: [] };
+  }
+
+  // 전체와 최근 90일을 동일한 상대 ID의 경기 목록에서 계산합니다.
+  const rawMatches = await fetchAllApiMatches(playerId, rival.player_id);
+  const rows = mergeProfileRows(apiMatchRows(rawMatches, playerId))
+    .filter((row) => String(row.opponentId) === String(rival.player_id));
+  const cutoff = koreaDateKey(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const recentRows = rows.filter((row) => row.date >= cutoff);
+  return {
+    playerName, opponentName: rival.name, opponentRace: rival.race || rows[0]?.opponentRace || "",
+    overall: tallyRivalMatches(rows), recent90: tallyRivalMatches(recentRows),
+    recentMatches: recentRows.slice(0, 30)
+  };
 }
 
 async function loadApiPlayer(playerId, playerName = "") {
@@ -3608,7 +3641,6 @@ function lanUrls(port) {
 }
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (url.pathname === "/solo" || url.pathname.startsWith("/solo/")) return soloArchive.handle(req, res);
   const isCctvOnlyPath = /^\/cctv(?:\.(?:html|css|js)|\/)/.test(url.pathname) ||
     url.pathname === "/api/cctv" ||
     url.pathname.startsWith("/api/cctv/");
@@ -4587,34 +4619,10 @@ const server = http.createServer(async (req, res) => {
       if (!/^\d+$/.test(playerId) || !opponentQuery || opponentQuery.length > 40) {
         return send(res, 400, JSON.stringify({ error: "선수와 상대 이름을 확인해 주세요." }), "application/json; charset=utf-8");
       }
-      const profile = await loadApiProfile(playerId);
-      const rivals = await fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals", { q: opponentQuery });
-      const queryKey = normalizeName(opponentQuery);
-      const rival = (Array.isArray(rivals) ? rivals : []).find((item) => normalizeName(item.name) === queryKey)
-        || (Array.isArray(rivals) ? rivals : []).find((item) => normalizeName(item.name).includes(queryKey))
-        || null;
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 90);
-      cutoff.setHours(0, 0, 0, 0);
-      const rows = (profile.matches || []).filter((match) => normalizeName(match.opponent).includes(queryKey));
-      const recentRows = rows.filter((match) => {
-        const playedAt = new Date(String(match.date || "") + "T00:00:00");
-        return !Number.isNaN(playedAt.getTime()) && playedAt >= cutoff;
-      });
-      const tally = (items) => {
-        const wins = items.filter((item) => Number(item.elo) > 0).length;
-        const losses = items.filter((item) => Number(item.elo) < 0).length;
-        const games = items.length;
-        return { games, wins, losses, rate: games ? Math.round((wins / games) * 1000) / 10 : 0 };
-      };
-      return send(res, 200, JSON.stringify({
-        playerName: profile.name,
-        opponentName: rival?.name || rows[0]?.opponent || opponentQuery,
-        opponentRace: rival?.race || rows.find((item) => item.opponentRace)?.opponentRace || "",
-        overall: rival ? { games: Number(rival.games || 0), wins: Number(rival.wins || 0), losses: Number(rival.losses || 0), rate: Number(rival.win_rate || 0) } : null,
-        recent90: tally(recentRows),
-        recentMatches: recentRows.slice(0, 30)
-      }), "application/json; charset=utf-8");
+      const key = playerId + "\u0000" + normalizeName(opponentQuery);
+      const result = await reuseShortResult(playerRivalResults, playerRivalRequests, key, 15 * 1000,
+        () => loadPlayerRivalRecord(playerId, opponentQuery), 100);
+      return send(res, 200, JSON.stringify(result), "application/json; charset=utf-8");
     } catch (error) {
       return send(res, 502, JSON.stringify({ error: error.message || "상대전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
@@ -4628,6 +4636,32 @@ const server = http.createServer(async (req, res) => {
       }
       const requestedWrId = url.searchParams.get("wr_id");
       if (url.searchParams.get("profileOnly") === "1" && requestedWrId) {
+        if (url.searchParams.get("preview") === "1" &&
+            requestedWrId === IAKKANG_API_ID &&
+            autoDiaryPlayerKey(query) === autoDiaryPlayerKey(AUTO_PLAYER_NAME)) {
+          // 첫 화면에서는 서버에 이미 있는 전적만 즉시 반환합니다. 외부 수집과 자동등록은 뒤이은 정상 조회가 맡습니다.
+          let previewProfile = profileCache.get("api:" + requestedWrId)?.profile || null;
+          if (!previewProfile) {
+            try { previewProfile = await loadStoredIakkangProfile(); } catch (error) {
+              console.warn("Initial player preview unavailable:", error.message);
+            }
+          }
+          if (!previewProfile) return send(res, 204, "");
+          return sendRecordJson(res, JSON.stringify({
+            source: BOARD_URL,
+            fetchedAt: new Date().toISOString(),
+            pagesLoaded: 0,
+            requestedPages: 0,
+            siteMaxPages: 0,
+            matches: [],
+            ...summarize([], query),
+            players: [{ name: previewProfile.name, wrId: previewProfile.wrId, url: previewProfile.url, source: "saved-profile" }],
+            profile: previewProfile,
+            profileOnly: true,
+            preview: true,
+            resultState: "found"
+          }));
+        }
         // 현재 /players/{id} 번호는 성별과 관계없이 새 API에서 직접 읽습니다.
         // 예전 여성 게시판 캐시가 같은 숫자 키로 남아 있어도 섞이지 않게 합니다.
         let profile;
