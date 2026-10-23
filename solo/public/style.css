@@ -16,3 +16,5 @@ body [hidden]{display:none!important}.usage-grid{display:grid;grid-template-colu
 .metrics{grid-template-columns:repeat(5,minmax(0,1fr))}@media(max-width:1200px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:680px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .sort-column{border:0;background:transparent;color:#38465e;font-weight:700;padding:5px 2px;white-space:nowrap}.sort-column:hover,.sort-column:focus-visible{background:#edebfa;color:#55449b}th[aria-sort="descending"] .sort-column,th[aria-sort="ascending"] .sort-column{color:#55449b}
+
+.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:680px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -21,8 +21,9 @@ export function battleView(state) {
       d.battleTotal += g.count;
       if (g.manual) { d.manualBattle = true; d.events++; }
     }
+    const ads=Object.values(state.adGifts||{}).filter(g=>g.bjId===b.bjId),adTotal=ads.reduce((sum,g)=>sum+g.count,0);for(const d of Object.values(donors[b.bjId]))d.adTotal=0;for(const g of ads){const d=donors[b.bjId][g.donorId||g.donor]||={donorId:g.donorId,donor:g.donor,total:0,regularTotal:0,missionTotal:0,battleTotal:0,adTotal:0,events:0};d.adTotal+=g.count;d.total+=g.count;d.events++;}
     const battleEarnedTotal=Object.values(state.battleSettlements||{}).filter(x=>x.bjId===b.bjId).reduce((sum,x)=>sum+x.count,0);
-    return { ...b, total:b.total+battleEarnedTotal,battleEarnedTotal, battleTotal: gifts.reduce((sum, g) => sum + g.count, 0) };
+    return { ...b, total:b.total+battleEarnedTotal+adTotal,battleEarnedTotal,adTotal, battleTotal: gifts.reduce((sum, g) => sum + g.count, 0) };
   });
   // Never mix battle pledges into ordinary/challenge settled totals or effects.
   return { ...state, broadcasts, donors };

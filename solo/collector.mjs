@@ -24,6 +24,7 @@ export class Collector {
         this.queue=this.queue.then(async()=>{
           let kind,payload,key=null;
           if([18,33,105].includes(p.serviceCode)){const offset=p.serviceCode===105?1:0,count=Number(p.fields[3+offset]);if(!Number.isSafeInteger(count)||count<=0)return;kind='regular';payload={donorId:String(p.fields[1+offset]||''),donor:String(p.fields[2+offset]||p.fields[1+offset]||'익명'),count,serviceCode:p.serviceCode};}
+          else if(p.serviceCode===87){const count=Number(p.fields[9]);if(p.fields[1]!==this.bjId||!Number.isSafeInteger(count)||count<=0||p.fields[6])return;kind='adballoon';payload={donorId:String(p.fields[2]||''),donor:String(p.fields[3]||p.fields[2]||'익명'),count,serviceCode:87};const packetId=Buffer.from(data).subarray(14,50).toString('utf8');if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(packetId)&&packetId!=='00000000-0000-0000-0000-000000000000')key=this.bjId+':adballoon:'+packetId;}
           else if(p.serviceCode===121){let e;try{e=JSON.parse(p.fields[0]);}catch{return;}if(e.is_relay===true||(e.bj_id&&e.bj_id!==this.bjId))return;
             const earned=e.type==='SETTLE';if(earned){if((!e.uuid&&!/^\d+$/.test(String(e.key)))||!Number.isSafeInteger(e.settle_count)||e.settle_count<=0)return;}else if(!e.uuid||!/^\d+$/.test(String(e.key)))return;
             const battle=e.type==='GIFT'&&e.is_relay===false&&e.bj_id===this.bjId&&/^mission_gift_\d+$/.test(e.image||'');
