@@ -1,5 +1,4 @@
 ﻿const http = require("node:http");
-const soloArchive = require("./solo/integration.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
@@ -285,11 +284,18 @@ function cleanTournamentBracketState(value) {
   const winners = source.winners && typeof source.winners === "object" ? source.winners : {};
   const choices = (key, length) => Array.from({ length }, (_, index) =>
     winners[key]?.[index] === 0 || winners[key]?.[index] === 1 ? winners[key][index] : null);
+  const oldSixteen = Array.isArray(source.players) && source.players.length === 16;
+  const players = oldSixteen
+    ? Array.from({ length: 24 }, (_, index) => index % 3 === 2 ? "" : text(source.players?.[Math.floor(index / 3) * 2 + index % 3], 32))
+    : Array.from({ length: 24 }, (_, index) => text(source.players?.[index], 32));
+  const firstRoundWinners = oldSixteen
+    ? Array.from({ length: 8 }, (_, match) => choices("r16", 8)[match] !== null && players[match * 3 + 1] ? 0 : null)
+    : choices("r24", 8);
   return {
     title: text(source.title, 48),
     subtitle: text(source.subtitle, 80),
-    players: Array.from({ length: 16 }, (_, index) => text(source.players?.[index], 32)),
-    winners: { r16: choices("r16", 8), qf: choices("qf", 4), sf: choices("sf", 2), final: choices("final", 1) }
+    players,
+    winners: { r24: firstRoundWinners, r16: choices("r16", 8), qf: choices("qf", 4), sf: choices("sf", 2), final: choices("final", 1) }
   };
 }
 
@@ -3642,7 +3648,6 @@ function lanUrls(port) {
 }
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (url.pathname === "/solo" || url.pathname.startsWith("/solo/")) return soloArchive.handle(req, res);
   const isCctvOnlyPath = /^\/cctv(?:\.(?:html|css|js)|\/)/.test(url.pathname) ||
     url.pathname === "/api/cctv" ||
     url.pathname.startsWith("/api/cctv/");
