@@ -1,15 +1,16 @@
 (() => {
   const API = '/api/tournament-bracket-state';
-  const rounds = { r16: 8, qf: 4, sf: 2, final: 1 };
-  const centers = { r16: [120, 302, 484, 666], qf: [211, 575], sf: [393], final: [393] };
+  const centers = { r24: [120, 302, 484, 666], r16: [120, 302, 484, 666], qf: [211, 575], sf: [393], final: [393] };
   const columns = [
+    { id: 'left-r24', label: '24강', round: 'r24', matches: [0, 1, 2, 3] },
     { id: 'left-r16', label: '16강', round: 'r16', matches: [0, 1, 2, 3] },
     { id: 'left-qf', label: '8강', round: 'qf', matches: [0, 1] },
     { id: 'left-sf', label: '4강', round: 'sf', matches: [0] },
     { id: 'final', label: '결승', round: 'final', matches: [0] },
     { id: 'right-sf', label: '4강', round: 'sf', matches: [1] },
     { id: 'right-qf', label: '8강', round: 'qf', matches: [2, 3] },
-    { id: 'right-r16', label: '16강', round: 'r16', matches: [4, 5, 6, 7] }
+    { id: 'right-r16', label: '16강', round: 'r16', matches: [4, 5, 6, 7] },
+    { id: 'right-r24', label: '24강', round: 'r24', matches: [4, 5, 6, 7] }
   ];
   const grid = document.getElementById('bracketGrid');
   const editor = document.getElementById('bracketEditor');
@@ -65,26 +66,34 @@
   }
 
   function blankState() {
-    return { title: '', subtitle: '', players: Array(16).fill(''), winners: {
-      r16: Array(8).fill(null), qf: Array(4).fill(null), sf: Array(2).fill(null), final: [null]
+    return { title: '', subtitle: '', players: Array(24).fill(''), winners: {
+      r24: Array(8).fill(null), r16: Array(8).fill(null), qf: Array(4).fill(null), sf: Array(2).fill(null), final: [null]
     } };
   }
 
   function normalize(raw) {
     const source = raw && typeof raw === 'object' ? raw : {};
     const text = (value, length) => String(value ?? '').trim().slice(0, length);
+    const oldSixteen = Array.isArray(source.players) && source.players.length === 16;
+    const players = oldSixteen
+      ? Array.from({ length: 24 }, (_, index) => index % 3 === 2 ? '' : text(source.players?.[Math.floor(index / 3) * 2 + index % 3], 32))
+      : Array.from({ length: 24 }, (_, index) => text(source.players?.[index], 32));
+    const choices = (round, count) => Array.from({ length: count }, (_, index) =>
+      [0, 1].includes(source.winners?.[round]?.[index]) ? source.winners[round][index] : null);
     return {
       title: text(source.title, 48),
       subtitle: text(source.subtitle, 80),
-      players: Array.from({ length: 16 }, (_, index) => text(source.players?.[index], 32)),
-      winners: Object.fromEntries(Object.entries(rounds).map(([round, count]) => [round,
-        Array.from({ length: count }, (_, index) => [0, 1].includes(source.winners?.[round]?.[index])
-          ? source.winners[round][index] : null)]))
+      players,
+      winners: { r24: oldSixteen
+        ? Array.from({ length: 8 }, (_, match) => choices('r16', 8)[match] !== null && players[match * 3 + 1] ? 0 : null)
+        : choices('r24', 8),
+        r16: choices('r16', 8), qf: choices('qf', 4), sf: choices('sf', 2), final: choices('final', 1) }
     };
   }
 
   function playerAt(round, match, side) {
-    if (round === 'r16') return draft.players[match * 2 + side] || '';
+    if (round === 'r24') return draft.players[match * 3 + side + 1] || '';
+    if (round === 'r16') return side === 0 ? draft.players[match * 3] || '' : winnerAt('r24', match);
     const previous = { qf: 'r16', sf: 'qf', final: 'sf' }[round];
     return winnerAt(previous, match * 2 + side);
   }
@@ -95,6 +104,7 @@
   }
 
   function clearFollowing(round, match) {
+    if (round === 'r24') { draft.winners.r16[match] = null; round = 'r16'; }
     if (round === 'r16') { draft.winners.qf[Math.floor(match / 2)] = null; round = 'qf'; match = Math.floor(match / 2); }
     if (round === 'qf') { draft.winners.sf[Math.floor(match / 2)] = null; round = 'sf'; match = Math.floor(match / 2); }
     if (round === 'sf') draft.winners.final[0] = null;
@@ -181,10 +191,12 @@
       path.setAttribute('d', `M ${x1} ${y1} H ${middle} V ${y2} H ${x2}`);
       svg.append(path);
     };
+    for (let i = 0; i < 4; i += 1) pair('left-r24', `r24-${i}`, 'left-r16', `r16-${i}`, true);
     for (let i = 0; i < 4; i += 1) pair('left-r16', `r16-${i}`, 'left-qf', `qf-${Math.floor(i / 2)}`, true);
     for (let i = 0; i < 2; i += 1) pair('left-qf', `qf-${i}`, 'left-sf', 'sf-0', true);
     pair('left-sf', 'sf-0', 'final', 'final-0', true);
     for (let i = 4; i < 8; i += 1) pair('right-r16', `r16-${i}`, 'right-qf', `qf-${Math.floor(i / 2)}`, false);
+    for (let i = 4; i < 8; i += 1) pair('right-r24', `r24-${i}`, 'right-r16', `r16-${i}`, false);
     for (let i = 2; i < 4; i += 1) pair('right-qf', `qf-${i}`, 'right-sf', 'sf-1', false);
     pair('right-sf', 'sf-1', 'final', 'final-0', false);
   }
@@ -192,17 +204,17 @@
   function renderView() {
     const title = draft.title || '대진표';
     document.getElementById('tournamentTitle').textContent = title;
-    document.getElementById('tournamentSubtitle').textContent = draft.subtitle || '16명이 결승까지 올라가는 토너먼트';
+    document.getElementById('tournamentSubtitle').textContent = draft.subtitle || '24명이 결승까지 올라가는 토너먼트';
     document.title = `${title} · 대진표`;
     document.getElementById('championName').textContent = winnerAt('final', 0) || '우승자 미정';
     renderBracket();
   }
 
   function createPlayerInputs() {
-    for (let index = 0; index < 16; index += 1) {
+    for (let index = 0; index < 24; index += 1) {
       const label = document.createElement('label');
       const number = document.createElement('span');
-      number.textContent = `${index % 8 + 1}번`;
+      number.textContent = `${index % 12 + 1}번`;
       const input = document.createElement('input');
       input.maxLength = 32;
       input.placeholder = '선수 이름';
@@ -210,13 +222,15 @@
       input.dataset.player = String(index);
       input.addEventListener('input', () => {
         draft.players[index] = input.value;
-        draft.winners.r16[Math.floor(index / 2)] = null;
-        clearFollowing('r16', Math.floor(index / 2));
+        const match = Math.floor(index / 3);
+        if (index % 3 === 0) draft.winners.r16[match] = null;
+        else draft.winners.r24[match] = null;
+        clearFollowing(index % 3 === 0 ? 'r16' : 'r24', match);
         markDirty();
         renderView();
       });
       label.append(number, input);
-      document.getElementById(index < 8 ? 'leftPlayers' : 'rightPlayers').append(label);
+      document.getElementById(index < 12 ? 'leftPlayers' : 'rightPlayers').append(label);
     }
   }
 
