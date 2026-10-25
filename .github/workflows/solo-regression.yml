@@ -1,0 +1,15 @@
+name: Broadcast archive regression checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: node scripts/check-solo-integration.cjs
+      - run: node --test test/solo-archive.test.js test/solo-correction.test.mjs test/solo-startup.test.cjs

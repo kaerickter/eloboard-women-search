@@ -16,6 +16,7 @@ export class Collector {
       const endpoint=process.env.NODE_ENV==='test'&&process.env.SOLO_TEST_SOCKET?process.env.SOLO_TEST_SOCKET:`wss://${info.CHDOMAIN||info.CHIP}${info.CHPT?':'+(Number(info.CHPT)+1):''}/Websocket/${info.BJID||this.bjId}`;
       const ws=new WebSocket(endpoint,'chat',{origin:'https://play.sooplive.co.kr',handshakeTimeout:12000,headers:{referer:`https://play.sooplive.co.kr/${this.bjId}/${info.BNO}`}});this.socket=ws;let alive=Date.now();
       ws.on('open',()=>{if(gen!==this.generation)return;ws.send(makePacket(1,[info.FTK,'',16]));this.heartbeat=setInterval(()=>{if(Date.now()-alive>90000)return ws.terminate();if(ws.readyState===WebSocket.OPEN){ws.send(makePacket(0));ws.ping();}},30000);this.leaseTimer=setInterval(async()=>{try{if(!await this.store.lease())ws.terminate();}catch(e){this.status('error','DB 연결 확인 중');ws.terminate();}},30000);});
+      const joinTimer=setTimeout(()=>{if(gen===this.generation&&this.runtime.status!=='connected')ws.terminate();},20000);joinTimer.unref?.();ws.on('close',()=>clearTimeout(joinTimer));
       ws.on('pong',()=>alive=Date.now());
       ws.on('message',data=>{if(gen!==this.generation)return;alive=Date.now();const p=parsePacket(data);
         if(p.serviceCode===1){if(p.retCode!==0)return ws.close();return ws.send(makePacket(2,[info.CHATNO,info.FTK,0,'','pver=2&access_system=html5&mode=landing']));}
@@ -23,7 +24,7 @@ export class Collector {
         // Serialize writes: settlements must follow their earlier contributions.
         this.queue=this.queue.then(async()=>{
           let kind,payload,key=null;
-          if([18,33,105].includes(p.serviceCode)){const offset=p.serviceCode===105?1:0,count=Number(p.fields[3+offset]);if(!Number.isSafeInteger(count)||count<=0)return;kind='regular';payload={donorId:String(p.fields[1+offset]||''),donor:String(p.fields[2+offset]||p.fields[1+offset]||'익명'),count,serviceCode:p.serviceCode};}
+          if([18,33,105].includes(p.serviceCode)){if(p.serviceCode===105&&p.fields[1]!==this.bjId)return;const offset=p.serviceCode===105?1:0,count=Number(p.fields[3+offset]);if(!Number.isSafeInteger(count)||count<=0)return;kind='regular';payload={donorId:String(p.fields[1+offset]||''),donor:String(p.fields[2+offset]||p.fields[1+offset]||'익명'),count,serviceCode:p.serviceCode,...(p.serviceCode===105?{giftType:'video'}:{})};}
           else if(p.serviceCode===87){const count=Number(p.fields[9]);if(p.fields[1]!==this.bjId||!Number.isSafeInteger(count)||count<=0||p.fields[6])return;kind='adballoon';payload={donorId:String(p.fields[2]||''),donor:String(p.fields[3]||p.fields[2]||'익명'),count,serviceCode:87};const packetId=Buffer.from(data).subarray(14,50).toString('utf8');if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(packetId)&&packetId!=='00000000-0000-0000-0000-000000000000')key=this.bjId+':adballoon:'+packetId;}
           else if(p.serviceCode===121){let e;try{e=JSON.parse(p.fields[0]);}catch{return;}if(e.is_relay===true||(e.bj_id&&e.bj_id!==this.bjId))return;
             const earned=e.type==='SETTLE';if(earned){if((!e.uuid&&!/^\d+$/.test(String(e.key)))||!Number.isSafeInteger(e.settle_count)||e.settle_count<=0)return;}else if(!e.uuid||!/^\d+$/.test(String(e.key)))return;

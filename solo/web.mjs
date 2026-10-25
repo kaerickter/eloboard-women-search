@@ -28,7 +28,7 @@ export async function createApp(options={}) {
   async function handle(req,res){
     try{
       const url=new URL(req.url,'http://'+req.headers.host),p=url.pathname.replace(/^\/solo/,'')||'/';
-      if(p==='/healthz'&&req.method==='GET'){res.writeHead(204,{'cache-control':'no-store'});return res.end();}
+      if(p==='/healthz'&&req.method==='GET'){const r=collector.runtime,healthy=!collector.enabled||(['waiting','connected'].includes(r.status)&&r.lastCheckedAt)||(r.status==='connecting'&&Date.now()-Date.parse(r.lastCheckedAt)<30000);res.writeHead(healthy?204:503,{'cache-control':'no-store'});return res.end();}
       if(p==='/usage-notice'&&req.method==='GET'){const u=await usage.check?.()||usage.snapshot;return send(req,res,200,{level:u?.level||'unknown',configured:!!u?.configured,month:u?.month||new Date().toISOString().slice(0,7)});}
       if(req.method!=='GET'&&req.headers.origin&&!['http://'+req.headers.host,'https://'+req.headers.host].includes(req.headers.origin))return send(req,res,403,{error:'허용되지 않은 요청입니다.'});
       if(p==='/login'&&req.method==='POST'){
