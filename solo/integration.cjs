@@ -5,3 +5,5 @@ exports.handle = async function(req,res) {
   catch {res.writeHead(503,{'content-type':'text/plain; charset=utf-8','retry-after':'30'});res.end('후원 기록실을 준비하고 있습니다. 잠시 뒤 다시 확인해 주세요.');}
 };
 if(process.env.DATABASE_URL&&process.env.SPAWN_DIARY_ADMIN_PASSWORD)load().catch(()=>{});
+
+exports.close=async()=>{clearTimeout(retry);if(loaded)await (await loaded).close();};
