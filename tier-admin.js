@@ -226,7 +226,9 @@ class TierAdmin {
     const result = [];
     for (const player of (Array.isArray(players) ? players : [])) {
       seen.add(playerKey(player.name));
-      const override = this.overrides.get(playerKey(player.name));
+      if (player.realName) seen.add(playerKey(player.realName));
+      const override = this.overrides.get(playerKey(player.name)) ||
+        (player.realName ? this.overrides.get(playerKey(player.realName)) : null);
       if (!override) {
         result.push(player);
         continue;
@@ -246,7 +248,7 @@ class TierAdmin {
         profileUrl: override.broadcastId
           ? "https://play.sooplive.co.kr/" + encodeURIComponent(override.broadcastId)
           : player.profileUrl,
-        customPlayer: false,
+        customPlayer: Boolean(override.isCustom),
         universityOverride: true,
         tierOverride: Boolean(override.tier)
       });

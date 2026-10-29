@@ -41,6 +41,7 @@ const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const MEN_BROADCAST_MAP_FILE = path.join(ROOT, "data", "men-player-broadcast-map.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
+const TIER_ROSTER_BACKUP_FILE = path.join(ROOT, "data", "tier-roster-before-refresh.json");
 const MEN_TIER_FALLBACK_FILE = path.join(ROOT, "data", "men-tier-fallback.json");
 const SCOREBOARD_STATE_FILE = path.join(ROOT, "data", "scoreboard-state.json");
 const JUNGMAN_CUP_STATE_FILE = path.join(ROOT, "data", "jungman-cup-state.json");
@@ -147,6 +148,7 @@ const universityApiMembersPromises = new Map();
 const universityApiPlayerIdsCache = new Map();
 let tierRosterCache = null;
 let tierRosterPromise = null;
+let tierRosterRetryAt = 0;
 let channelCache = new Map();
 let liveStatusCache = new Map();
 let liveNameCache = new Map();
@@ -600,6 +602,7 @@ try {
   if (Array.isArray(savedTierRoster?.players) && savedTierRoster.players.length) {
     tierRosterCache = {
       cacheTime: Number(new Date(savedTierRoster.updatedAt)) || 0,
+      source: savedTierRoster.source || UNIVERSITY_LIST_URL,
       players: withMenTierFallback(savedTierRoster.players)
     };
   }
@@ -2452,24 +2455,55 @@ async function loadUniversityRoster(name, force = false) {
 }
 
 async function refreshTierRoster() {
-  const universities = await loadUniversities(true);
-  const tierUniversities = [...universities, { name: "연합팀", label: "FA" }];
-  const rosters = await mapConcurrent(tierUniversities, 4, (university) => loadUniversityRoster(university.name, true));
-  const players = new Map();
-  const menTiers = new Set(["갓", "킹", "잭", "조커", "스페이드"]);
-  for (const player of rosters.flat()) {
-    const isWomenTier = player.division === "women" && (/^\d+$/.test(player.tier) || player.tier === "FA");
-    const isMenTier = player.division === "men" && (menTiers.has(player.tier) || player.tier === "FA");
-    if (!isWomenTier && !isMenTier) continue;
-    const pinnedName = PINNED_TIER_DISPLAY_NAMES[normalizeName(player.name)] || player.name;
-    const rosterPlayer = pinnedName === player.name ? player : { ...player, name: pinnedName };
-    const key = rosterPlayer.division + ":" + normalizeName(rosterPlayer.name);
-    const current = players.get(key);
-    if (!current) {
-      players.set(key, { ...rosterPlayer, universities: [rosterPlayer.university] });
-    } else if (!current.universities.includes(rosterPlayer.university)) {
-      current.universities.push(rosterPlayer.university);
+  const previous = tierRosterCache?.players || [];
+  const players = new Map(previous.map((player) => [
+    player.division + ":" + normalizeName(player.division === "men" ? tierDisplayName(player.name) : player.name),
+    player
+  ]));
+  if (players.size !== previous.length) {
+    throw new Error("저장된 명단에 동일한 표시 이름이 있어 자동 갱신을 중단합니다.");
+  }
+  const visiblePlayers = addTierCctvSources(applyTierOverrides(previous));
+  const visibleNames = new Set(visiblePlayers.map((player) => player.division + ":" + normalizeName(player.name)));
+  const visibleBroadcastIds = new Set(visiblePlayers.map((player) => String(player.broadcastId || "").toLowerCase()).filter(Boolean));
+  let tieredApiPlayers = 0;
+  let added = 0;
+  for (const division of ["women", "men"]) {
+    let completed = false;
+    for (let offset = 0; offset < 2000; offset += 200) {
+      const page = await fetchEloApi("/players", { division, limit: 200, offset });
+      if (!Array.isArray(page)) throw new Error("ELOBoard 선수 명단 응답 형식이 올바르지 않습니다.");
+      for (const item of page) {
+        if (item.is_main_race === false) continue;
+        const tier = String(item.tier_label || "").trim().replace(/티어$/, "");
+        if (!(division === "women" && /^[0-9]$/.test(tier)) &&
+            !(division === "men" && ["갓", "킹", "잭", "조커", "스페이드", "베이비"].includes(tier))) continue;
+        tieredApiPlayers += 1;
+        const name = String(item.display_name || item.name || "").trim();
+        const displayName = division === "men" ? tierDisplayName(name) : name;
+        const key = division + ":" + normalizeName(displayName);
+        const broadcastId = String(item.soop_id || "").trim();
+        if (!name || !item.id || players.has(key) || visibleNames.has(key) ||
+            (broadcastId && visibleBroadcastIds.has(broadcastId.toLowerCase()))) continue;
+        const university = String(item.college_name || "").trim() || "연합팀";
+        players.set(key, {
+          name, tier, division, race: String(item.main_race || "").toUpperCase(),
+          university, universities: university === "연합팀" ? [] : [university],
+          image: apiImageUrl(item.thumb_url), profileUrl: apiPlayerUrl(item.id), broadcastId
+        });
+        visibleNames.add(key);
+        if (broadcastId) visibleBroadcastIds.add(broadcastId.toLowerCase());
+        added += 1;
+      }
+      if (page.length < 200) {
+        completed = true;
+        break;
+      }
     }
+    if (!completed) throw new Error("ELOBoard 선수 명단이 끝까지 수집되지 않았습니다.");
+  }
+  if (tieredApiPlayers < 250 || (previous.length && added > previous.length * 0.5)) {
+    throw new Error("ELOBoard 명단 수가 비정상적이어서 저장본을 유지합니다.");
   }
   const tierOrder = new Map([
     ["갓", 0],
@@ -2477,21 +2511,44 @@ async function refreshTierRoster() {
     ["잭", 2],
     ["조커", 3],
     ["스페이드", 4],
-    ...Array.from({ length: 10 }, (_, index) => [String(index), index + 5]),
-    ["FA", 15]
+    ["베이비", 5],
+    ...Array.from({ length: 10 }, (_, index) => [String(index), index + 6]),
+    ["FA", 16]
   ]);
   const tierRank = (tier) => tierOrder.get(tier) ?? Number.MAX_SAFE_INTEGER;
   const data = [...players.values()].sort((a, b) =>
     tierRank(a.tier) - tierRank(b.tier) ||
     a.division.localeCompare(b.division) ||
     a.name.localeCompare(b.name, "ko"));
-  tierRosterCache = { cacheTime: Date.now(), players: data };
+  if (previous.length) {
+    const countByTier = (roster) => {
+      const counts = new Map();
+      for (const player of roster) {
+        const key = player.division + ":" + player.tier;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      return counts;
+    };
+    const incoming = countByTier(data);
+    const lostTier = [...countByTier(previous)].some(([key, count]) =>
+      count >= 5 && (incoming.get(key) || 0) === 0);
+    if (data.length < previous.length * 0.7 || lostTier) {
+      throw new Error("불완전한 외부 티어 명단이어서 저장본을 유지합니다.");
+    }
+  }
+  tierRosterCache = { cacheTime: Date.now(), source: ELOBOARD_API_URL + "/players", players: data };
   try {
     fs.mkdirSync(path.dirname(TIER_ROSTER_FILE), { recursive: true });
-    fs.writeFileSync(TIER_ROSTER_FILE, JSON.stringify({
+    if (fs.existsSync(TIER_ROSTER_FILE) && !fs.existsSync(TIER_ROSTER_BACKUP_FILE)) {
+      fs.copyFileSync(TIER_ROSTER_FILE, TIER_ROSTER_BACKUP_FILE);
+    }
+    const nextRosterFile = TIER_ROSTER_FILE + ".tmp";
+    fs.writeFileSync(nextRosterFile, JSON.stringify({
       updatedAt: new Date(tierRosterCache.cacheTime).toISOString(),
+      source: tierRosterCache.source,
       players: data
     }, null, 2) + "\n");
+    fs.renameSync(nextRosterFile, TIER_ROSTER_FILE);
   } catch {
     // 읽기 전용 배포 환경에서도 메모리 캐시는 계속 사용합니다.
   }
@@ -2500,7 +2557,10 @@ async function refreshTierRoster() {
 
 async function loadTierRoster(force = false) {
   if (!force && tierRosterCache?.players?.length) {
-    if (koreaDateKey(tierRosterCache.cacheTime) !== koreaDateKey() && !tierRosterPromise) {
+    if (koreaDateKey(tierRosterCache.cacheTime) !== koreaDateKey() &&
+        Date.now() >= tierRosterRetryAt && !tierRosterPromise) {
+      // 외부 명단 응답 오류 중에는 저장본을 유지하며 재시도를 30분 간격으로 제한합니다.
+      tierRosterRetryAt = Date.now() + 30 * 60 * 1000;
       tierRosterPromise = refreshTierRoster().catch(() => tierRosterCache.players).finally(() => {
         tierRosterPromise = null;
       });
@@ -2518,7 +2578,7 @@ async function loadTierRoster(force = false) {
 // 대학대결은 별도 대학 명단이 아니라, 화면에 표시되는 티어표와 같은 명단·소속·티어를 사용합니다.
 // 따라서 선수관리에서 소속이나 티어를 바꾸면 대학대결에도 바로 같은 기준으로 반영됩니다.
 async function loadTierBasedUniversityPlayers() {
-  const players = addTierCctvSources(tierAdmin.applyOverrides(await loadTierRoster(false)));
+  const players = addTierCctvSources(applyTierOverrides(await loadTierRoster(false)));
   return players.filter((player) => {
     const universities = Array.isArray(player.universities) ? player.universities : [player.university];
     return String(player.tier || "").trim() && universities.some((name) => String(name || "").trim() && String(name).trim() !== "연합팀");
@@ -2620,6 +2680,16 @@ function applyMenTierDisplayNames(players) {
     if (!displayName || displayName === player.name) return player;
     return { ...player, realName: player.name, name: displayName };
   });
+}
+
+function applyTierOverrides(players) {
+  return tierAdmin.applyOverrides(applyMenTierDisplayNames(players));
+}
+
+function matchesTierPlayerName(player, name) {
+  const key = normalizeName(name);
+  return normalizeName(player.name) === key ||
+    (player.division === "men" && normalizeName(player.realName) === key);
 }
 
 function addTierCctvSources(players) {
@@ -4137,7 +4207,7 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const name = String(url.searchParams.get("name") || "").trim();
-      const members = tierAdmin.universityMembers(await loadTierRoster(false), name);
+      const members = tierAdmin.universityMembers(applyMenTierDisplayNames(await loadTierRoster(false)), name);
       return send(res, 200, JSON.stringify({
         name, count: members.length, players: members.map((player) => player.name)
       }), "application/json; charset=utf-8");
@@ -4156,7 +4226,7 @@ const server = http.createServer(async (req, res) => {
       }
       const sourcePlayers = await loadTierRoster(false);
       const changed = await tierAdmin.changeUniversityName(
-        sourcePlayers, body.oldName, req.method === "DELETE" ? null : body.newName,
+        applyMenTierDisplayNames(sourcePlayers), body.oldName, req.method === "DELETE" ? null : body.newName,
         body.expectedCount, body.expectedPlayers
       );
       return send(res, 200, JSON.stringify({ ok: true, ...changed, storage: tierAdmin.storageStatus }), "application/json; charset=utf-8");
@@ -4174,8 +4244,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const playerName = String(body.playerName || "").replace(/\s+/g, " ").trim().slice(0, 40);
       const sourcePlayers = await loadTierRoster(false);
-      const exists = tierAdmin.applyOverrides(sourcePlayers).some((player) =>
-        normalizeName(player.name) === normalizeName(playerName));
+      const exists = applyTierOverrides(sourcePlayers).some((player) =>
+        matchesTierPlayerName(player, playerName));
       if (!playerName) {
         return send(res, 400, JSON.stringify({ error: "새 선수 이름을 입력해 주세요." }), "application/json; charset=utf-8");
       }
@@ -4192,8 +4262,8 @@ const server = http.createServer(async (req, res) => {
         race: body.race,
         broadcastId: channelFromUrl?.broadcastId || body.broadcastId
       });
-      const player = tierAdmin.applyOverrides(sourcePlayers).find((item) =>
-        normalizeName(item.name) === normalizeName(playerName));
+      const player = applyTierOverrides(sourcePlayers).find((item) =>
+        matchesTierPlayerName(item, playerName));
       return send(res, 201, JSON.stringify({
         ok: true,
         override,
@@ -4215,8 +4285,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const playerName = String(body.playerName || "").replace(/\s+/g, " ").trim().slice(0, 40);
       const sourcePlayers = await loadTierRoster(false);
-      const currentPlayer = tierAdmin.applyOverrides(sourcePlayers).find((player) =>
-        normalizeName(player.name) === normalizeName(playerName)) ||
+      const currentPlayer = applyTierOverrides(sourcePlayers).find((player) =>
+        matchesTierPlayerName(player, playerName)) ||
         adminPlayerSnapshot(body.playerSnapshot, playerName);
       if (!currentPlayer) {
         return send(res, 404, JSON.stringify({ error: "현재 티어 명단에서 선수를 찾지 못했습니다." }), "application/json; charset=utf-8");
@@ -4254,8 +4324,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const playerName = String(body.playerName || "").trim();
       const sourcePlayers = await loadTierRoster(false);
-      const currentPlayer = tierAdmin.applyOverrides(sourcePlayers).find((player) =>
-        normalizeName(player.name) === normalizeName(playerName)) ||
+      const currentPlayer = applyTierOverrides(sourcePlayers).find((player) =>
+        matchesTierPlayerName(player, playerName)) ||
         adminPlayerSnapshot(body.playerSnapshot, playerName);
       if (!currentPlayer) {
         return send(res, 404, JSON.stringify({ error: "현재 티어 명단에서 선수를 찾지 못했습니다." }), "application/json; charset=utf-8");
@@ -4281,8 +4351,8 @@ const server = http.createServer(async (req, res) => {
         race: body.race == null ? currentPlayer.race : body.race,
         broadcastId: currentPlayer.broadcastId
       });
-      const player = tierAdmin.applyOverrides(sourcePlayers).find((item) =>
-        normalizeName(item.name) === normalizeName(playerName));
+      const player = applyTierOverrides(sourcePlayers).find((item) =>
+        matchesTierPlayerName(item, playerName));
       return send(res, 200, JSON.stringify({
         ok: true,
         override,
@@ -4303,11 +4373,11 @@ const server = http.createServer(async (req, res) => {
       if (!force && url.searchParams.get("wait") === "1" && tierRosterPromise) {
         players = await tierRosterPromise;
       }
-      const visiblePlayers = addTierCctvSources(tierAdmin.applyOverrides(players));
+      const visiblePlayers = addTierCctvSources(applyTierOverrides(players));
       return send(res, 200, JSON.stringify({
         players: visiblePlayers,
         liveStatuses: sharedLiveStatuses(visiblePlayers.map((player) => player.name)),
-        source: UNIVERSITY_LIST_URL,
+        source: tierRosterCache?.source || UNIVERSITY_LIST_URL,
         updatedAt: new Date(tierRosterCache?.cacheTime || Date.now()).toISOString(),
         refreshing: Boolean(tierRosterPromise)
       }), "application/json; charset=utf-8");
