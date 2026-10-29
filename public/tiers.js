@@ -51,7 +51,7 @@ const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
 const LIVE_SHARED_SYNC_MS = 1000;
 const LIVE_STATUS_MAX_AGE_MS = 30000;
-const LIVE_DISPLAY_MAX_AGE_MS = 60000;
+const LIVE_DISPLAY_MAX_AGE_MS = 3 * 60 * 1000;
 const LIVE_HOVER_REFRESH_MS = 30000;
 const LIVE_THUMBNAIL_REFRESH_MS = 15000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
@@ -671,7 +671,7 @@ function savedAdminMessage(message) {
 
 function adminPlayerSnapshot(player) {
   return {
-    name: player.name,
+    name: player.customPlayer ? player.name : (player.realName || player.name),
     tier: player.tier,
     race: player.race,
     universities: playerUniversities(player),
@@ -709,7 +709,7 @@ async function checkTierAdminSession() {
 async function saveTierAdminPlayer(changes, successMessage) {
   const player = adminSelectedPlayer();
   if (!player || tierAdminSaving) return;
-  const playerName = player.name;
+  const playerName = player.customPlayer ? player.name : (player.realName || player.name);
   const tier = changes.tier ?? tierAdminCode(player.tier);
   const promotionLight = tier === "FA"
     ? false
@@ -741,13 +741,15 @@ async function saveTierAdminPlayer(changes, successMessage) {
       JSON.stringify([...universities].sort())) {
       throw new Error("저장 후 서버 명단에서 변경 결과를 확인하지 못했습니다. 다시 확인해 주세요.");
     }
-    state.players = state.players.filter((item) => keyOf(item.name) !== keyOf(playerName));
-    state.players.push(data.player);
+    state.players = state.players.filter((item) => keyOf(item.name) !== keyOf(player.name));
+    state.players.push(player.realName
+      ? { ...data.player, name: player.name, realName: player.realName }
+      : data.player);
     saveTierRoster();
     render();
-    renderTierAdminEditor(playerName);
+    renderTierAdminEditor(player.name);
     await loadRoster(false);
-    renderTierAdminEditor(playerName);
+    renderTierAdminEditor(player.name);
     tierAdminStatus.textContent = savedAdminMessage(successMessage);
   } catch (error) {
     tierAdminStatus.textContent = error.message;
@@ -875,7 +877,7 @@ async function createTierAdminPlayer() {
 async function revertTierAdminMembership() {
   const player = adminSelectedPlayer();
   if (!player || tierAdminSaving) return;
-  const playerName = player.name;
+  const playerName = player.customPlayer ? player.name : (player.realName || player.name);
   const customPlayer = Boolean(player.customPlayer);
   tierAdminSaving = true;
   setTierAdminControlsDisabled(true);
@@ -1119,6 +1121,23 @@ function syncProfileAnimations() {
   }
 }
 
+function isCompleteTierRoster(players) {
+  if (!Array.isArray(players) || !players.length) return false;
+  if (!state.players.length) return true;
+  if (players.length < state.players.length * 0.7) return false;
+  const countByTier = (roster) => {
+    const counts = new Map();
+    for (const player of roster) {
+      const key = String(player.division || "") + ":" + String(player.tier || "");
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  };
+  const previous = countByTier(state.players);
+  const incoming = countByTier(players);
+  return [...previous].every(([tier, count]) => count < 5 || (incoming.get(tier) || 0) > 0);
+}
+
 async function loadRoster(force = false) {
   refreshButton.disabled = true;
   statusLine.textContent = force ? "최신 티어 명단을 확인하고 있습니다." : "";
@@ -1126,7 +1145,10 @@ async function loadRoster(force = false) {
     const response = await fetch("/api/tiers" + (force ? "?refresh=1" : ""));
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "티어 명단을 불러오지 못했습니다.");
-    state.players = Array.isArray(data.players) ? data.players : [];
+    if (!isCompleteTierRoster(data.players)) {
+      throw new Error("불완전한 티어 명단이 도착해 기존 명단을 유지합니다.");
+    }
+    state.players = data.players;
     saveTierRoster();
     keepRosterLiveStatuses();
     const sharedStatuses = Array.isArray(data.liveStatuses)
@@ -1162,7 +1184,7 @@ async function syncDailyRoster() {
   try {
     const response = await fetch("/api/tiers?wait=1");
     const data = await response.json();
-    if (!response.ok || !Array.isArray(data.players) || !data.players.length) return;
+    if (!response.ok || !isCompleteTierRoster(data.players)) return;
     state.players = data.players;
     saveTierRoster();
     keepRosterLiveStatuses();
@@ -1177,28 +1199,62 @@ async function syncDailyRoster() {
 function statusSignature(status) {
   return JSON.stringify([
     Boolean(status?.isLive),
-    status?.broadcastUrl || "",
+    status?.broadcastUrl || ""
+  ]);
+}
+
+function statusDetailsSignature(status) {
+  return JSON.stringify([
     status?.title || "",
     Number(status?.viewerCount || 0),
     status?.thumbnail || ""
   ]);
 }
 
+function updateLiveCardDetails(name, status) {
+  const card = [...board.querySelectorAll(".player-card")]
+    .find((item) => item.dataset.player === name);
+  if (!card || !status.isLive) return;
+  const title = card.querySelector(".popover-title");
+  if (title) title.textContent = status.title || "현재 방송 중입니다.";
+  const thumb = card.querySelector(".popover-thumb");
+  if (thumb) thumb.dataset.viewers = formatViewers(status.viewerCount);
+  const image = thumb?.querySelector("img");
+  const thumbnail = liveThumbnailUrl(status);
+  if (image && thumbnail && image.src !== thumbnail) image.src = thumbnail;
+  const href = safeExternalUrl(status.broadcastUrl);
+  if (href) {
+    card.dataset.href = href;
+    const link = card.querySelector(".watch-link");
+    if (link) link.href = href;
+  }
+}
+
 function mergeLiveStatuses(statuses) {
   let changed = 0;
+  let updated = 0;
   for (const [name, status] of statuses) {
+    // 방송국 조회 실패는 방송 종료 확인이 아닙니다.
+    if (status?.stale || status?.available === false) continue;
     const incomingAt = Date.parse(status?.sharedAt || "");
     if (Number.isFinite(incomingAt) && Date.now() - incomingAt > LIVE_STATUS_MAX_AGE_MS) continue;
-    const previousAt = Date.parse(state.liveByName.get(name)?.sharedAt || "");
+    const previous = state.liveByName.get(name);
+    const previousAt = Date.parse(previous?.sharedAt || "");
     if (Number.isFinite(incomingAt) && Number.isFinite(previousAt) && incomingAt < previousAt) continue;
-    if (statusSignature(state.liveByName.get(name)) !== statusSignature(status)) changed += 1;
+    const visibilityChanged = statusSignature(previous) !== statusSignature(status);
+    const detailsChanged = statusDetailsSignature(previous) !== statusDetailsSignature(status);
+    if (!visibilityChanged && !detailsChanged && incomingAt === previousAt) continue;
+    if (visibilityChanged) changed += 1;
+    else if (detailsChanged) updateLiveCardDetails(name, status);
     state.liveByName.set(name, status);
+    updated += 1;
   }
-  saveLiveStatuses();
+  if (updated) saveLiveStatuses();
   return changed;
 }
 
 function expireStaleLiveStatuses() {
+  if (state.loadingLive) return;
   let removed = 0;
   for (const [name, status] of state.liveByName) {
     const checkedAt = Date.parse(status?.sharedAt || "");
@@ -1264,7 +1320,7 @@ async function deleteTierAdminPlayer() {
   const player = adminSelectedPlayer();
   if (!player || tierAdminSaving) return;
   if (!window.confirm(player.name + " 선수를 티어표에서 삭제할까요?\n삭제 후에는 이 목록에 표시되지 않습니다.")) return;
-  const playerName = player.name;
+  const playerName = player.customPlayer ? player.name : (player.realName || player.name);
   tierAdminSaving = true;
   setTierAdminControlsDisabled(true);
   tierAdminStatus.textContent = playerName + " 선수를 티어표에서 삭제하고 있습니다.";
@@ -1365,7 +1421,7 @@ async function loadLive(force = false) {
     statusLine.textContent = "LIVE 상태 확인이 지연되고 있습니다. 티어 명단은 정상적으로 볼 수 있습니다.";
   } finally {
     expireStaleLiveStatuses();
-    countdown.textContent = "15초마다 자동 갱신";
+    countdown.textContent = "LIVE 15초마다 확인";
     state.loadingLive = false;
     if (pendingLiveReload) {
       const shouldForce = pendingLiveForce;
