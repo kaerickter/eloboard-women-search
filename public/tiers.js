@@ -50,6 +50,10 @@ const tierAdminGlobalDelete = document.getElementById("tierAdminGlobalDelete");
 const tierAdminStatus = document.getElementById("tierAdminStatus");
 const LIVE_POLL_MS = 15000;
 const LIVE_SHARED_SYNC_MS = 1000;
+const LIVE_STATUS_MAX_AGE_MS = 30000;
+const LIVE_DISPLAY_MAX_AGE_MS = 60000;
+const LIVE_HOVER_REFRESH_MS = 30000;
+const LIVE_THUMBNAIL_REFRESH_MS = 15000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
 const TIER_ROSTER_CACHE_KEY = "tier-board-roster-v1";
 const TIER_VIEW_STATE_KEY = "tier-board-view-state-v1";
@@ -60,6 +64,7 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 let livePollTimer = null;
 let liveSharedSyncTimer = null;
+const liveHoverCheckedAt = new Map();
 let liveSocket = null;
 let pendingLiveReload = false;
 let pendingLiveForce = false;
@@ -218,9 +223,34 @@ function avatar(player) {
   return '<span class="player-avatar">' + escapeHtml(initial) + image + "</span>";
 }
 
+function liveThumbnailUrl(live, refresh = false) {
+  const broadcastUrl = safeExternalUrl(live?.broadcastUrl);
+  const fallback = safeExternalUrl(live?.thumbnail);
+  let broadNo = "";
+  try {
+    const broadcast = new URL(broadcastUrl);
+    if (broadcast.hostname === "play.sooplive.co.kr") {
+      broadNo = broadcast.pathname.match(/^\/[a-z0-9_-]+\/(\d+)(?:\/|$)/i)?.[1] || "";
+    }
+  } catch {
+    // 방송 번호가 없어도 서버가 제공한 썸네일 주소를 사용할 수 있습니다.
+  }
+  try {
+    const thumbnail = broadNo
+      ? new URL("https://liveimg.sooplive.co.kr/m/" + broadNo)
+      : new URL(fallback);
+    if (refresh && thumbnail.hostname === "liveimg.sooplive.co.kr") {
+      thumbnail.searchParams.set("t", String(Math.floor(Date.now() / LIVE_THUMBNAIL_REFRESH_MS)));
+    }
+    return thumbnail.href;
+  } catch {
+    return fallback;
+  }
+}
+
 function popover(live) {
   if (!live?.isLive) return "";
-  const thumbnailUrl = safeExternalUrl(live.thumbnail);
+  const thumbnailUrl = liveThumbnailUrl(live);
   const broadcastUrl = safeExternalUrl(live.broadcastUrl);
   const image = thumbnailUrl
     ? '<img src="' + escapeHtml(thumbnailUrl) + '" alt="현재 방송 썸네일" loading="lazy">'
@@ -976,6 +1006,7 @@ function bindCards() {
         card.classList.add("is-open");
         state.openCard = card;
         syncProfileAnimations();
+        if (card.classList.contains("is-live")) void refreshHoveredLiveCard(card);
         return;
       }
       openDestination();
@@ -990,6 +1021,7 @@ function bindCards() {
         card.classList.add("is-open");
         state.openCard = card;
         syncProfileAnimations();
+        if (card.classList.contains("is-live")) void refreshHoveredLiveCard(card);
         return;
       }
       openDestination();
@@ -997,6 +1029,12 @@ function bindCards() {
     card.addEventListener("mouseenter", () => {
       card.classList.add("is-hovered");
       syncProfileAnimations();
+      if (card.classList.contains("is-live")) {
+        refreshLiveThumbnail(card);
+        setTimeout(() => {
+          if (card.isConnected && card.matches(":hover")) void refreshHoveredLiveCard(card);
+        }, 500);
+      }
     });
     card.addEventListener("mouseleave", () => {
       card.classList.remove("is-hovered");
@@ -1007,6 +1045,27 @@ function bindCards() {
   });
 
   observeProfilePhotos();
+}
+
+function refreshLiveThumbnail(card) {
+  const image = card.querySelector(".popover-thumb img");
+  const thumbnail = liveThumbnailUrl(state.liveByName.get(card.dataset.player), true);
+  if (image && thumbnail && image.src !== thumbnail) image.src = thumbnail;
+}
+
+async function refreshHoveredLiveCard(card) {
+  const key = card.dataset.player;
+  const player = state.players.find((item) => keyOf(item.name) === key);
+  if (!player || Date.now() - (liveHoverCheckedAt.get(key) || 0) < LIVE_HOVER_REFRESH_MS) return;
+  liveHoverCheckedAt.set(key, Date.now());
+  try {
+    const statuses = await fetchLiveStatuses([player.name], true);
+    const changed = mergeLiveStatuses(statuses);
+    if (changed) render();
+    else if (card.isConnected) refreshLiveThumbnail(card);
+  } catch {
+    liveHoverCheckedAt.delete(key);
+  }
 }
 
 function closeOpenCard() {
@@ -1128,11 +1187,29 @@ function statusSignature(status) {
 function mergeLiveStatuses(statuses) {
   let changed = 0;
   for (const [name, status] of statuses) {
+    const incomingAt = Date.parse(status?.sharedAt || "");
+    if (Number.isFinite(incomingAt) && Date.now() - incomingAt > LIVE_STATUS_MAX_AGE_MS) continue;
+    const previousAt = Date.parse(state.liveByName.get(name)?.sharedAt || "");
+    if (Number.isFinite(incomingAt) && Number.isFinite(previousAt) && incomingAt < previousAt) continue;
     if (statusSignature(state.liveByName.get(name)) !== statusSignature(status)) changed += 1;
     state.liveByName.set(name, status);
   }
   saveLiveStatuses();
   return changed;
+}
+
+function expireStaleLiveStatuses() {
+  let removed = 0;
+  for (const [name, status] of state.liveByName) {
+    const checkedAt = Date.parse(status?.sharedAt || "");
+    if (!Number.isFinite(checkedAt) || Date.now() - checkedAt <= LIVE_DISPLAY_MAX_AGE_MS) continue;
+    state.liveByName.delete(name);
+    removed += 1;
+  }
+  if (!removed) return;
+  saveLiveStatuses();
+  updateLiveStatusLine();
+  render();
 }
 
 function saveLiveStatuses() {
@@ -1147,7 +1224,10 @@ function restoreLiveStatuses() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(LIVE_STATUS_CACHE_KEY) || "[]");
     if (!Array.isArray(saved) || !saved.length) return false;
-    state.liveByName = new Map(saved.filter((entry) => Array.isArray(entry) && entry.length === 2));
+    state.liveByName = new Map(saved.filter((entry) =>
+      Array.isArray(entry) && entry.length === 2 &&
+      Number.isFinite(Date.parse(entry[1]?.sharedAt || "")) &&
+      Date.now() - Date.parse(entry[1].sharedAt) <= LIVE_STATUS_MAX_AGE_MS));
     return state.liveByName.size > 0;
   } catch {
     return false;
@@ -1222,6 +1302,7 @@ function scheduleSharedLiveSync() {
   liveSharedSyncTimer = null;
   if (document.visibilityState !== "visible") return;
   liveSharedSyncTimer = setTimeout(() => {
+    expireStaleLiveStatuses();
     subscribeLiveStatuses();
     scheduleSharedLiveSync();
   }, LIVE_SHARED_SYNC_MS);
@@ -1283,6 +1364,7 @@ async function loadLive(force = false) {
   } catch {
     statusLine.textContent = "LIVE 상태 확인이 지연되고 있습니다. 티어 명단은 정상적으로 볼 수 있습니다.";
   } finally {
+    expireStaleLiveStatuses();
     countdown.textContent = "15초마다 자동 갱신";
     state.loadingLive = false;
     if (pendingLiveReload) {
@@ -1309,7 +1391,7 @@ async function fetchLiveStatuses(names, force = false) {
   if (!response.ok) throw new Error(data.error || "방송 상태를 불러오지 못했습니다.");
   if (!Array.isArray(data.statuses)) throw new Error("LIVE 상태 응답 형식이 올바르지 않습니다.");
   const statuses = new Map();
-  for (const item of data.statuses || []) statuses.set(keyOf(item.name), item);
+  for (const item of data.statuses || []) statuses.set(keyOf(item.name), { ...item, sharedAt: data.updatedAt });
   return statuses;
 }
 
