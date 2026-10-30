@@ -55,9 +55,9 @@ const LIVE_DISPLAY_MAX_AGE_MS = 3 * 60 * 1000;
 const LIVE_HOVER_REFRESH_MS = 30000;
 const LIVE_THUMBNAIL_REFRESH_MS = 15000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
+const LIVE_FULL_CHECK_KEY = "tier-board-live-full-check-v1";
 const TIER_ROSTER_CACHE_KEY = "tier-board-roster-v1";
 const TIER_VIEW_STATE_KEY = "tier-board-view-state-v1";
-const TIER_RETURN_ANCHOR_KEY = "tier-board-return-anchor-v1";
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
@@ -66,6 +66,7 @@ if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 let livePollTimer = null;
 let liveSharedSyncTimer = null;
 let rosterReturnTimer = null;
+let rosterReturnPending = false;
 const liveHoverCheckedAt = new Map();
 let liveSocket = null;
 let pendingLiveReload = false;
@@ -79,7 +80,7 @@ let tierAdminDrag = null;
 let tierAdminStorage = { mode: "unknown", durable: false, message: "" };
 let initialTierScrollPending = true;
 let holdLiveSnapshotUntilRefresh = false;
-let returnViewAnchor = null;
+let fullLiveChecked = false;
 
 const state = {
   players: [],
@@ -115,36 +116,6 @@ function restoreTierViewState() {
     state.liveOnly = Boolean(saved.liveOnly);
   } catch {
     // 손상된 저장값은 무시합니다.
-  }
-}
-
-function restoreTierReturnAnchor() {
-  try {
-    const previousPage = new URL(document.referrer);
-    if (previousPage.origin !== location.origin || previousPage.pathname === location.pathname) return;
-    const saved = JSON.parse(sessionStorage.getItem(TIER_RETURN_ANCHOR_KEY) || "null");
-    if (saved && typeof saved.id === "string" && Number.isFinite(saved.offset)) returnViewAnchor = saved;
-  } catch {
-    // 처음 방문했거나 저장된 위치가 손상된 경우에는 기존 5티어 시작 위치를 사용합니다.
-  }
-}
-
-function saveTierReturnAnchor() {
-  const viewportTop = Math.max(
-    document.querySelector(".site-nav")?.getBoundingClientRect().bottom || 0,
-    document.querySelector(".tier-filter-toolbar")?.getBoundingClientRect().bottom || 0
-  ) + 12;
-  const rows = [...board.querySelectorAll(".tier-row")];
-  const row = rows.find((item) => item.getBoundingClientRect().bottom > viewportTop) || rows.at(-1);
-  const id = row?.querySelector(".tier-label strong")?.id;
-  if (!id) return;
-  try {
-    sessionStorage.setItem(TIER_RETURN_ANCHOR_KEY, JSON.stringify({
-      id,
-      offset: row.getBoundingClientRect().top - viewportTop
-    }));
-  } catch {
-    // 저장 공간을 사용할 수 없으면 브라우저 기본 위치를 유지합니다.
   }
 }
 
@@ -998,21 +969,6 @@ function render() {
 
 function scrollToInitialTier() {
   if (!initialTierScrollPending) return;
-  if (returnViewAnchor) {
-    const saved = returnViewAnchor;
-    const row = document.getElementById(saved.id)?.closest(".tier-row");
-    if (row) {
-      initialTierScrollPending = false;
-      requestAnimationFrame(() => {
-        const viewportTop = Math.max(
-          document.querySelector(".site-nav")?.getBoundingClientRect().bottom || 0,
-          document.querySelector(".tier-filter-toolbar")?.getBoundingClientRect().bottom || 0
-        ) + 12;
-        window.scrollTo({ top: Math.max(0, window.scrollY + row.getBoundingClientRect().top - viewportTop - saved.offset), behavior: "auto" });
-      });
-      return;
-    }
-  }
   if (scrollToTierFive()) initialTierScrollPending = false;
 }
 
@@ -1190,6 +1146,7 @@ function isCompleteTierRoster(players) {
 async function loadRoster(force = false) {
   clearTimeout(rosterReturnTimer);
   rosterReturnTimer = null;
+  rosterReturnPending = false;
   refreshButton.disabled = true;
   statusLine.textContent = force ? "최신 티어 명단을 확인하고 있습니다." : "";
   try {
@@ -1210,7 +1167,7 @@ async function loadRoster(force = false) {
     render();
     if (force) {
       await loadLive(true);
-    } else if (state.liveByName.size) {
+    } else if (state.liveByName.size && fullLiveChecked) {
       updateLiveStatusLine();
       scheduleLivePoll();
     } else {
@@ -1335,6 +1292,7 @@ function restoreLiveStatuses() {
       Array.isArray(entry) && entry.length === 2 &&
       Number.isFinite(Date.parse(entry[1]?.sharedAt || ""))));
     holdLiveSnapshotUntilRefresh = state.liveByName.size > 0;
+    fullLiveChecked = holdLiveSnapshotUntilRefresh && sessionStorage.getItem(LIVE_FULL_CHECK_KEY) === "1";
     return state.liveByName.size > 0;
   } catch {
     return false;
@@ -1448,6 +1406,13 @@ function scheduleLivePoll() {
   }, LIVE_POLL_MS);
 }
 
+function scheduleRosterReturnRefresh() {
+  clearTimeout(rosterReturnTimer);
+  rosterReturnTimer = null;
+  if (!rosterReturnPending || document.visibilityState !== "visible") return;
+  rosterReturnTimer = setTimeout(() => { void loadRoster(); }, LIVE_POLL_MS);
+}
+
 async function loadLive(force = false) {
   if (!state.players.length) return;
   if (state.loadingLive) {
@@ -1467,6 +1432,10 @@ async function loadLive(force = false) {
     }
     const statuses = await fetchLiveStatuses(names, force);
     if (document.visibilityState !== "visible") return;
+    if (names.every((name) => statuses.has(keyOf(name)))) {
+      fullLiveChecked = true;
+      try { sessionStorage.setItem(LIVE_FULL_CHECK_KEY, "1"); } catch { /* 저장이 불가능하면 이번 화면에서만 유지합니다. */ }
+    }
     holdLiveSnapshotUntilRefresh = false;
     const changed = mergeLiveStatuses(statuses);
     updateLiveStatusLine();
@@ -1771,6 +1740,7 @@ document.addEventListener("visibilitychange", () => {
   syncProfileAnimations();
   if (document.visibilityState === "visible") {
     scheduleLivePoll();
+    scheduleRosterReturnRefresh();
     scheduleSharedLiveSync();
   } else {
     if (state.liveByName.size) holdLiveSnapshotUntilRefresh = true;
@@ -1778,10 +1748,11 @@ document.addEventListener("visibilitychange", () => {
     livePollTimer = null;
     clearTimeout(liveSharedSyncTimer);
     liveSharedSyncTimer = null;
+    clearTimeout(rosterReturnTimer);
+    rosterReturnTimer = null;
   }
 });
 window.addEventListener("pagehide", () => {
-  saveTierReturnAnchor();
   if (state.liveByName.size) holdLiveSnapshotUntilRefresh = true;
 });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
@@ -1804,13 +1775,13 @@ document.addEventListener("keydown", (event) => {
 });
 
 restoreTierViewState();
-restoreTierReturnAnchor();
 restoreLiveStatuses();
 const restoredRoster = restoreTierRoster();
 connectLiveStatusSharing();
-if (restoredRoster) {
+if (restoredRoster && fullLiveChecked) {
+  rosterReturnPending = true;
   scheduleLivePoll();
-  rosterReturnTimer = setTimeout(() => { void loadRoster(); }, LIVE_POLL_MS);
+  scheduleRosterReturnRefresh();
 } else {
   void loadRoster();
 }
