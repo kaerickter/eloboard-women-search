@@ -12,4 +12,4 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: node scripts/check-solo-integration.cjs
-      - run: node --test test/solo-archive.test.js test/solo-correction.test.mjs test/solo-startup.test.cjs
+      - run: node --test test/solo-archive.test.js test/solo-correction.test.mjs test/solo-startup.test.cjs test/solo-vod.test.mjs

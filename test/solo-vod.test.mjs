@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {Store} from '../solo/store.mjs';import {applyVodScreenshotCorrection} from '../solo/correction-20261031.mjs';
+test('VOD 1개가 방송·후원자·내려받기 합계에 한 번씩 포함된다',async()=>{
+ const store=new Store();const original=store.pool;const events=[{id:1,session_id:'s',at:new Date('2026-10-30T15:57:00Z'),kind:'regular',payload:{donorId:'fan',donor:'팬',count:100,serviceCode:18}},{id:2,session_id:'s',at:new Date('2026-10-30T15:58:27Z'),kind:'regular',payload:{donorId:'fan',donor:'팬',count:1,serviceCode:86,giftType:'vod'}}];
+ store.pool={async query(sql){return {rows:sql.startsWith('SELECT s.*')?[{id:'s',bno:'298227301',bj_id:'2ahgo1203',version:'2',name:'이아깽',started_at:new Date('2026-10-30T10:00:00Z')}]:events}}};
+ try{const r=await store.report();assert.equal(r.totals.total,101);assert.equal(r.totals.regularTotal,101);assert.equal(r.donors[0].total,101);assert.equal(r.sessions[0].recent[0].giftType,'vod');assert.equal((await store.report()).totals.total,101);const out=await store.export();assert.equal(out.report.totals.total,101);assert.equal(out.events.filter(e=>e.payload.serviceCode===86).length,1);}finally{await original.end();}
+});
+test('VOD 사진 보완은 지정 회차에 1개만 반영하고 재실행 중복을 막는다',async()=>{
+ let saved;const client={release(){},async query(sql,p=[]){if(sql.startsWith('SELECT id FROM'))return {rows:[{id:'target'}]};if(sql.startsWith('SELECT 1 FROM'))return {rowCount:saved?1:0};if(sql.startsWith('SELECT payload'))return {rows:[]};if(sql.startsWith('INSERT INTO')){assert.equal(p[0],'target');saved=JSON.parse(p[2]);return {rowCount:1}}return {rows:[]}}};const pool={connect:async()=>client};assert.equal(await applyVodScreenshotCorrection(pool),1);assert.equal(await applyVodScreenshotCorrection(pool),0);assert.equal(saved.count,1);assert.equal(saved.serviceCode,86);assert.equal(saved.approximateAt,true);assert.equal(saved.donorId,'');
+});
