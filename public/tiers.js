@@ -55,9 +55,10 @@ const LIVE_DISPLAY_MAX_AGE_MS = 3 * 60 * 1000;
 const LIVE_HOVER_REFRESH_MS = 30000;
 const LIVE_THUMBNAIL_REFRESH_MS = 15000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
-const LIVE_FULL_CHECK_KEY = "tier-board-live-full-check-v1";
+const LIVE_FULL_CHECK_KEY = "tier-board-live-full-check-v2";
 const TIER_ROSTER_CACHE_KEY = "tier-board-roster-v1";
 const TIER_VIEW_STATE_KEY = "tier-board-view-state-v1";
+const TIER_SCROLL_KEY = "tier-board-scroll-y-v1";
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
@@ -67,6 +68,7 @@ let livePollTimer = null;
 let liveSharedSyncTimer = null;
 let rosterReturnTimer = null;
 let rosterReturnPending = false;
+let tierScrollSaveTimer = null;
 const liveHoverCheckedAt = new Map();
 let liveSocket = null;
 let pendingLiveReload = false;
@@ -137,6 +139,25 @@ function restoreTierRoster() {
     return true;
   } catch {
     return false;
+  }
+}
+
+function savedTierScrollY() {
+  try {
+    const saved = sessionStorage.getItem(TIER_SCROLL_KEY);
+    if (saved === null) return null;
+    const position = Number(saved);
+    return Number.isFinite(position) && position >= 0 ? position : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveTierScrollY() {
+  try {
+    if (state.players.length) sessionStorage.setItem(TIER_SCROLL_KEY, String(Math.max(0, window.scrollY)));
+  } catch {
+    // 저장이 불가능하면 기본 화면 위치를 사용합니다.
   }
 }
 
@@ -1368,7 +1389,6 @@ function scheduleSharedLiveSync() {
   if (document.visibilityState !== "visible") return;
   liveSharedSyncTimer = setTimeout(() => {
     expireStaleLiveStatuses();
-    subscribeLiveStatuses();
     scheduleSharedLiveSync();
   }, LIVE_SHARED_SYNC_MS);
 }
@@ -1388,7 +1408,10 @@ function connectLiveStatusSharing() {
     const shared = new Map(
       statuses
         .filter((status) => rosterNames.has(keyOf(status?.name)))
-        .map((status) => [keyOf(status.name), status])
+        .map((status) => [keyOf(status.name), {
+          ...status,
+          sharedAt: status.sharedAt || payload.updatedAt
+        }])
     );
     if (!shared.size) return;
     const changed = mergeLiveStatuses(shared);
@@ -1741,6 +1764,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     scheduleLivePoll();
     scheduleRosterReturnRefresh();
+    subscribeLiveStatuses();
     scheduleSharedLiveSync();
   } else {
     if (state.liveByName.size) holdLiveSnapshotUntilRefresh = true;
@@ -1753,8 +1777,14 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 window.addEventListener("pagehide", () => {
+  clearTimeout(tierScrollSaveTimer);
   if (state.liveByName.size) holdLiveSnapshotUntilRefresh = true;
 });
+window.addEventListener("wheel", () => requestAnimationFrame(saveTierScrollY), { passive: true });
+window.addEventListener("scroll", () => {
+  clearTimeout(tierScrollSaveTimer);
+  tierScrollSaveTimer = setTimeout(saveTierScrollY, 800);
+}, { passive: true });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".tier-admin-player-search")) hideTierAdminSuggestions();
@@ -1776,7 +1806,14 @@ document.addEventListener("keydown", (event) => {
 
 restoreTierViewState();
 restoreLiveStatuses();
+const returnScrollY = fullLiveChecked ? savedTierScrollY() : null;
+if (returnScrollY !== null) initialTierScrollPending = false;
 const restoredRoster = restoreTierRoster();
+if (restoredRoster && returnScrollY !== null) {
+  requestAnimationFrame(() => window.scrollTo({ top: returnScrollY, behavior: "auto" }));
+} else if (!restoredRoster) {
+  initialTierScrollPending = true;
+}
 connectLiveStatusSharing();
 if (restoredRoster && fullLiveChecked) {
   rosterReturnPending = true;
