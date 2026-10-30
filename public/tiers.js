@@ -911,6 +911,17 @@ async function revertTierAdminMembership() {
 }
 
 function render() {
+  const previousRows = [...board.querySelectorAll(".tier-row")];
+  const viewportTop = Math.max(
+    document.querySelector(".site-nav")?.getBoundingClientRect().bottom || 0,
+    document.querySelector(".tier-filter-toolbar")?.getBoundingClientRect().bottom || 0
+  ) + 12;
+  const anchor = !initialTierScrollPending && window.scrollY > 0
+    ? previousRows.find((row) => row.getBoundingClientRect().bottom > viewportTop)
+    : null;
+  const anchorId = anchor?.querySelector(".tier-label strong")?.id;
+  const anchorTop = anchor?.getBoundingClientRect().top;
+  const previousIds = previousRows.map((row) => row.querySelector(".tier-label strong")?.id);
   renderDivisionFilters();
   renderLiveOnlyToggle();
   renderUniversityFilters();
@@ -924,6 +935,7 @@ function render() {
     board.innerHTML = '<div class="empty-card">' +
       (state.liveOnly ? "현재 방송중인 선수가 없습니다." : "선택한 대학에 표시할 선수가 없습니다.") +
       "</div>";
+    if (anchorId) window.scrollTo(0, Math.max(0, window.scrollY + board.getBoundingClientRect().top - viewportTop));
     return;
   }
 
@@ -959,6 +971,17 @@ function render() {
   }).join("");
 
   bindCards();
+  if (anchorId) {
+    let updatedRow = document.getElementById(anchorId)?.closest(".tier-row");
+    if (updatedRow) {
+      window.scrollBy(0, updatedRow.getBoundingClientRect().top - anchorTop);
+    } else {
+      const previousIndex = previousIds.indexOf(anchorId);
+      const closestIds = [...previousIds.slice(previousIndex + 1), ...previousIds.slice(0, previousIndex).reverse()];
+      updatedRow = closestIds.map((id) => document.getElementById(id)?.closest(".tier-row")).find(Boolean);
+      if (updatedRow) window.scrollBy(0, updatedRow.getBoundingClientRect().top - viewportTop);
+    }
+  }
   scrollToInitialTier();
 }
 
@@ -969,7 +992,7 @@ function scrollToInitialTier() {
 
 function scrollToTierFive() {
   const tierHeading = document.getElementById("tier-5티어") || document.getElementById("tier-5");
-  const tierRow = tierHeading?.closest(".tier-row");
+  const tierRow = tierHeading?.closest(".tier-row") || board.querySelector(".tier-row");
   if (!tierRow) return false;
 
   requestAnimationFrame(() => {
@@ -1283,7 +1306,7 @@ function restoreLiveStatuses() {
     state.liveByName = new Map(saved.filter((entry) =>
       Array.isArray(entry) && entry.length === 2 &&
       Number.isFinite(Date.parse(entry[1]?.sharedAt || "")) &&
-      Date.now() - Date.parse(entry[1].sharedAt) <= LIVE_STATUS_MAX_AGE_MS));
+      Date.now() - Date.parse(entry[1].sharedAt) <= LIVE_DISPLAY_MAX_AGE_MS));
     return state.liveByName.size > 0;
   } catch {
     return false;
@@ -1716,13 +1739,19 @@ tierAdminLogout.addEventListener("click", async () => {
 document.addEventListener("visibilitychange", () => {
   syncProfileAnimations();
   if (document.visibilityState === "visible") {
-    scheduleLivePoll();
+    void loadLive(false);
     scheduleSharedLiveSync();
   } else {
     clearTimeout(livePollTimer);
     livePollTimer = null;
     clearTimeout(liveSharedSyncTimer);
     liveSharedSyncTimer = null;
+  }
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    scrollToTierFive();
+    if (!state.loadingLive) void loadLive(false);
   }
 });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
