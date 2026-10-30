@@ -57,6 +57,7 @@ const LIVE_THUMBNAIL_REFRESH_MS = 15000;
 const LIVE_STATUS_CACHE_KEY = "tier-board-live-statuses-v1";
 const TIER_ROSTER_CACHE_KEY = "tier-board-roster-v1";
 const TIER_VIEW_STATE_KEY = "tier-board-view-state-v1";
+const TIER_RETURN_ANCHOR_KEY = "tier-board-return-anchor-v1";
 const ALL_UNIVERSITIES = "__all__";
 const FREE_AGENTS = "__fa__";
 const ALL_DIVISIONS = "__all__";
@@ -64,6 +65,7 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 let livePollTimer = null;
 let liveSharedSyncTimer = null;
+let rosterReturnTimer = null;
 const liveHoverCheckedAt = new Map();
 let liveSocket = null;
 let pendingLiveReload = false;
@@ -76,6 +78,8 @@ let tierAdminSuggestionIndex = -1;
 let tierAdminDrag = null;
 let tierAdminStorage = { mode: "unknown", durable: false, message: "" };
 let initialTierScrollPending = true;
+let holdLiveSnapshotUntilRefresh = false;
+let returnViewAnchor = null;
 
 const state = {
   players: [],
@@ -111,6 +115,36 @@ function restoreTierViewState() {
     state.liveOnly = Boolean(saved.liveOnly);
   } catch {
     // 손상된 저장값은 무시합니다.
+  }
+}
+
+function restoreTierReturnAnchor() {
+  try {
+    const previousPage = new URL(document.referrer);
+    if (previousPage.origin !== location.origin || previousPage.pathname === location.pathname) return;
+    const saved = JSON.parse(sessionStorage.getItem(TIER_RETURN_ANCHOR_KEY) || "null");
+    if (saved && typeof saved.id === "string" && Number.isFinite(saved.offset)) returnViewAnchor = saved;
+  } catch {
+    // 처음 방문했거나 저장된 위치가 손상된 경우에는 기존 5티어 시작 위치를 사용합니다.
+  }
+}
+
+function saveTierReturnAnchor() {
+  const viewportTop = Math.max(
+    document.querySelector(".site-nav")?.getBoundingClientRect().bottom || 0,
+    document.querySelector(".tier-filter-toolbar")?.getBoundingClientRect().bottom || 0
+  ) + 12;
+  const rows = [...board.querySelectorAll(".tier-row")];
+  const row = rows.find((item) => item.getBoundingClientRect().bottom > viewportTop) || rows.at(-1);
+  const id = row?.querySelector(".tier-label strong")?.id;
+  if (!id) return;
+  try {
+    sessionStorage.setItem(TIER_RETURN_ANCHOR_KEY, JSON.stringify({
+      id,
+      offset: row.getBoundingClientRect().top - viewportTop
+    }));
+  } catch {
+    // 저장 공간을 사용할 수 없으면 브라우저 기본 위치를 유지합니다.
   }
 }
 
@@ -911,17 +945,6 @@ async function revertTierAdminMembership() {
 }
 
 function render() {
-  const previousRows = [...board.querySelectorAll(".tier-row")];
-  const viewportTop = Math.max(
-    document.querySelector(".site-nav")?.getBoundingClientRect().bottom || 0,
-    document.querySelector(".tier-filter-toolbar")?.getBoundingClientRect().bottom || 0
-  ) + 12;
-  const anchor = !initialTierScrollPending && window.scrollY > 0
-    ? previousRows.find((row) => row.getBoundingClientRect().bottom > viewportTop)
-    : null;
-  const anchorId = anchor?.querySelector(".tier-label strong")?.id;
-  const anchorTop = anchor?.getBoundingClientRect().top;
-  const previousIds = previousRows.map((row) => row.querySelector(".tier-label strong")?.id);
   renderDivisionFilters();
   renderLiveOnlyToggle();
   renderUniversityFilters();
@@ -935,7 +958,6 @@ function render() {
     board.innerHTML = '<div class="empty-card">' +
       (state.liveOnly ? "현재 방송중인 선수가 없습니다." : "선택한 대학에 표시할 선수가 없습니다.") +
       "</div>";
-    if (anchorId) window.scrollTo(0, Math.max(0, window.scrollY + board.getBoundingClientRect().top - viewportTop));
     return;
   }
 
@@ -971,28 +993,32 @@ function render() {
   }).join("");
 
   bindCards();
-  if (anchorId) {
-    let updatedRow = document.getElementById(anchorId)?.closest(".tier-row");
-    if (updatedRow) {
-      window.scrollBy(0, updatedRow.getBoundingClientRect().top - anchorTop);
-    } else {
-      const previousIndex = previousIds.indexOf(anchorId);
-      const closestIds = [...previousIds.slice(previousIndex + 1), ...previousIds.slice(0, previousIndex).reverse()];
-      updatedRow = closestIds.map((id) => document.getElementById(id)?.closest(".tier-row")).find(Boolean);
-      if (updatedRow) window.scrollBy(0, updatedRow.getBoundingClientRect().top - viewportTop);
-    }
-  }
   scrollToInitialTier();
 }
 
 function scrollToInitialTier() {
   if (!initialTierScrollPending) return;
+  if (returnViewAnchor) {
+    const saved = returnViewAnchor;
+    const row = document.getElementById(saved.id)?.closest(".tier-row");
+    if (row) {
+      initialTierScrollPending = false;
+      requestAnimationFrame(() => {
+        const viewportTop = Math.max(
+          document.querySelector(".site-nav")?.getBoundingClientRect().bottom || 0,
+          document.querySelector(".tier-filter-toolbar")?.getBoundingClientRect().bottom || 0
+        ) + 12;
+        window.scrollTo({ top: Math.max(0, window.scrollY + row.getBoundingClientRect().top - viewportTop - saved.offset), behavior: "auto" });
+      });
+      return;
+    }
+  }
   if (scrollToTierFive()) initialTierScrollPending = false;
 }
 
 function scrollToTierFive() {
   const tierHeading = document.getElementById("tier-5티어") || document.getElementById("tier-5");
-  const tierRow = tierHeading?.closest(".tier-row") || board.querySelector(".tier-row");
+  const tierRow = tierHeading?.closest(".tier-row");
   if (!tierRow) return false;
 
   requestAnimationFrame(() => {
@@ -1162,6 +1188,8 @@ function isCompleteTierRoster(players) {
 }
 
 async function loadRoster(force = false) {
+  clearTimeout(rosterReturnTimer);
+  rosterReturnTimer = null;
   refreshButton.disabled = true;
   statusLine.textContent = force ? "최신 티어 명단을 확인하고 있습니다." : "";
   try {
@@ -1177,7 +1205,7 @@ async function loadRoster(force = false) {
     const sharedStatuses = Array.isArray(data.liveStatuses)
       ? new Map(data.liveStatuses.map((status) => [keyOf(status.name), status]))
       : new Map();
-    if (sharedStatuses.size) mergeLiveStatuses(sharedStatuses);
+    if (sharedStatuses.size && !holdLiveSnapshotUntilRefresh) mergeLiveStatuses(sharedStatuses);
     subscribeLiveStatuses();
     render();
     if (force) {
@@ -1277,7 +1305,7 @@ function mergeLiveStatuses(statuses) {
 }
 
 function expireStaleLiveStatuses() {
-  if (state.loadingLive) return;
+  if (state.loadingLive || holdLiveSnapshotUntilRefresh) return;
   let removed = 0;
   for (const [name, status] of state.liveByName) {
     const checkedAt = Date.parse(status?.sharedAt || "");
@@ -1305,8 +1333,8 @@ function restoreLiveStatuses() {
     if (!Array.isArray(saved) || !saved.length) return false;
     state.liveByName = new Map(saved.filter((entry) =>
       Array.isArray(entry) && entry.length === 2 &&
-      Number.isFinite(Date.parse(entry[1]?.sharedAt || "")) &&
-      Date.now() - Date.parse(entry[1].sharedAt) <= LIVE_DISPLAY_MAX_AGE_MS));
+      Number.isFinite(Date.parse(entry[1]?.sharedAt || ""))));
+    holdLiveSnapshotUntilRefresh = state.liveByName.size > 0;
     return state.liveByName.size > 0;
   } catch {
     return false;
@@ -1395,6 +1423,7 @@ function connectLiveStatusSharing() {
     scheduleSharedLiveSync();
   });
   liveSocket.on("live:statuses", (payload = {}) => {
+    if (holdLiveSnapshotUntilRefresh) return;
     const statuses = Array.isArray(payload.statuses) ? payload.statuses : [];
     if (!statuses.length) return;
     const rosterNames = new Set(state.players.map((player) => keyOf(player.name)));
@@ -1437,6 +1466,8 @@ async function loadLive(force = false) {
       return;
     }
     const statuses = await fetchLiveStatuses(names, force);
+    if (document.visibilityState !== "visible") return;
+    holdLiveSnapshotUntilRefresh = false;
     const changed = mergeLiveStatuses(statuses);
     updateLiveStatusLine();
     if (changed) render();
@@ -1739,20 +1770,19 @@ tierAdminLogout.addEventListener("click", async () => {
 document.addEventListener("visibilitychange", () => {
   syncProfileAnimations();
   if (document.visibilityState === "visible") {
-    void loadLive(false);
+    scheduleLivePoll();
     scheduleSharedLiveSync();
   } else {
+    if (state.liveByName.size) holdLiveSnapshotUntilRefresh = true;
     clearTimeout(livePollTimer);
     livePollTimer = null;
     clearTimeout(liveSharedSyncTimer);
     liveSharedSyncTimer = null;
   }
 });
-window.addEventListener("pageshow", (event) => {
-  if (event.persisted) {
-    scrollToTierFive();
-    if (!state.loadingLive) void loadLive(false);
-  }
+window.addEventListener("pagehide", () => {
+  saveTierReturnAnchor();
+  if (state.liveByName.size) holdLiveSnapshotUntilRefresh = true;
 });
 reducedMotion.addEventListener?.("change", syncProfileAnimations);
 document.addEventListener("click", (event) => {
@@ -1774,7 +1804,13 @@ document.addEventListener("keydown", (event) => {
 });
 
 restoreTierViewState();
+restoreTierReturnAnchor();
 restoreLiveStatuses();
-restoreTierRoster();
+const restoredRoster = restoreTierRoster();
 connectLiveStatusSharing();
-loadRoster();
+if (restoredRoster) {
+  scheduleLivePoll();
+  rosterReturnTimer = setTimeout(() => { void loadRoster(); }, LIVE_POLL_MS);
+} else {
+  void loadRoster();
+}
