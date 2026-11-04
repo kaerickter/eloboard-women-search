@@ -13,6 +13,13 @@ body:has(.kill-area) {
   --button-edge: #8a81dc;
   --button-hover: #dcd6ff;
 }
+/* 이름 4글자와 킬 수 3자리 기준으로 카드 폭을 맞춥니다. */
+.kill-area .chicken-kill-setting { font-size: 20px; }
+.kill-area .chicken-kill-setting input { font-size: 23px; }
+.kill-area .timer-control { font-size: 15px; }
+.kill-area .timer-control input { font-size: 17px; }
+.kill-area .timer-control button { font-size: 15px; }
+.kill-area .page-title { font-size: clamp(25px, 4.2vw, 38px); }
 /* 네 팀을 한 줄로 표시할 때 이름칸이 버튼에 밀리지 않도록 킬 내기만 넓힙니다. */
 body:has(.kill-area) .page-shell {
   width: min(1880px, 100%) !important;
@@ -57,9 +64,10 @@ body:has(.kill-area) .page-shell {
   padding: 0;
 }
 /* 4:4:4:4의 팀 카드 한 칸을 기준으로, 팀 수만큼만 섹션 너비를 사용합니다. */
-.kill-area .mode-section.one-team-mode { width: calc(25% + 18px); justify-self: start; }
-.kill-area .mode-section.two-team-mode { width: calc(50% + 12px); justify-self: start; }
-.kill-area .mode-section.three-team-mode { width: calc(75% + 6px); justify-self: start; }
+.kill-area .mode-section.one-team-mode { width: min(100%, 413px); justify-self: start; }
+.kill-area .mode-section.two-team-mode { width: min(100%, 802px); justify-self: start; }
+.kill-area .mode-section.three-team-mode { width: min(100%, 1191px); justify-self: start; }
+.kill-area .mode-section.four-team-mode { width: min(100%, 1580px); justify-self: start; }
 .kill-area .one-team-mode .team-grid { grid-template-columns: minmax(0, 1fr); }
 .kill-area .two-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .kill-area .three-team-mode .team-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -90,7 +98,7 @@ body:has(.kill-area) .page-shell {
 .kill-area .mode-section .team-label-input {
   border: 0;
   color: #fff;
-  font-size: 24px;
+  font-size: 25px;
   font-weight: 900;
   text-align: left;
 }
@@ -100,6 +108,7 @@ body:has(.kill-area) .page-shell {
   background: #f8f6ff;
   color: #463b9f;
   box-shadow: none;
+  font-size: 22px;
 }
 .kill-area .mode-section .score-panel {
   padding: 12px 14px 15px;
@@ -114,24 +123,26 @@ body:has(.kill-area) .page-shell {
   padding-bottom: 9px;
   border-bottom: 1px solid #ddd9f6;
 }
-.kill-area .mode-section .total-count { color: #514ab7; font-size: 27px; }
+.kill-area .mode-section .title-main { font-size: 25px; }
+.kill-area .mode-section .total-count { color: #514ab7; font-size: 28px; }
 .kill-area .mode-section .panel-chicken-field {
   margin-right: 0;
   border-color: #b4aaf0;
   background: #f7f5ff;
   color: #514ab7;
+  font-size: 18px;
 }
-.kill-area .mode-section .panel-chicken-input { color: #514ab7; }
+.kill-area .mode-section .panel-chicken-input { color: #514ab7; font-size: 15px; }
 .kill-area .mode-section .rows { gap: 2px; }
 .kill-area .mode-section .counter-row,
 .kill-area .one-team-mode .counter-row,
 .kill-area .two-team-mode .counter-row,
 .kill-area .three-team-mode .counter-row,
 .kill-area .four-team-mode .counter-row {
-  grid-template-columns: minmax(0, 1fr) 62px 38px 38px 52px 52px;
+  grid-template-columns: 88px 50px 38px 38px 52px 52px;
   justify-content: stretch;
   min-height: 48px;
-  gap: 5px;
+  gap: 4px;
   padding: 4px 2px;
   border-bottom: 1px solid #eeeaf9;
 }
@@ -143,11 +154,15 @@ body:has(.kill-area) .page-shell {
   border-bottom-color: #c8c0f0;
   color: #24204b;
   font-family: Arial, "Malgun Gothic", sans-serif;
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
 }
 .kill-area .mode-section .name-input::placeholder { color: #938bb9; }
-.kill-area .mode-section .count { color: #514ab7; font-size: 20px; font-variant-numeric: tabular-nums; }
+.kill-area .mode-section .count { color: #514ab7; font-size: 21px; font-variant-numeric: tabular-nums; }
+.kill-area .score-panel .reset-button { font-size: 14px; }
+.kill-area .score-panel .step-button { font-size: 23px; }
+.kill-area .score-panel .fail-button { font-size: 16px; }
+.kill-area .score-panel .cancel-button { font-size: 15px; }
 .kill-area .score-panel .reset-button,
 .kill-area .score-panel .step-button,
 .kill-area .score-panel .fail-button,
@@ -165,20 +180,26 @@ body:has(.kill-area) .page-shell {
 .kill-area .score-panel .fail-button.has-fails { border-color: #d96490 !important; background: #ffe4ef !important; }
 .kill-area .score-panel .cancel-button { color: #605a96 !important; }
 @media (max-width: 1680px) {
-  .kill-area .mode-section.one-team-mode { width: calc(50% + 12px); }
-  .kill-area .mode-section.two-team-mode,
-  .kill-area .mode-section.three-team-mode { width: 100%; }
+  .kill-area .mode-section.three-team-mode,
+  .kill-area .mode-section.four-team-mode { width: min(100%, 802px); }
   .kill-area .three-team-mode .team-grid,
   .kill-area .four-team-mode .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 680px) {
+@media (max-width: 850px) {
   .kill-area .mode-section.one-team-mode,
   .kill-area .mode-section.two-team-mode,
-  .kill-area .mode-section.three-team-mode { width: 100%; }
+  .kill-area .mode-section.three-team-mode,
+  .kill-area .mode-section.four-team-mode { width: min(100%, 413px); }
   .kill-area .one-team-mode .team-grid,
   .kill-area .two-team-mode .team-grid,
   .kill-area .three-team-mode .team-grid,
   .kill-area .four-team-mode .team-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 680px) {
   .kill-area .mode-section,
   .kill-area .mode-section.wide { padding: 11px; }
+}
+@media (max-width: 460px) {
+  /* 작은 화면에서는 이름과 버튼을 잘라내지 않고 점수판만 가로 이동합니다. */
+  .kill-area .board { min-width: 395px; }
 }
