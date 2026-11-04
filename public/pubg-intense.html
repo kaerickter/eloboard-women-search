@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="./common-theme.css">
   <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   <link rel="stylesheet" href="./collaboration.css">
-  <link rel="stylesheet" href="./pubg-intense.css?v=20261105-1">
-  <script defer src="./tournament-nav.js?v=20261105-pubg-intense"></script>
+  <link rel="stylesheet" href="./pubg-intense.css?v=20261105-centered-settings">
+  <script defer src="./tournament-nav.js?v=20261105-no-funding-solo"></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="페이지 이동">
@@ -28,20 +28,40 @@
 
   <main class="intense-shell">
     <header class="intense-hero">
-      <div>
+      <div class="intense-heading">
         <p class="intense-eyebrow">TEAM SCORE × KILL COUNTER</p>
         <input id="boardTitle" class="intense-title" value="배그 인텐스모드" maxlength="40" aria-label="대회 제목">
         <p>게임별 점수는 팀 합계로, 팀원의 킬은 팀 킬수로 따로 합산됩니다.</p>
       </div>
+      <section id="intenseSettings" class="intense-settings" aria-label="대결 설정">
+        <div class="setting">
+          <label for="teamSize">팀당 인원</label>
+          <div class="setting-stepper">
+            <button class="setting-step" type="button" data-target="teamSize" data-step="-1" aria-label="팀당 인원 줄이기">▼</button>
+            <input id="teamSize" type="number" min="1" max="8" value="4" inputmode="numeric">
+            <button class="setting-step" type="button" data-target="teamSize" data-step="1" aria-label="팀당 인원 늘리기">▲</button>
+          </div>
+        </div>
+        <div class="setting">
+          <label for="teamCount">팀 수</label>
+          <div class="setting-stepper">
+            <button class="setting-step" type="button" data-target="teamCount" data-step="-1" aria-label="팀 수 줄이기">▼</button>
+            <input id="teamCount" type="number" min="2" max="6" value="4" inputmode="numeric">
+            <button class="setting-step" type="button" data-target="teamCount" data-step="1" aria-label="팀 수 늘리기">▲</button>
+          </div>
+        </div>
+        <div class="setting">
+          <label for="gameCount">게임 수</label>
+          <div class="setting-stepper">
+            <button class="setting-step" type="button" data-target="gameCount" data-step="-1" aria-label="게임 수 줄이기">▼</button>
+            <input id="gameCount" type="number" min="1" max="20" value="10" inputmode="numeric">
+            <button class="setting-step" type="button" data-target="gameCount" data-step="1" aria-label="게임 수 늘리기">▲</button>
+          </div>
+        </div>
+        <strong id="sizeSummary" class="size-summary">4명 × 4팀 · 10게임</strong>
+      </section>
       <span class="save-state">방 참여 전에는 이 기기에 자동 저장</span>
     </header>
-
-    <section class="intense-settings" aria-label="대결 설정">
-      <label>팀당 인원 <input id="teamSize" type="number" min="1" max="8" value="4" inputmode="numeric"> 명</label>
-      <label>팀 수 <input id="teamCount" type="number" min="2" max="6" value="4" inputmode="numeric"> 팀</label>
-      <label>게임 수 <input id="gameCount" type="number" min="1" max="20" value="10" inputmode="numeric"> 게임</label>
-      <strong id="sizeSummary" class="size-summary">4명 × 4팀 · 10게임</strong>
-    </section>
 
     <section class="intense-card" aria-labelledby="score-title">
       <div class="section-head">
@@ -66,6 +86,6 @@
   </main>
   <script src="/socket.io/socket.io.js"></script>
   <script src="./collaboration.js"></script>
-  <script src="./pubg-intense.js?v=20261105-1"></script>
+  <script src="./pubg-intense.js?v=20261105-large-controls"></script>
 </body>
 </html>

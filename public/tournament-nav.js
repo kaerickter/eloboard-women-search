@@ -46,8 +46,9 @@
   function setupCalculatorMenu() {
     const link = document.querySelector('.site-nav a.site-tab[href$="match-scoreboard.html"]');
     if (!link || link.closest('.calculator-menu')) return;
+    const nav = link.closest('.site-nav');
     const wrapper = document.createElement('div');
-    wrapper.className = 'calculator-menu';
+    wrapper.className = 'tournament-menu calculator-menu';
     link.before(wrapper);
     wrapper.append(link);
 
@@ -61,17 +62,17 @@
     link.setAttribute('aria-expanded', 'false');
 
     const submenu = document.createElement('div');
-    submenu.className = 'calculator-submenu';
+    submenu.className = 'tournament-submenu calculator-submenu';
     submenu.setAttribute('aria-label', '점수계산기 하위 메뉴');
-    submenu.innerHTML = '<a href="./match-scoreboard.html">점수계산기</a><a href="./funding-distributor.html">펀딩분배기</a><a href="./pubg-intense.html">배그 인텐스모드</a>';
-    const current = submenu.querySelector(isIntensePage ? 'a:nth-child(3)' : isFundingPage ? 'a:nth-child(2)' : 'a:first-child');
-    if (link.classList.contains('active')) {
+    submenu.innerHTML = '<a href="./match-scoreboard.html">점수계산기</a><a href="./pubg-intense.html">배그 인텐스모드</a>';
+    const current = submenu.querySelector(isIntensePage ? 'a:last-child' : 'a:first-child');
+    if (link.classList.contains('active') && !isFundingPage) {
       current.classList.add('is-current');
       current.setAttribute('aria-current', 'page');
     }
     wrapper.append(submenu);
-    const open = () => link.setAttribute('aria-expanded', 'true');
-    const close = () => link.setAttribute('aria-expanded', 'false');
+    const open = () => { nav.classList.add('tournament-nav-open'); link.setAttribute('aria-expanded', 'true'); };
+    const close = () => { nav.classList.remove('tournament-nav-open'); link.setAttribute('aria-expanded', 'false'); };
     wrapper.addEventListener('mouseenter', open);
     wrapper.addEventListener('mouseleave', close);
     wrapper.addEventListener('focusin', open);
@@ -83,11 +84,21 @@
     });
   }
 
+  function setupBroadcastMenu() {
+    const nav = document.querySelector('.site-nav');
+    if (!nav || nav.querySelector('a[href="/solo/"]')) return;
+    const link = document.createElement('a');
+    link.className = 'site-tab';
+    link.href = '/solo/';
+    link.textContent = '이아깽 방송기록 🔒';
+    nav.append(link);
+  }
+
   const css = document.createElement('link');
   css.rel = 'stylesheet';
-  css.href = './tournament-nav.css?v=20261016-funding';
+  css.href = './tournament-nav.css?v=20261105-shared-dropdown';
   document.head.append(css);
-  function setupMenus() { setupTournamentMenu(); setupCalculatorMenu(); }
+  function setupMenus() { setupTournamentMenu(); setupCalculatorMenu(); setupBroadcastMenu(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupMenus);
   else setupMenus();
 })();

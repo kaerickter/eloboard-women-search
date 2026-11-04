@@ -244,6 +244,17 @@
   configure("teamSize", teamSizeInput, 1, MAX_MEMBERS);
   configure("teamCount", teamCountInput, 2, MAX_TEAMS);
   configure("games", gameCountInput, 1, MAX_GAMES);
+  document.querySelectorAll(".setting-step").forEach(button => {
+    button.addEventListener("click", () => {
+      const input = byId(button.dataset.target);
+      const key = button.dataset.target === "gameCount" ? "games" : button.dataset.target;
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const current = integer(input.value, min, max, state[key]);
+      input.value = String(integer(current + Number(button.dataset.step), min, max, current));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
   render();
   room = new RealtimeRoom({
     feature: "pubg-intense",
