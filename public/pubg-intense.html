@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="팀별 게임 점수와 개인 킬 수를 함께 기록하는 배그 인텐스모드">
+  <title>배그 인텐스모드 · ELOBoard 도구</title>
+  <link rel="stylesheet" href="./common-theme.css">
+  <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
+  <link rel="stylesheet" href="./collaboration.css">
+  <link rel="stylesheet" href="./pubg-intense.css?v=20261105-1">
+  <script defer src="./tournament-nav.js?v=20261105-pubg-intense"></script>
+</head>
+<body>
+  <nav class="site-nav" aria-label="페이지 이동">
+    <a class="site-tab" href="./tiers.html">티어표</a>
+    <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+    <a class="site-tab" href="./index.html">전적검색</a>
+    <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+    <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+    <a class="site-tab" href="./scoreboard.html">스코어보드</a>
+    <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+    <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+    <a class="site-tab active" href="./match-scoreboard.html">점수계산기</a>
+    <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+    <a class="site-tab cup-tab" href="./jungman-cup.html">K-중만컵</a>
+  </nav>
+
+  <main class="intense-shell">
+    <header class="intense-hero">
+      <div>
+        <p class="intense-eyebrow">TEAM SCORE × KILL COUNTER</p>
+        <input id="boardTitle" class="intense-title" value="배그 인텐스모드" maxlength="40" aria-label="대회 제목">
+        <p>게임별 점수는 팀 합계로, 팀원의 킬은 팀 킬수로 따로 합산됩니다.</p>
+      </div>
+      <span class="save-state">방 참여 전에는 이 기기에 자동 저장</span>
+    </header>
+
+    <section class="intense-settings" aria-label="대결 설정">
+      <label>팀당 인원 <input id="teamSize" type="number" min="1" max="8" value="4" inputmode="numeric"> 명</label>
+      <label>팀 수 <input id="teamCount" type="number" min="2" max="6" value="4" inputmode="numeric"> 팀</label>
+      <label>게임 수 <input id="gameCount" type="number" min="1" max="20" value="10" inputmode="numeric"> 게임</label>
+      <strong id="sizeSummary" class="size-summary">4명 × 4팀 · 10게임</strong>
+    </section>
+
+    <section class="intense-card" aria-labelledby="score-title">
+      <div class="section-head">
+        <div><p class="section-kicker">GAME SCORES</p><h2 id="score-title">게임별 팀 점수</h2></div>
+        <span>점수와 코멘트를 입력하면 합계가 바로 갱신됩니다.</span>
+      </div>
+      <div class="table-scroll">
+        <table class="game-table">
+          <thead id="scoreHead"></thead>
+          <tbody id="scoreBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="intense-card" aria-labelledby="team-title">
+      <div class="section-head">
+        <div><p class="section-kicker">TEAM KILLS</p><h2 id="team-title">팀명 · 팀원 · 킬수</h2></div>
+        <span>+ / −로 킬을 기록하고, 실패는 취소할 수 있습니다.</span>
+      </div>
+      <div id="teamCards" class="team-cards"></div>
+    </section>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="./collaboration.js"></script>
+  <script src="./pubg-intense.js?v=20261105-1"></script>
+</body>
+</html>

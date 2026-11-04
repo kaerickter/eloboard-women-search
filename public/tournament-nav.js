@@ -43,10 +43,51 @@
     });
   }
 
+  function setupCalculatorMenu() {
+    const link = document.querySelector('.site-nav a.site-tab[href$="match-scoreboard.html"]');
+    if (!link || link.closest('.calculator-menu')) return;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'calculator-menu';
+    link.before(wrapper);
+    wrapper.append(link);
+
+    const isFundingPage = location.pathname.endsWith('/funding-distributor.html');
+    const isIntensePage = location.pathname.endsWith('/pubg-intense.html');
+    if (isFundingPage || isIntensePage) {
+      link.classList.add('active');
+      link.removeAttribute('aria-current');
+    }
+    link.setAttribute('aria-haspopup', 'true');
+    link.setAttribute('aria-expanded', 'false');
+
+    const submenu = document.createElement('div');
+    submenu.className = 'calculator-submenu';
+    submenu.setAttribute('aria-label', '점수계산기 하위 메뉴');
+    submenu.innerHTML = '<a href="./match-scoreboard.html">점수계산기</a><a href="./funding-distributor.html">펀딩분배기</a><a href="./pubg-intense.html">배그 인텐스모드</a>';
+    const current = submenu.querySelector(isIntensePage ? 'a:nth-child(3)' : isFundingPage ? 'a:nth-child(2)' : 'a:first-child');
+    if (link.classList.contains('active')) {
+      current.classList.add('is-current');
+      current.setAttribute('aria-current', 'page');
+    }
+    wrapper.append(submenu);
+    const open = () => link.setAttribute('aria-expanded', 'true');
+    const close = () => link.setAttribute('aria-expanded', 'false');
+    wrapper.addEventListener('mouseenter', open);
+    wrapper.addEventListener('mouseleave', close);
+    wrapper.addEventListener('focusin', open);
+    wrapper.addEventListener('focusout', () => window.setTimeout(() => {
+      if (!wrapper.contains(document.activeElement)) close();
+    }, 0));
+    wrapper.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { close(); link.focus(); }
+    });
+  }
+
   const css = document.createElement('link');
   css.rel = 'stylesheet';
-  css.href = './tournament-nav.css?v=20261009';
+  css.href = './tournament-nav.css?v=20261016-funding';
   document.head.append(css);
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupTournamentMenu);
-  else setupTournamentMenu();
+  function setupMenus() { setupTournamentMenu(); setupCalculatorMenu(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupMenus);
+  else setupMenus();
 })();

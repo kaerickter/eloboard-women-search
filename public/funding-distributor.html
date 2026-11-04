@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SOOP 별풍선 펀딩 총액을 참가자별로 나누어 보는 분배 계산기">
+  <title>펀딩분배기 · ELOBoard 도구</title>
+  <link rel="stylesheet" href="./scoreboard.css?v=20261002-score-text-17px">
+  <link rel="stylesheet" href="./common-theme.css">
+  <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
+  <link rel="stylesheet" href="./funding-distributor.css?v=20261016">
+  <script defer src="./tournament-nav.js?v=20261105-pubg-intense"></script>
+  <script defer src="./funding-distributor.js?v=20261016"></script>
+</head>
+<body>
+  <nav class="site-nav" aria-label="페이지 이동">
+    <a class="site-tab" href="./tiers.html">티어표</a>
+    <a class="site-tab" href="./spawn-diary.html">스폰일지</a>
+    <a class="site-tab" href="./index.html">전적검색</a>
+    <a class="site-tab matchup" href="./matchup.html">상대전적</a>
+    <a class="site-tab university" href="./university-matchup.html">대학대결</a>
+    <a class="site-tab" href="./scoreboard.html">스코어보드</a>
+    <a class="site-tab bingo" href="./bingo-board.html">빙고판 열기</a>
+    <a class="site-tab" href="./kill-bet.html">킬 내기</a>
+    <a class="site-tab active" href="./match-scoreboard.html">점수계산기</a>
+    <a class="site-tab roulette" href="./lucky-roulette.html">행운 돌림판</a>
+    <a class="site-tab cup-tab" href="./jungman-cup.html">K-중만컵</a>
+  </nav>
+
+  <main class="funding-shell">
+    <header class="funding-hero">
+      <p class="funding-eyebrow">SOOP FUNDING SPLIT</p>
+      <h1>펀딩분배기</h1>
+      <p>펀딩 별풍선을 참가자에게 균등 또는 가중치로 나눠 보세요. 이 계산은 SOOP 공식 정산·수수료와 무관합니다.</p>
+    </header>
+
+    <div class="funding-layout">
+      <section class="funding-card" aria-labelledby="funding-input-title">
+        <div class="funding-card-head"><h2 id="funding-input-title">분배 설정</h2><span>이 기기에만 자동 저장</span></div>
+        <div class="funding-top-inputs">
+          <label>펀딩 총액 <small>별풍선 개수</small><input id="fundingTotal" type="number" min="0" max="1000000000" step="1" inputmode="numeric" placeholder="예: 100000"></label>
+          <label>제외할 수량 <small>선택 사항 · 기본 0</small><input id="fundingExcluded" type="number" min="0" max="1000000000" step="1" inputmode="numeric" value="0"></label>
+        </div>
+        <fieldset class="funding-mode">
+          <legend>분배 방식</legend>
+          <label><input type="radio" name="fundingMode" value="equal" checked> 균등 분배</label>
+          <label><input type="radio" name="fundingMode" value="weighted"> 가중치 분배</label>
+        </fieldset>
+        <div class="funding-people-head"><h3>참가자</h3><button type="button" id="addFundingPerson" class="funding-button">+ 참가자 추가</button></div>
+        <p class="funding-help">가중치 2는 가중치 1의 두 배를 받습니다. 남는 1개 단위는 위쪽 참가자부터 배분합니다.</p>
+        <div id="fundingPeople" class="funding-people"></div>
+      </section>
+
+      <section class="funding-card funding-results" aria-labelledby="funding-result-title">
+        <div class="funding-card-head"><h2 id="funding-result-title">분배 결과</h2><button type="button" id="copyFundingResult" class="funding-button" disabled>결과 복사</button></div>
+        <div class="funding-summary"><div><span>펀딩 총액</span><strong id="fundingGross">0</strong></div><div><span>제외 수량</span><strong id="fundingHeld">0</strong></div><div class="funding-net"><span>분배 대상</span><strong id="fundingNet">0</strong></div></div>
+        <p id="fundingMessage" class="funding-message" role="status">펀딩 총액과 참가자 이름을 입력하면 결과가 표시됩니다.</p>
+        <div id="fundingResultList" class="funding-result-list" aria-live="polite"></div>
+        <p class="funding-note">별풍선 개수 기준 예상 분배표입니다. 실제 지급, 환전액, 세금 및 SOOP 대결미션 자동 정산은 계산하지 않습니다.</p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
