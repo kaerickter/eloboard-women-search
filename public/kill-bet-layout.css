@@ -13,6 +13,10 @@ body:has(.kill-area) {
   --button-edge: #8a81dc;
   --button-hover: #dcd6ff;
 }
+/* 네 팀을 한 줄로 표시할 때 이름칸이 버튼에 밀리지 않도록 킬 내기만 넓힙니다. */
+body:has(.kill-area) .page-shell {
+  width: min(1880px, 100%) !important;
+}
 .kill-area .board {
   width: min(100%, 1880px);
   display: flex;
@@ -160,7 +164,7 @@ body:has(.kill-area) {
 .kill-area .score-panel .fail-button { color: #a63762 !important; }
 .kill-area .score-panel .fail-button.has-fails { border-color: #d96490 !important; background: #ffe4ef !important; }
 .kill-area .score-panel .cancel-button { color: #605a96 !important; }
-@media (max-width: 1350px) {
+@media (max-width: 1680px) {
   .kill-area .mode-section.one-team-mode { width: calc(50% + 12px); }
   .kill-area .mode-section.two-team-mode,
   .kill-area .mode-section.three-team-mode { width: 100%; }
