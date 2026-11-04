@@ -3,7 +3,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { Pool } = require("pg");
 
-const FEATURES = new Set(["bingo", "kill-bet", "scoreboard"]);
+const FEATURES = new Set(["bingo", "kill-bet", "scoreboard", "pubg-intense"]);
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ROOM_FILE = process.env.ROOM_DATA_FILE || path.join(__dirname, "data", "collaboration-rooms.json");
 const DATABASE_RETRY_MS = 15000;
@@ -24,6 +24,15 @@ function defaultState(feature) {
     chickenKillValue: 1,
     panels: {},
     timer: normalizeBingoTimer()
+  };
+  if (feature === "pubg-intense") return {
+    title: "배그 인텐스모드", teamSize: 4, teamCount: 4, games: 10,
+    teamNames: Array.from({ length: 6 }, (_, index) => `${index + 1}팀`),
+    memberNames: Array.from({ length: 6 }, () => Array(8).fill("")),
+    scores: Array.from({ length: 6 }, () => Array(20).fill("")),
+    comments: Array.from({ length: 6 }, () => Array(20).fill("")),
+    kills: Array.from({ length: 6 }, () => Array(8).fill(0)),
+    fails: Array.from({ length: 6 }, () => Array(8).fill(0))
   };
   return {
     title: "매치 카멜레온", players: 7, games: 9, names: Array(7).fill(""),
@@ -132,6 +141,25 @@ function normalizeState(feature, raw = {}) {
       chickenKillValue: number(raw.chickenKillValue, 0, 999, 1),
       panels,
       timer: normalizeBingoTimer(raw.timer)
+    };
+  }
+  if (feature === "pubg-intense") {
+    return {
+      title: text(raw.title ?? "배그 인텐스모드", 40),
+      teamSize: number(raw.teamSize, 1, 8, 4),
+      teamCount: number(raw.teamCount, 2, 6, 4),
+      games: number(raw.games, 1, 20, 10),
+      teamNames: Array.from({ length: 6 }, (_, team) => text(raw.teamNames?.[team] ?? `${team + 1}팀`, 24)),
+      memberNames: Array.from({ length: 6 }, (_, team) =>
+        Array.from({ length: 8 }, (_, member) => text(raw.memberNames?.[team]?.[member], 24))),
+      scores: Array.from({ length: 6 }, (_, team) =>
+        Array.from({ length: 20 }, (_, game) => text(raw.scores?.[team]?.[game], 12))),
+      comments: Array.from({ length: 6 }, (_, team) =>
+        Array.from({ length: 20 }, (_, game) => text(raw.comments?.[team]?.[game], 80))),
+      kills: Array.from({ length: 6 }, (_, team) =>
+        Array.from({ length: 8 }, (_, member) => number(raw.kills?.[team]?.[member], -9999, 9999, 0))),
+      fails: Array.from({ length: 6 }, (_, team) =>
+        Array.from({ length: 8 }, (_, member) => number(raw.fails?.[team]?.[member], -9999, 0, 0)))
     };
   }
   const players = number(raw.players, 1, 30, 7);
