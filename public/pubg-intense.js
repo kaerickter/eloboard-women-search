@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const STORAGE_KEY = "eloboard.pubgIntense.v1";
-  const MAX_TEAMS = 6;
+  const MAX_TEAMS = 8;
   const MAX_MEMBERS = 8;
   const MAX_GAMES = 20;
   const byId = id => document.getElementById(id);
@@ -121,14 +121,7 @@
           });
         score.placeholder = "0";
         score.inputMode = "numeric";
-        const comment = makeInput("comment-input", state.comments[team][game],
-          `${team + 1}팀 ${game + 1}게임 코멘트`, `comments.${team}.${game}`, event => {
-            state.comments[team][game] = event.target.value;
-            room?.sendSet(`comments.${team}.${game}`, event.target.value);
-            save();
-          });
-        comment.placeholder = "코멘트";
-        entry.append(score, comment);
+        entry.append(score);
         cell.append(entry);
         row.append(cell);
       }
@@ -162,7 +155,6 @@
   }
   function renderCards() {
     teamCards.replaceChildren();
-    teamCards.classList.toggle("three-columns", state.teamCount >= 5);
     teamCards.classList.toggle("two-columns", state.teamCount === 2);
     for (let team = 0; team < state.teamCount; team += 1) {
       const card = document.createElement("article");

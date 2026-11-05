@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./common-theme.css">
   <link rel="stylesheet" href="./purple-five-tabs.css?v=20260731-nav-score-calculator">
   <link rel="stylesheet" href="./collaboration.css">
-  <link rel="stylesheet" href="./pubg-intense.css?v=20261105-centered-settings">
+  <link rel="stylesheet" href="./pubg-intense.css?v=20261105-eight-teams-scores">
   <script defer src="./tournament-nav.js?v=20261105-no-funding-solo"></script>
 </head>
 <body>
@@ -46,7 +46,7 @@
           <label for="teamCount">팀 수</label>
           <div class="setting-stepper">
             <button class="setting-step" type="button" data-target="teamCount" data-step="-1" aria-label="팀 수 줄이기">▼</button>
-            <input id="teamCount" type="number" min="2" max="6" value="4" inputmode="numeric">
+            <input id="teamCount" type="number" min="2" max="8" value="4" inputmode="numeric">
             <button class="setting-step" type="button" data-target="teamCount" data-step="1" aria-label="팀 수 늘리기">▲</button>
           </div>
         </div>
@@ -66,7 +66,7 @@
     <section class="intense-card" aria-labelledby="score-title">
       <div class="section-head">
         <div><p class="section-kicker">GAME SCORES</p><h2 id="score-title">게임별 팀 점수</h2></div>
-        <span>점수와 코멘트를 입력하면 합계가 바로 갱신됩니다.</span>
+        <span>점수를 입력하면 합계가 바로 갱신됩니다.</span>
       </div>
       <div class="table-scroll">
         <table class="game-table">
@@ -86,6 +86,6 @@
   </main>
   <script src="/socket.io/socket.io.js"></script>
   <script src="./collaboration.js"></script>
-  <script src="./pubg-intense.js?v=20261105-large-controls"></script>
+  <script src="./pubg-intense.js?v=20261105-eight-teams-scores"></script>
 </body>
 </html>

@@ -49,13 +49,11 @@ button, input { font: inherit; }
 .game-table .game-cell { width: 96px; min-width: 96px; padding: 5px 6px; }
 .game-table .total-head, .game-table .total-cell { width: 88px; min-width: 88px; background: #eeecce; color: #282454; font-weight: 900; }
 .game-table .total-cell { font-size: 20px; }
-.score-entry { display: grid; gap: 3px; }
+.score-entry { display: grid; }
 .score-entry input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; text-align: center; }
-.score-entry .score-input { height: 28px; color: #272251; font-size: 18px; font-weight: 900; }
-.score-entry .comment-input { height: 23px; border-top: 1px dashed #ddd9eb; color: #777088; font-size: 11px; }
+.score-entry .score-input { height: 54px; color: #272251; font-size: 24px; font-weight: 900; }
 .score-entry input:focus { background: #eeeaff; border-radius: 5px; }
 .team-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
-.team-cards.three-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .team-cards.two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .team-card { min-width: 0; border: 1px solid #c8c0f1; border-radius: 12px; overflow: hidden; background: #fff; }
 .team-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 10px 12px; background: linear-gradient(100deg, #5e56c3, #7770e1); }
@@ -97,12 +95,12 @@ button, input { font: inherit; }
   .save-state { grid-column: 1; justify-self: start; }
 }
 @media (max-width: 1080px) {
-  .team-cards, .team-cards.three-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .team-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 710px) {
   .intense-settings { grid-template-columns: repeat(2, 188px); }
   .size-summary { justify-self: start; }
-  .team-cards, .team-cards.three-columns, .team-cards.two-columns { grid-template-columns: minmax(0, 1fr); }
+  .team-cards, .team-cards.two-columns { grid-template-columns: minmax(0, 1fr); }
   .section-head { align-items: start; flex-direction: column; }
 }
 @media (max-width: 475px) {
