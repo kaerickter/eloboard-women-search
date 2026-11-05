@@ -440,13 +440,21 @@ function renderRaceRates(data) {
       ? data.profile.raceTotals.combined && data.profile.raceTotals.combined[race]
       : null;
     const officialOverall = parsedOverall && Number(parsedOverall.games) > 0 ? parsedOverall : null;
+    const completeHistory = Number(data?.profile?.total?.games) > 0 &&
+      rows.length >= Number(data.profile.total.games);
     const values = {
-      Overall: officialOverall || periodStats(raceRows),
+      Overall: officialOverall || (completeHistory ? periodStats(raceRows) : null),
       Year: periodStats(yearRows),
       Month: periodStats(monthRows)
     };
     for (const [period, stats] of Object.entries(values)) {
       const element = $("race" + period + race);
+      if (!stats) {
+        element.textContent = "전체 전적 확인 불가";
+        element.title = "공식 종족별 전체 전적을 가져오지 못했습니다.";
+        element.dataset.empty = "true";
+        continue;
+      }
       element.innerHTML = '<span class="race-stat-games">' + stats.games + '전</span>' +
         '<span class="race-stat-wins">' + stats.wins + '승</span>' +
         '<span class="race-stat-losses">' + stats.losses + '패</span>' +
