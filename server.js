@@ -1307,6 +1307,22 @@ function publicEloMatchKey(row) {
   return [row.date, normalizeName(row.opponent), String(row.map || "").trim(),
     row.result || (Number(row.elo) > 0 ? "승" : "패"), String(row.format || "").trim()].join("|");
 }
+function parsePublicRaceTotals(html) {
+  const heading = String(html || "").match(/<h2[^>]*>\s*종족별 전적\s*<\/h2>/)?.[0] || "";
+  const start = heading ? html.indexOf(heading) : -1;
+  if (start < 0) return {};
+  const end = html.indexOf("</section>", start);
+  const visible = cleanText(html.slice(start, end > start ? end : start + 3500));
+  const totals = {};
+  for (const [race, label] of [["T", "테란"], ["Z", "저그"], ["P", "프로토스"]]) {
+    const record = visible.match(new RegExp("vs\\s*" + label + "[\\s\\S]{0,90}?([\\d,]+)\\s*승\\s*([\\d,]+)\\s*패"));
+    if (!record) continue;
+    const wins = Number(record[1].replace(/,/g, ""));
+    const losses = Number(record[2].replace(/,/g, ""));
+    totals[race] = recordRate({ games: wins + losses, wins, losses });
+  }
+  return totals;
+}
 function parsePublicEloProfile(html, playerId, previous = null, expectedName = "") {
   const title = cleanText(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "");
   const name = title.split("·")[0].trim();
@@ -1321,22 +1337,8 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
   const total = apiRecord(number(totals[2]), number(totals[3]), number(totals[1]));
   if (total.games !== total.wins + total.losses) throw new Error("ELOBoard 공개 총전적이 일치하지 않습니다.");
   const division = html.includes("여성부") ? "women" : html.includes("남성부") ? "men" : previous?.division || "";
-  const raceTotals = {
-    ...(previous?.raceTotals || {}),
-    combined: { ...(previous?.raceTotals?.combined || {}) }
-  };
-  const raceStart = html.indexOf("<h2>종족별 전적</h2>");
-  const raceSection = raceStart < 0 ? "" : html.slice(raceStart, raceStart + 3500);
-  const raceMarkers = [...raceSection.matchAll(/<i[^>]*class="race\s+([TZP])"[^>]*>/g)];
-  for (const [index, marker] of raceMarkers.entries()) {
-    const recordText = cleanText(raceSection.slice(marker.index,
-      raceMarkers[index + 1]?.index ?? raceSection.length));
-    const record = recordText.match(/([\d,]+)승\s*([\d,]+)패/);
-    if (!record) continue;
-    const wins = number(record[1]);
-    const losses = number(record[2]);
-    raceTotals.combined[marker[1]] = recordRate({ games: wins + losses, wins, losses });
-  }
+  // 이전 저장본의 부분 종족 기록은 공식 전체 기록으로 재사용하지 않습니다.
+  const raceTotals = { women: {}, mixed: {}, combined: parsePublicRaceTotals(html) };
   const recentSection = html.match(/<h2>최근 경기<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
   const publicRows = [];
   for (const match of recentSection.matchAll(/<div class="[^"]*mrow[^"]*">([\s\S]*?)<\/div>/g)) {
@@ -1394,6 +1396,21 @@ async function loadPublicEloProfile(playerId, previous = null, expectedName = ""
   }, 1);
   if (!response.ok) throw new Error("ELOBoard 공개 선수 페이지 response error: " + response.status);
   const profile = parsePublicEloProfile(await response.text(), playerId, previous, expectedName);
+  if (["T", "Z", "P"].some((race) => !profile.raceTotals.combined[race])) {
+    try {
+      const racesResponse = await fetchWithRetry(apiPlayerUrl(playerId) + "?tab=races", {
+        headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
+      }, 1);
+      if (racesResponse.ok) {
+        profile.raceTotals.combined = {
+          ...profile.raceTotals.combined,
+          ...parsePublicRaceTotals(await racesResponse.text())
+        };
+      }
+    } catch (error) {
+      console.warn("ELOBoard public race totals unavailable:", error.message);
+    }
+  }
   profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
   void rememberProfileSnapshot(profile);
   return profile;
