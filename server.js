@@ -4741,19 +4741,20 @@ const server = http.createServer(async (req, res) => {
             resultState: "found"
           }));
         }
-        // 현재 /players/{id} 번호는 성별과 관계없이 새 API에서 직접 읽습니다.
-        // 예전 여성 게시판 캐시가 같은 숫자 키로 남아 있어도 섞이지 않게 합니다.
+        // /players/{id}는 옛 게시판의 wr_id와 다른 번호입니다.
+        // API가 막혔을 때 옛 주소의 정상 HTTP 응답(빈 EloBoard 페이지)을 선수로 오인하지 않습니다.
         let profile;
         try {
           profile = await loadApiProfile(requestedWrId, force, query);
         } catch (apiError) {
-          profile = String(requestedWrId) === IAKKANG_WR_ID
+          const saved = String(requestedWrId) === IAKKANG_API_ID
             ? await loadStoredIakkangProfile()
-            : url.searchParams.get("division") === "men"
-            ? await loadMenProfile(requestedWrId, force, query)
-            : await loadProfile(requestedWrId, force);
+            : await cachedProfileForName(query);
+          if (!saved || String(saved.wrId) !== String(requestedWrId)) throw apiError;
+          profile = { ...saved, stale: true, cached: true };
         }
-        const autoDiarySync = await syncSpawnDiaryNow(query, profile);
+        // 저장본은 새 전적이 아니므로 스폰일지 자동등록에도 다시 보내지 않습니다.
+        const autoDiarySync = profile.cached ? null : await syncSpawnDiaryNow(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
         const result = summarize([], query);
@@ -4763,6 +4764,10 @@ const server = http.createServer(async (req, res) => {
           players,
           profile,
           autoDiarySync,
+          cached: Boolean(profile?.cached),
+          cacheNotice: profile?.cached
+            ? "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다. 자동 재시도는 하지 않습니다."
+            : "",
           resultState: profile ? "found" : "empty"
         }));
       }
