@@ -1320,6 +1320,21 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
   const number = (value) => Number(value.replace(/,/g, ""));
   const total = apiRecord(number(totals[2]), number(totals[3]), number(totals[1]));
   if (total.games !== total.wins + total.losses) throw new Error("ELOBoard 공개 총전적이 일치하지 않습니다.");
+  const division = html.includes("여성부") ? "women" : html.includes("남성부") ? "men" : previous?.division || "";
+  const raceTotals = {
+    ...(previous?.raceTotals || {}),
+    combined: { ...(previous?.raceTotals?.combined || {}) }
+  };
+  const raceSection = html.match(/<h2>종족별 전적<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
+  for (const item of raceSection.matchAll(/<div class="[^"]*__vs-t"[^>]*>([\s\S]*?)<\/div>/g)) {
+    const race = item[1].match(/<i class="race ([TZP])"/)?.[1];
+    const recordText = cleanText(item[1].match(/class="[^"]*__n"[^>]*>([\s\S]*?)<\/span>/)?.[1] || "");
+    const record = recordText.match(/([\d,]+)승\s*([\d,]+)패/);
+    if (!race || !record) continue;
+    const wins = number(record[1]);
+    const losses = number(record[2]);
+    raceTotals.combined[race] = recordRate({ games: wins + losses, wins, losses });
+  }
   const recentSection = html.match(/<h2>최근 경기<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
   const publicRows = [];
   for (const match of recentSection.matchAll(/<div class="[^"]*mrow[^"]*">([\s\S]*?)<\/div>/g)) {
@@ -1361,7 +1376,8 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     race: description.match(/(?:^|—\s*)(테란|저그|프로토스)/)?.[1] || previous?.race || "",
     url: apiPlayerUrl(playerId),
     image: avatarSrc ? new URL(avatarSrc, "https://eloboard.com/").href : previous?.image || "",
-    total, matches: rows, periodPartial: rows.length < total.games,
+    division, total, women: division === "women" ? total : null,
+    raceTotals, matches: rows, periodPartial: rows.length < total.games,
     recent30: inferRecent30(rows),
     info: { ...(previous?.info || {}), source: "ELOBoard 공개 선수 페이지" },
     cached: false, stale: false
