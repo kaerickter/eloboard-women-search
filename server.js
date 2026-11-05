@@ -1303,6 +1303,83 @@ async function loadApiProfile(playerId, force = false, playerName = "") {
   void rememberProfileSnapshot(profile);
   return profile;
 }
+function publicEloMatchKey(row) {
+  return [row.date, normalizeName(row.opponent), String(row.map || "").trim(),
+    row.result || (Number(row.elo) > 0 ? "승" : "패"), String(row.format || "").trim()].join("|");
+}
+function parsePublicEloProfile(html, playerId, previous = null, expectedName = "") {
+  const title = cleanText(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "");
+  const name = title.split("·")[0].trim();
+  if (!name || name === "EloBoard" ||
+      (expectedName && normalizeName(name) !== normalizeName(expectedName))) {
+    throw new Error("ELOBoard 공개 선수 페이지가 다른 선수를 반환했습니다.");
+  }
+  const description = cleanText(html.match(/<meta\s+name="description"\s+content="([^"]+)"/i)?.[1] || "");
+  const totals = description.match(/([\d,]+)전\s*([\d,]+)승\s*([\d,]+)패/);
+  if (!totals) throw new Error("ELOBoard 공개 선수 페이지의 총전적을 확인하지 못했습니다.");
+  const number = (value) => Number(value.replace(/,/g, ""));
+  const total = apiRecord(number(totals[2]), number(totals[3]), number(totals[1]));
+  if (total.games !== total.wins + total.losses) throw new Error("ELOBoard 공개 총전적이 일치하지 않습니다.");
+  const recentSection = html.match(/<h2>최근 경기<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
+  const publicRows = [];
+  for (const match of recentSection.matchAll(/<div class="[^"]*mrow[^"]*">([\s\S]*?)<\/div>/g)) {
+    const row = match[1];
+    const opponentLink = row.match(/<a\s+href="\/players\/(\d+)"[^>]*>([\s\S]*?)<\/a>/);
+    const date = row.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] || "";
+    const result = cleanText(row.match(/class="[^"]*__res[^"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1] || "");
+    if (!opponentLink || !date || !["승", "패"].includes(result)) continue;
+    const deltaText = cleanText(row.match(/class="[^"]*__dlt[^"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1] || "");
+    const delta = Number(deltaText);
+    const eventName = cleanText(row.match(/<a[^>]*href="\/events\/\d+"[^>]*>([\s\S]*?)<\/a>/)?.[1] || "");
+    publicRows.push({
+      date, opponent: cleanText(opponentLink[2]), opponentId: opponentLink[1],
+      opponentUrl: apiPlayerUrl(opponentLink[1]),
+      opponentRace: row.match(/<i\s+class="race\s+([TZP])"/)?.[1] || "",
+      map: cleanText(row.match(/class="[^"]*__map[^"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1] || ""),
+      result, elo: Number.isFinite(delta) && delta !== 0 ? delta : (result === "승" ? 1 : -1),
+      eloText: deltaText, format: cleanText(row.match(/class="[^"]*__sc[^"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1] || ""),
+      memo: eventName, source: "eloboard-public"
+    });
+  }
+  const duplicates = new Map();
+  for (const row of publicRows) {
+    const key = publicEloMatchKey(row);
+    duplicates.set(key, (duplicates.get(key) || 0) + 1);
+  }
+  const olderRows = (Array.isArray(previous?.matches) ? previous.matches : []).filter((row) => {
+    const key = publicEloMatchKey(row);
+    const count = duplicates.get(key) || 0;
+    if (!count) return true;
+    duplicates.set(key, count - 1);
+    return false;
+  });
+  const rows = mergeProfileRows(publicRows, olderRows);
+  const avatarTag = html.match(/<img[^>]*class="[^"]*avatar-img[^"]*"[^>]*>/i)?.[0] || "";
+  const avatarSrc = avatarTag.match(/\bsrc="([^"]+)"/i)?.[1] || "";
+  return {
+    ...(previous || {}), wrId: String(playerId), name,
+    race: description.match(/(?:^|—\s*)(테란|저그|프로토스)/)?.[1] || previous?.race || "",
+    url: apiPlayerUrl(playerId),
+    image: avatarSrc ? new URL(avatarSrc, "https://eloboard.com/").href : previous?.image || "",
+    total, matches: rows, periodPartial: rows.length < total.games,
+    recent30: inferRecent30(rows),
+    info: { ...(previous?.info || {}), source: "ELOBoard 공개 선수 페이지" },
+    cached: false, stale: false
+  };
+}
+async function loadPublicEloProfile(playerId, previous = null, expectedName = "") {
+  const cacheKey = "public:" + playerId;
+  const cached = profileCache.get(cacheKey);
+  if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
+  const response = await fetchWithRetry(apiPlayerUrl(playerId), {
+    headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
+  }, 1);
+  if (!response.ok) throw new Error("ELOBoard 공개 선수 페이지 response error: " + response.status);
+  const profile = parsePublicEloProfile(await response.text(), playerId, previous, expectedName);
+  profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
+  void rememberProfileSnapshot(profile);
+  return profile;
+}
 function playersFromMatches(matches) {
   const map = new Map();
   for (const match of matches) {
@@ -1442,6 +1519,20 @@ async function searchPlayerCandidates(name) {
     })).filter((player) => player.name && player.wrId);
     if (converted.length) return findPlayers(name, [], converted);
   } catch (error) {
+    const saved = await cachedProfileForName(name);
+    if (saved?.wrId && normalizeName(saved.name) === normalizeName(name)) {
+      return [{ name: saved.name, wrId: String(saved.wrId), url: apiPlayerUrl(saved.wrId),
+        source: "eloboard-public", division: saved.division === "men" ? "men" : "women" }];
+    }
+    const key = normalizeName(name);
+    const rosterCandidates = (tierRosterCache?.players || []).flatMap((player) => {
+      const id = String(player.profileUrl || "").match(/eloboard\.com\/players\/(\d+)/)?.[1];
+      return id && normalizeName(player.name).includes(key)
+        ? [{ name: player.name, wrId: id, url: apiPlayerUrl(id), source: "eloboard-public",
+            division: player.division === "men" ? "men" : "women" }]
+        : [];
+    });
+    if (rosterCandidates.length) return findPlayers(name, [], rosterCandidates);
     console.warn("ELOBoard API player search unavailable; trying legacy search:", error.message);
   }
   const searchUrl = BJ_LIST_URL + "&sfl=wr_subject&stx=" + encodeURIComponent(name);
@@ -1867,6 +1958,17 @@ function iakkangProfileFromState(state) {
 
 async function loadStoredIakkangProfile() {
   return iakkangProfileFromState(await loadIakkangRecordState());
+}
+async function loadIakkangFallbackProfile() {
+  // 전적검색은 ELOBoard의 마지막 정상 수집본만 사용합니다.
+  // 스폰일지 수동 기록이나 옛 수술대 자료를 섞어 총전적을 만들지 않습니다.
+  const snapshot = await cachedProfileForName(AUTO_PLAYER_NAME);
+  if (String(snapshot?.wrId || "") !== IAKKANG_API_ID ||
+      autoDiaryPlayerKey(snapshot?.name) !== autoDiaryPlayerKey(AUTO_PLAYER_NAME) ||
+      !Array.isArray(snapshot.matches) || !snapshot.matches.length || !snapshot.total) {
+    return null;
+  }
+  return snapshot;
 }
 async function fetchWomenRecordRows(playerName, profileUrl) {
   const name = String(playerName || "").trim();
@@ -4721,7 +4823,7 @@ const server = http.createServer(async (req, res) => {
           // 첫 화면에서는 서버에 이미 있는 전적만 즉시 반환합니다. 외부 수집과 자동등록은 뒤이은 정상 조회가 맡습니다.
           let previewProfile = profileCache.get("api:" + requestedWrId)?.profile || null;
           if (!previewProfile) {
-            try { previewProfile = await loadStoredIakkangProfile(); } catch (error) {
+            try { previewProfile = await loadIakkangFallbackProfile(); } catch (error) {
               console.warn("Initial player preview unavailable:", error.message);
             }
           }
@@ -4748,12 +4850,17 @@ const server = http.createServer(async (req, res) => {
           profile = await loadApiProfile(requestedWrId, force, query);
         } catch (apiError) {
           const saved = String(requestedWrId) === IAKKANG_API_ID
-            ? await loadStoredIakkangProfile()
+            ? await loadIakkangFallbackProfile()
             : await cachedProfileForName(query);
-          if (!saved || String(saved.wrId) !== String(requestedWrId)) throw apiError;
-          profile = { ...saved, stale: true, cached: true };
+          const matchingSaved = String(saved?.wrId || "") === String(requestedWrId) ? saved : null;
+          try {
+            profile = await loadPublicEloProfile(requestedWrId, matchingSaved, query);
+          } catch (publicError) {
+            if (!matchingSaved) throw apiError;
+            profile = { ...matchingSaved, stale: true, cached: true };
+          }
         }
-        // 저장본은 새 전적이 아니므로 스폰일지 자동등록에도 다시 보내지 않습니다.
+        // 정상 ELOBoard 전적만 기존 중복 확인 절차로 스폰일지에 반영합니다.
         const autoDiarySync = profile.cached ? null : await syncSpawnDiaryNow(query, profile);
         const players = profile ? [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "profile" }] : [];
         const data = { source: BOARD_URL, fetchedAt: new Date().toISOString(), pagesLoaded: 0, requestedPages: 0, siteMaxPages: 0, matches: [], profileOnly: true };
@@ -4766,7 +4873,7 @@ const server = http.createServer(async (req, res) => {
           autoDiarySync,
           cached: Boolean(profile?.cached),
           cacheNotice: profile?.cached
-            ? "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다. 자동 재시도는 하지 않습니다."
+            ? "ELOBoard 마지막 정상 전적을 표시합니다. 최신 전적 확인은 현재 제한되어 있습니다."
             : "",
           resultState: profile ? "found" : "empty"
         }));
@@ -4797,7 +4904,9 @@ const server = http.createServer(async (req, res) => {
         }
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
         if (selected?.wrId) {
-          profile = selected.source === "eloboard-api" || /\/players\//i.test(String(selected.url || ""))
+          profile = selected.source === "eloboard-public"
+            ? await loadPublicEloProfile(selected.wrId, await cachedProfileForName(selected.name), selected.name)
+            : selected.source === "eloboard-api" || /\/players\//i.test(String(selected.url || ""))
             ? await loadApiProfile(selected.wrId, force, selected.name || query)
             : selected.division === "men" || /\/men\//i.test(String(selected.url || ""))
               ? await loadMenProfile(selected.wrId, force, selected.name)
@@ -4806,7 +4915,8 @@ const server = http.createServer(async (req, res) => {
         if (!profile) {
           const cachedProfile = await cachedProfileForName(query);
           if (cachedProfile) {
-            profile = cachedProfile;
+            profile = await loadPublicEloProfile(cachedProfile.wrId, cachedProfile, query)
+              .catch(() => cachedProfile);
             players = [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "saved-profile" }];
           }
         }
@@ -4828,6 +4938,8 @@ const server = http.createServer(async (req, res) => {
       const query = String(url.searchParams.get("name") || "").trim();
       const cachedProfile = await cachedProfileForName(query);
       if (cachedProfile) {
+        const profile = await loadPublicEloProfile(cachedProfile.wrId, cachedProfile, query)
+          .catch(() => cachedProfile);
         return sendRecordJson(res, JSON.stringify({
           source: BOARD_URL,
           fetchedAt: new Date().toISOString(),
@@ -4835,10 +4947,10 @@ const server = http.createServer(async (req, res) => {
           requestedPages: 0,
           siteMaxPages: 0,
           matches: [],
-          players: [{ name: cachedProfile.name, wrId: cachedProfile.wrId, url: cachedProfile.url, source: "saved-profile" }],
-          profile: cachedProfile,
-          cached: true,
-          cacheNotice: "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다. 자동 재시도는 하지 않습니다.",
+          players: [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "saved-profile" }],
+          profile,
+          cached: Boolean(profile.cached),
+          cacheNotice: profile.cached ? "ELOBoard 연결이 제한되어 마지막 정상 전적을 표시합니다." : "",
           resultState: "found"
         }));
       }
