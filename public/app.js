@@ -39,6 +39,7 @@ function restoreSearchSession() {
       const saved = JSON.parse(storage.getItem(storage === sessionStorage ? SEARCH_SESSION_KEY : SEARCH_PERSISTENT_KEY) || "null");
       if (!saved || typeof saved !== "object") continue;
       validateSearchResponse(saved.data);
+      if (invalidDefaultProfile(saved.data, saved.name || DEFAULT_NAME)) continue;
       $("nameInput").value = String(saved.name || DEFAULT_NAME);
       state.query = $("nameInput").value.trim();
       state.data = saved.data;
@@ -103,6 +104,14 @@ const TXT = {
 
 function cleanName(value) {
   return String(value || "").replace(/\s+/g, "").toLowerCase();
+}
+
+function invalidDefaultProfile(data, name) {
+  if (cleanName(name) !== cleanName(DEFAULT_NAME)) return false;
+  const profile = data?.profile;
+  return !profile || String(profile.wrId || "") !== DEFAULT_WR_ID ||
+    cleanName(profile.name) !== cleanName(DEFAULT_NAME) ||
+    (!profile.total && (!Array.isArray(profile.matches) || profile.matches.length === 0));
 }
 
 function fmtPoint(value) {
@@ -480,7 +489,8 @@ function renderPeriod(data) {
   const month = periodStats(monthRows);
   const day = periodStats(dayRows);
 
-  $("periodLabel").textContent = (data.profile?.name || state.query || "선수") + " \u00b7 " + TXT.periodBasis;
+  $("periodLabel").textContent = (data.profile?.name || state.query || "선수") + " \u00b7 " + TXT.periodBasis
+    + (data.profile?.periodPartial ? " · 공개 페이지와 저장된 최근 경기 기준(과거 일부 미포함)" : "");
   $("dayRowLabel").innerHTML = "<span>당일</span><small>"
     + matchWindow.startDate + " 06:01 ~ " + matchWindow.endDate + " 06:00</small>";
   $("dayRowLabel").title = matchWindow.startDate + " 오전 06:01부터 "
@@ -694,6 +704,8 @@ async function load(name = "", refresh = false, silent = false, preview = false)
 
   const data = await fetchSearchJson("/api/data?" + params.toString(), controller.signal, preview ? 1 : 2);
   if (requestId !== state.requestId) return;
+  // 실패한 구 게시판 응답이 이아깽 저장 전적을 빈 프로필로 덮어쓰지 못하게 합니다.
+  if (invalidDefaultProfile(data, name)) throw new Error("최신 전적 확인에 실패했습니다. 저장된 전적은 유지합니다.");
 
   state.query = name;
   state.data = data;
