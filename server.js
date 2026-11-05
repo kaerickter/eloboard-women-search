@@ -1325,15 +1325,17 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     ...(previous?.raceTotals || {}),
     combined: { ...(previous?.raceTotals?.combined || {}) }
   };
-  const raceSection = html.match(/<h2>종족별 전적<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
-  for (const item of raceSection.matchAll(/<div class="[^"]*__vs-t"[^>]*>([\s\S]*?)<\/div>/g)) {
-    const race = item[1].match(/<i class="race ([TZP])"/)?.[1];
-    const recordText = cleanText(item[1].match(/class="[^"]*__n"[^>]*>([\s\S]*?)<\/span>/)?.[1] || "");
+  const raceStart = html.indexOf("<h2>종족별 전적</h2>");
+  const raceSection = raceStart < 0 ? "" : html.slice(raceStart, raceStart + 3500);
+  const raceMarkers = [...raceSection.matchAll(/<i[^>]*class="race\s+([TZP])"[^>]*>/g)];
+  for (const [index, marker] of raceMarkers.entries()) {
+    const recordText = cleanText(raceSection.slice(marker.index,
+      raceMarkers[index + 1]?.index ?? raceSection.length));
     const record = recordText.match(/([\d,]+)승\s*([\d,]+)패/);
-    if (!race || !record) continue;
+    if (!record) continue;
     const wins = number(record[1]);
     const losses = number(record[2]);
-    raceTotals.combined[race] = recordRate({ games: wins + losses, wins, losses });
+    raceTotals.combined[marker[1]] = recordRate({ games: wins + losses, wins, losses });
   }
   const recentSection = html.match(/<h2>최근 경기<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
   const publicRows = [];
