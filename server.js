@@ -41,6 +41,7 @@ const SOOP_CHANNEL_FILE = path.join(ROOT, "data", "soop-channels.json");
 const SOOP_ALIAS_FILE = path.join(ROOT, "data", "soop-aliases.json");
 const MEN_BROADCAST_MAP_FILE = path.join(ROOT, "data", "men-player-broadcast-map.json");
 const TIER_ROSTER_FILE = path.join(ROOT, "data", "tier-roster.json");
+const ELO_PLAYER_ID_INDEX_FILE = path.join(ROOT, "data", "eloboard-player-id-index.json");
 const TIER_ROSTER_BACKUP_FILE = path.join(ROOT, "data", "tier-roster-before-refresh.json");
 const MEN_TIER_FALLBACK_FILE = path.join(ROOT, "data", "men-tier-fallback.json");
 const SCOREBOARD_STATE_FILE = path.join(ROOT, "data", "scoreboard-state.json");
@@ -149,6 +150,7 @@ const universityApiPlayerIdsCache = new Map();
 let tierRosterCache = null;
 let tierRosterPromise = null;
 let tierRosterRetryAt = 0;
+let savedEloPlayerIds = [];
 let channelCache = new Map();
 let liveStatusCache = new Map();
 let liveNameCache = new Map();
@@ -608,6 +610,13 @@ try {
   }
 } catch {
   tierRosterCache = null;
+}
+
+try {
+  const index = JSON.parse(fs.readFileSync(ELO_PLAYER_ID_INDEX_FILE, "utf8"));
+  savedEloPlayerIds = Array.isArray(index.players) ? index.players : [];
+} catch {
+  savedEloPlayerIds = [];
 }
 
 function send(res, status, body, type = "text/plain; charset=utf-8", headers = {}) {
@@ -1546,30 +1555,41 @@ async function searchAllPlayerCandidatesUncached(name, force = false) {
 
 async function searchPlayerCandidates(name) {
   // 새 ELOBoard는 선수 검색 API가 여성·남성을 함께 반환합니다.
+  let apiError = null;
   try {
     const players = await fetchEloApi("/players", { q: name });
     const converted = (Array.isArray(players) ? players : []).map((player) => ({
       name: String(player.display_name || player.name || ""), wrId: String(player.id || ""),
       url: apiPlayerUrl(player.id), source: "eloboard-api", division: player.division === "men" ? "men" : "women"
     })).filter((player) => player.name && player.wrId);
-    if (converted.length) return findPlayers(name, [], converted);
+    const matches = findPlayers(name, [], converted);
+    if (matches.length) return matches;
   } catch (error) {
-    const saved = await cachedProfileForName(name);
-    if (saved?.wrId && normalizeName(saved.name) === normalizeName(name)) {
-      return [{ name: saved.name, wrId: String(saved.wrId), url: apiPlayerUrl(saved.wrId),
-        source: "eloboard-public", division: saved.division === "men" ? "men" : "women" }];
-    }
-    const key = normalizeName(name);
-    const rosterCandidates = (tierRosterCache?.players || []).flatMap((player) => {
-      const id = String(player.profileUrl || "").match(/eloboard\.com\/players\/(\d+)/)?.[1];
-      return id && normalizeName(player.name).includes(key)
-        ? [{ name: player.name, wrId: id, url: apiPlayerUrl(id), source: "eloboard-public",
-            division: player.division === "men" ? "men" : "women" }]
-        : [];
-    });
-    if (rosterCandidates.length) return findPlayers(name, [], rosterCandidates);
-    console.warn("ELOBoard API player search unavailable; trying legacy search:", error.message);
+    apiError = error;
   }
+  // 이름 검색이 빈 배열을 돌려주는 경우에도 저장된 선수 번호로 조회할 수 있어야 합니다.
+  const saved = await cachedProfileForName(name);
+  if (saved?.wrId && normalizeName(saved.name) === normalizeName(name)) {
+    return [{ name: saved.name, wrId: String(saved.wrId), url: apiPlayerUrl(saved.wrId),
+      source: "eloboard-public", division: saved.division === "men" ? "men" : "women" }];
+  }
+  const key = normalizeName(name);
+  const rosterCandidates = (tierRosterCache?.players || []).flatMap((player) => {
+    const id = String(player.profileUrl || "").match(/eloboard\.com\/players\/(\d+)/)?.[1];
+    return id && normalizeName(player.name).includes(key)
+      ? [{ name: player.name, wrId: id, url: apiPlayerUrl(id), source: "eloboard-public",
+          division: player.division === "men" ? "men" : "women" }]
+      : [];
+  });
+  if (rosterCandidates.length) return findPlayers(name, [], rosterCandidates);
+  // 운영 티어표가 옛 대학 주소를 유지해도, 별도 보관한 새 선수 번호로 조회합니다.
+  const indexedCandidates = savedEloPlayerIds.flatMap(([playerName, id, division]) =>
+    id && normalizeName(playerName).includes(key)
+      ? [{ name: playerName, wrId: String(id), url: apiPlayerUrl(id), source: "eloboard-public",
+          division: division === "men" ? "men" : "women" }]
+      : []);
+  if (indexedCandidates.length) return findPlayers(name, [], indexedCandidates);
+  if (apiError) console.warn("ELOBoard API player search unavailable; trying legacy search:", apiError.message);
   const searchUrl = BJ_LIST_URL + "&sfl=wr_subject&stx=" + encodeURIComponent(name);
   const response = await fetchWithRetry(searchUrl, {
     headers: {
