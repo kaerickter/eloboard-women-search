@@ -138,6 +138,8 @@ const universityTargetRivalsCache = new Map();
 const universityTargetRivalsPromises = new Map();
 const playerCandidateResults = new Map();
 const playerCandidateRequests = new Map();
+const publicPlayerDirectoryCache = new Map();
+const publicPlayerDirectoryRequests = new Map();
 const matchupResults = new Map();
 const matchupRequests = new Map();
 const universityMatchupResults = new Map();
@@ -162,6 +164,7 @@ let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const ELO_API_REQUEST_INTERVAL_MS = 180;
 const ELO_API_429_RETRY_MS = 2500;
+const PUBLIC_PLAYER_DIRECTORY_CACHE_MS = 30 * 60 * 1000;
 const PROFILE_SNAPSHOT_LIMIT = 120;
 const PROFILE_SNAPSHOT_MATCH_LIMIT = 250;
 const LIVE_CACHE_MS = 1000 * 15;
@@ -1553,6 +1556,60 @@ async function searchAllPlayerCandidatesUncached(name, force = false) {
   }
 }
 
+function publicPlayerInitial(name) {
+  const first = String(name || "").trim()[0] || "";
+  const syllable = first.charCodeAt(0) - 0xac00;
+  if (syllable >= 0 && syllable < 11172) {
+    const initial = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"[Math.floor(syllable / 588)];
+    return { "ㄲ": "ㄱ", "ㄸ": "ㄷ", "ㅃ": "ㅂ", "ㅆ": "ㅅ", "ㅉ": "ㅈ" }[initial] || initial;
+  }
+  if (/^[a-z0-9]$/i.test(first)) return "A-Z";
+  return first || "기타";
+}
+
+function parsePublicPlayerDirectory(html) {
+  const players = [];
+  const cards = String(html || "").matchAll(/<a\b[^>]*href=["']\/players\/(\d+)["'][^>]*>([\s\S]*?)<\/a>/gi);
+  for (const card of cards) {
+    const nameTag = card[2].match(/<b\b[^>]*class=["'][^"']*__nm["'][^>]*>([\s\S]*?)<\/b>/i);
+    const name = cleanText(nameTag?.[1] || "");
+    if (name) players.push({ name, wrId: card[1], url: apiPlayerUrl(card[1]),
+      source: "eloboard-public" });
+  }
+  return players;
+}
+
+async function loadPublicPlayerDirectory(initial) {
+  const cached = publicPlayerDirectoryCache.get(initial);
+  if (cached && Date.now() - cached.cacheTime < PUBLIC_PLAYER_DIRECTORY_CACHE_MS) return cached.players;
+  if (publicPlayerDirectoryRequests.has(initial)) return publicPlayerDirectoryRequests.get(initial);
+  const request = (async () => {
+    const players = new Map();
+    let maxPages = 1;
+    for (let page = 1; page <= maxPages; page += 1) {
+      const url = "https://eloboard.com/players?initial=" + encodeURIComponent(initial)
+        + (page > 1 ? "&page=" + page : "");
+      const response = await fetchWithRetry(url, {
+        headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
+      }, 1);
+      if (!response.ok) throw new Error("ELOBoard public player directory response error: " + response.status);
+      const html = await response.text();
+      for (const player of parsePublicPlayerDirectory(html)) players.set(player.wrId, player);
+      if (page === 1) {
+        const pages = [...html.matchAll(/href=["']\/players\?initial=[^"']*?page=(\d+)/gi)]
+          .map((match) => Number(match[1]));
+        maxPages = Math.min(6, Math.max(1, ...pages));
+      }
+    }
+    const result = [...players.values()];
+    publicPlayerDirectoryCache.set(initial, { cacheTime: Date.now(), players: result });
+    return result;
+  })();
+  publicPlayerDirectoryRequests.set(initial, request);
+  try { return await request; }
+  finally { publicPlayerDirectoryRequests.delete(initial); }
+}
+
 async function searchPlayerCandidates(name) {
   // 새 ELOBoard는 선수 검색 API가 여성·남성을 함께 반환합니다.
   let apiError = null;
@@ -1589,6 +1646,13 @@ async function searchPlayerCandidates(name) {
           division: division === "men" ? "men" : "women" }]
       : []);
   if (indexedCandidates.length) return findPlayers(name, [], indexedCandidates);
+  // 전적이 적거나 새로 등록된 선수는 저장된 명단에 없을 수 있어 공개 선수 목록을 확인합니다.
+  try {
+    const publicCandidates = findPlayers(name, [], await loadPublicPlayerDirectory(publicPlayerInitial(name)));
+    if (publicCandidates.length) return publicCandidates;
+  } catch (error) {
+    console.warn("ELOBoard public player directory unavailable:", error.message);
+  }
   if (apiError) console.warn("ELOBoard API player search unavailable; trying legacy search:", apiError.message);
   const searchUrl = BJ_LIST_URL + "&sfl=wr_subject&stx=" + encodeURIComponent(name);
   const response = await fetchWithRetry(searchUrl, {
