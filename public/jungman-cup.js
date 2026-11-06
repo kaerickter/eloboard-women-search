@@ -42,6 +42,7 @@ let sharedSaveInFlight = false;
 let sharedSaveQueued = false;
 let lastUploadedState = "";
 const fixtureTierTooltipCache = new Map();
+const fixtureTierTooltipRequests = new Map();
 PLAYOFFS.forEach((stage) => {
   if (!Array.isArray(state.playoffs?.[stage.key])) state.playoffs[stage.key] = emptyPlayoffs()[stage.key];
 });
@@ -113,7 +114,6 @@ function renderSharedState() {
   renderPlayoffs();
   renderMatchPanel();
   fixtureTierTooltipCache.clear();
-  void loadFixtureTierTooltips();
 }
 
 function scheduleSharedSave() {
@@ -431,13 +431,25 @@ function fixtureMatchupPopover(stage, index, fixture) {
   return '<span class="fixture-matchup-popover" role="tooltip"><strong>' + escapeHtml(heading) + '</strong><div class="fixture-matchup-title"><b>' + escapeHtml(home) + '</b><span>VS</span><b>' + escapeHtml(away) + '</b></div><div class="fixture-matchup-rows">' + rows + '</div></span>';
 }
 
-async function loadFixtureTierTooltips() {
-  const fixtures = GROUPS.flatMap((group) => state.fixtures?.[group] || [])
-    .concat(PLAYOFFS.flatMap((stage) => (state.playoffs?.[stage.key] || []).map((fixture) => ({ ...fixture, ...playoffFixtureTeams(fixture) }))))
-    .filter((fixture) => isResolvedPlayoffTeam(fixture?.home) && isResolvedPlayoffTeam(fixture?.away));
-  const uniqueFixtures = [...new Map(fixtures.map((fixture) => [fixtureTierKey(fixture), fixture])).values()];
-  await Promise.all(uniqueFixtures.map(async (fixture) => {
-    const key = fixtureTierKey(fixture);
+function updateFixtureTierTooltips(key) {
+  document.querySelectorAll(".fixture-date-trigger").forEach((trigger) => {
+    if (trigger.dataset.tierKey !== key) return;
+    const fixture = { home: trigger.dataset.home, away: trigger.dataset.away };
+    const stage = trigger.dataset.stage;
+    const index = Number(trigger.dataset.index);
+    trigger.setAttribute("aria-label", fixtureMatchupTitle(stage, index, fixture));
+    const popover = trigger.querySelector(".fixture-matchup-popover");
+    if (popover) popover.outerHTML = fixtureMatchupPopover(stage, index, fixture);
+  });
+}
+
+async function loadFixtureTierTooltip(trigger) {
+  const fixture = { home: trigger.dataset.home, away: trigger.dataset.away };
+  if (!isResolvedPlayoffTeam(fixture.home) || !isResolvedPlayoffTeam(fixture.away)) return;
+  const key = fixtureTierKey(fixture);
+  if (fixtureTierTooltipCache.has(key)) return;
+  if (fixtureTierTooltipRequests.has(key)) return fixtureTierTooltipRequests.get(key);
+  const request = (async () => {
     try {
       const response = await fetch("/api/universities/tier-matchup?universityA=" + encodeURIComponent(fixture.home) + "&universityB=" + encodeURIComponent(fixture.away));
       const data = await response.json();
@@ -445,9 +457,11 @@ async function loadFixtureTierTooltips() {
     } catch {
       fixtureTierTooltipCache.set(key, []);
     }
-  }));
-  renderGroups();
-  renderPlayoffs();
+    updateFixtureTierTooltips(key);
+  })();
+  fixtureTierTooltipRequests.set(key, request);
+  try { await request; }
+  finally { fixtureTierTooltipRequests.delete(key); }
 }
 
 function renderGroups() {
@@ -466,7 +480,7 @@ function renderGroups() {
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><span class="fixture-date-trigger" tabindex="0" aria-label="' + escapeHtml(matchupTitle) + '"><time>' + escapeHtml(fixtureDate) + '</time>' + matchupPopover + '</span>' +
+        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><span class="fixture-date-trigger" tabindex="0" data-tier-key="' + escapeHtml(fixtureTierKey(fixture)) + '" data-home="' + escapeHtml(fixture.home) + '" data-away="' + escapeHtml(fixture.away) + '" data-stage="' + group + '" data-index="' + index + '" aria-label="' + escapeHtml(matchupTitle) + '"><time>' + escapeHtml(fixtureDate) + '</time>' + matchupPopover + '</span>' +
           '</time>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-group="' + group + '" data-fixture="' + index +
           '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
@@ -637,7 +651,7 @@ function renderPlayoffs() {
       return [
         '<div class="fixture' + (today ? " is-today" : "") + '">',
         '<button class="fixture-team" type="button" data-playoff="' + stage.key + '" data-fixture="' + index + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(home) + "</button>",
-        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><span class="fixture-date-trigger" tabindex="0" aria-label="' + escapeHtml(matchupTitle) + '"><time>' + escapeHtml(formatGroupDate(fixture.date)) + '</time>' + matchupPopover + '</span>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
+        '<span class="fixture-vs"><b>' + (index + 1) + '경기 · VS</b><span class="fixture-date-trigger" tabindex="0" data-tier-key="' + escapeHtml(fixtureTierKey(teams)) + '" data-home="' + escapeHtml(teams.home) + '" data-away="' + escapeHtml(teams.away) + '" data-stage="' + stage.title + '" data-index="' + index + '" aria-label="' + escapeHtml(matchupTitle) + '"><time>' + escapeHtml(formatGroupDate(fixture.date)) + '</time>' + matchupPopover + '</span>' + (today ? '<em class="today-badge">오늘 경기</em>' : "") + "</span>",
         '<button class="fixture-team" type="button" data-playoff="' + stage.key + '" data-fixture="' + index + '"' + (disabled ? " disabled" : "") + ">" + escapeHtml(away) + "</button>",
         "</div>"
       ].join("");
@@ -651,6 +665,15 @@ groupGrid.addEventListener("click", (event) => {
   if (!button) return;
   selectMatch(button.dataset.group, Number(button.dataset.fixture));
 });
+
+for (const grid of [groupGrid, knockoutGrid]) {
+  const loadHoveredFixture = (event) => {
+    const trigger = event.target.closest(".fixture-date-trigger");
+    if (trigger && grid.contains(trigger)) void loadFixtureTierTooltip(trigger);
+  };
+  grid.addEventListener("pointerover", loadHoveredFixture);
+  grid.addEventListener("focusin", loadHoveredFixture);
+}
 
 knockoutGrid.addEventListener("click", (event) => {
   const button = event.target.closest("[data-playoff][data-fixture]");
@@ -751,7 +774,6 @@ cupAdminSave.addEventListener("click", () => {
   renderPlayoffs();
   renderMatchPanel();
   fixtureTierTooltipCache.clear();
-  void loadFixtureTierTooltips();
   cupAdminStatus.textContent = completed.length + "개 대전을 저장하고 화면에 반영했습니다.";
   cupAdminDialog.close();
 });
@@ -772,5 +794,4 @@ cupAdminReset.addEventListener("click", () => {
 renderGroups();
 renderPlayoffs();
 renderMatchPanel();
-void loadFixtureTierTooltips();
 void initializeSharedState();
