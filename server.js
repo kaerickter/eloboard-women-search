@@ -162,6 +162,7 @@ let channelAliases = {};
 let menBroadcastMapRows = [];
 let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
+const PUBLIC_PROFILE_CACHE_MS = 1000 * 30;
 const ELO_API_REQUEST_INTERVAL_MS = 180;
 const ELO_API_429_RETRY_MS = 2500;
 const PUBLIC_PLAYER_DIRECTORY_CACHE_MS = 30 * 60 * 1000;
@@ -1449,30 +1450,41 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
 async function loadPublicEloProfile(playerId, previous = null, expectedName = "", force = false) {
   const cacheKey = "public:" + playerId;
   const cached = profileCache.get(cacheKey);
-  if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
-  const response = await fetchWithRetry(apiPlayerUrl(playerId), {
-    headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
-  }, 1);
-  if (!response.ok) throw new Error("ELOBoard 공개 선수 페이지 response error: " + response.status);
-  const profile = parsePublicEloProfile(await response.text(), playerId, previous, expectedName);
-  if (["T", "Z", "P"].some((race) => !profile.raceTotals.combined[race])) {
-    try {
-      const racesResponse = await fetchWithRetry(apiPlayerUrl(playerId) + "?tab=races", {
-        headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
-      }, 1);
-      if (racesResponse.ok) {
-        profile.raceTotals.combined = {
-          ...profile.raceTotals.combined,
-          ...parsePublicRaceTotals(await racesResponse.text())
-        };
+  if (!force && cached && Date.now() - cached.cacheTime < PUBLIC_PROFILE_CACHE_MS) return cached.profile;
+  if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
+  const request = (async () => {
+    const response = await fetchWithRetry(apiPlayerUrl(playerId), {
+      headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
+    }, 1);
+    if (!response.ok) throw new Error("ELOBoard 공개 선수 페이지 response error: " + response.status);
+    const profile = parsePublicEloProfile(await response.text(), playerId, previous, expectedName);
+    if (["T", "Z", "P"].some((race) => !profile.raceTotals.combined[race])) {
+      try {
+        const racesResponse = await fetchWithRetry(apiPlayerUrl(playerId) + "?tab=races", {
+          headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
+        }, 1);
+        if (racesResponse.ok) {
+          profile.raceTotals.combined = {
+            ...profile.raceTotals.combined,
+            ...parsePublicRaceTotals(await racesResponse.text())
+          };
+        }
+      } catch (error) {
+        console.warn("ELOBoard public race totals unavailable:", error.message);
       }
-    } catch (error) {
-      console.warn("ELOBoard public race totals unavailable:", error.message);
     }
+    profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
+    void rememberProfileSnapshot(profile);
+    return profile;
+  })();
+  profilePromises.set(cacheKey, request);
+  try { return await request; }
+  catch (error) {
+    if (!cached) throw error;
+    return { ...cached.profile, cached: true, stale: true,
+      cachedAt: new Date(cached.cacheTime).toISOString() };
   }
-  profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
-  void rememberProfileSnapshot(profile);
-  return profile;
+  finally { profilePromises.delete(cacheKey); }
 }
 function sharedProfileEntry(playerId) {
   const id = String(playerId || "");
