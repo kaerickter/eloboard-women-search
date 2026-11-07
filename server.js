@@ -1399,10 +1399,10 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     cached: false, stale: false
   };
 }
-async function loadPublicEloProfile(playerId, previous = null, expectedName = "") {
+async function loadPublicEloProfile(playerId, previous = null, expectedName = "", force = false) {
   const cacheKey = "public:" + playerId;
   const cached = profileCache.get(cacheKey);
-  if (cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
+  if (!force && cached && Date.now() - cached.cacheTime < CACHE_MS) return cached.profile;
   const response = await fetchWithRetry(apiPlayerUrl(playerId), {
     headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
   }, 1);
@@ -1426,6 +1426,22 @@ async function loadPublicEloProfile(playerId, previous = null, expectedName = ""
   profileCache.set(cacheKey, { cacheTime: Date.now(), profile });
   void rememberProfileSnapshot(profile);
   return profile;
+}
+function sharedProfileEntry(playerId) {
+  const id = String(playerId || "");
+  const api = profileCache.get("api:" + id);
+  const publicProfile = profileCache.get("public:" + id);
+  if (!api) return publicProfile || null;
+  if (!publicProfile) return api;
+  return api.cacheTime >= publicProfile.cacheTime ? api : publicProfile;
+}
+function profileRevisionFor(profile) {
+  const id = String(profile?.wrId || "");
+  for (const key of ["api:" + id, "public:" + id]) {
+    const entry = profileCache.get(key);
+    if (entry?.profile === profile) return entry.cacheTime;
+  }
+  return 0;
 }
 function playersFromMatches(matches) {
   const map = new Map();
@@ -4927,6 +4943,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 502, JSON.stringify({ error: error.message || "상대전적을 불러오지 못했습니다." }), "application/json; charset=utf-8");
     }
   }
+  if (url.pathname === "/api/profile-shared") {
+    const playerId = String(url.searchParams.get("wr_id") || "");
+    if (!/^\d{1,8}$/.test(playerId)) {
+      return send(res, 400, JSON.stringify({ error: "올바른 선수 번호가 필요합니다." }), "application/json; charset=utf-8");
+    }
+    const entry = sharedProfileEntry(playerId);
+    const since = Number(url.searchParams.get("since") || 0);
+    if (!entry || entry.cacheTime <= since) return send(res, 204, "");
+    return sendRecordJson(res, JSON.stringify({ profileRevision: entry.cacheTime, profile: entry.profile }));
+  }
   if (url.pathname === "/api/data") {
     try {
       const force = url.searchParams.get("refresh") === "1";
@@ -4957,6 +4983,7 @@ const server = http.createServer(async (req, res) => {
             ...summarize([], query),
             players: [{ name: previewProfile.name, wrId: previewProfile.wrId, url: previewProfile.url, source: "saved-profile" }],
             profile: previewProfile,
+            profileRevision: 0,
             profileOnly: true,
             preview: true,
             resultState: "found"
@@ -4973,7 +5000,7 @@ const server = http.createServer(async (req, res) => {
             : await cachedProfileForName(query);
           const matchingSaved = String(saved?.wrId || "") === String(requestedWrId) ? saved : null;
           try {
-            profile = await loadPublicEloProfile(requestedWrId, matchingSaved, query);
+            profile = await loadPublicEloProfile(requestedWrId, matchingSaved, query, force);
           } catch (publicError) {
             if (!matchingSaved) throw apiError;
             profile = { ...matchingSaved, stale: true, cached: true };
@@ -4989,6 +5016,7 @@ const server = http.createServer(async (req, res) => {
           ...result,
           players,
           profile,
+          profileRevision: profileRevisionFor(profile),
           autoDiarySync,
           cached: Boolean(profile?.cached),
           cacheNotice: profile?.cached
@@ -5024,7 +5052,7 @@ const server = http.createServer(async (req, res) => {
         const selected = requestedWrId ? players.find((player) => player.wrId === requestedWrId) || { wrId: requestedWrId } : players[0];
         if (selected?.wrId) {
           profile = selected.source === "eloboard-public"
-            ? await loadPublicEloProfile(selected.wrId, await cachedProfileForName(selected.name), selected.name)
+            ? await loadPublicEloProfile(selected.wrId, await cachedProfileForName(selected.name), selected.name, force)
             : selected.source === "eloboard-api" || /\/players\//i.test(String(selected.url || ""))
             ? await loadApiProfile(selected.wrId, force, selected.name || query)
             : selected.division === "men" || /\/men\//i.test(String(selected.url || ""))
@@ -5034,7 +5062,7 @@ const server = http.createServer(async (req, res) => {
         if (!profile) {
           const cachedProfile = await cachedProfileForName(query);
           if (cachedProfile) {
-            profile = await loadPublicEloProfile(cachedProfile.wrId, cachedProfile, query)
+            profile = await loadPublicEloProfile(cachedProfile.wrId, cachedProfile, query, force)
               .catch(() => cachedProfile);
             players = [{ name: profile.name, wrId: profile.wrId, url: profile.url, source: "saved-profile" }];
           }
@@ -5046,6 +5074,7 @@ const server = http.createServer(async (req, res) => {
         ...result,
           players,
           profile,
+          profileRevision: profileRevisionFor(profile),
           autoDiarySync,
           cached: Boolean(profile?.cached),
           cacheNotice: profile?.cached
@@ -5057,7 +5086,7 @@ const server = http.createServer(async (req, res) => {
       const query = String(url.searchParams.get("name") || "").trim();
       const cachedProfile = await cachedProfileForName(query);
       if (cachedProfile) {
-        const profile = await loadPublicEloProfile(cachedProfile.wrId, cachedProfile, query)
+        const profile = await loadPublicEloProfile(cachedProfile.wrId, cachedProfile, query, url.searchParams.get("refresh") === "1")
           .catch(() => cachedProfile);
         return sendRecordJson(res, JSON.stringify({
           source: BOARD_URL,
