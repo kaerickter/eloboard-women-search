@@ -738,6 +738,41 @@ async function load(name = "", refresh = false, silent = false, preview = false)
   }
 }
 
+let sharedProfileCheckPending = false;
+async function checkSharedProfile() {
+  if (sharedProfileCheckPending || document.visibilityState !== "visible" ||
+      $("status").dataset.state === "loading") return;
+  const playerId = String(state.data?.profile?.wrId || "");
+  const query = state.query;
+  const requestId = state.requestId;
+  if (!/^\d+$/.test(playerId) || !query || $("nameInput").value.trim() !== query) return;
+  sharedProfileCheckPending = true;
+  try {
+    const since = Number(state.data?.profileRevision || 0);
+    const params = new URLSearchParams({ wr_id: playerId, since: String(since) });
+    const response = await fetch("/api/profile-shared?" + params, {
+      cache: "no-store", signal: AbortSignal.timeout(5000)
+    });
+    if (response.status === 204 || !response.ok) return;
+    const update = await response.json();
+    const revision = Number(update?.profileRevision || 0);
+    if (requestId !== state.requestId || state.query !== query ||
+        String(state.data?.profile?.wrId || "") !== playerId ||
+        $("nameInput").value.trim() !== query ||
+        revision <= Number(state.data?.profileRevision || 0) ||
+        String(update?.profile?.wrId || "") !== playerId ||
+        !Array.isArray(update.profile.matches) || !update.profile.total) return;
+    state.data = { ...state.data, profile: update.profile, profileRevision: revision };
+    render(state.data);
+    saveSearchSession();
+    setSearchState("success", "다른 화면에서 갱신된 최신 전적을 반영했습니다.");
+  } catch {
+    // 공유 확인 실패 시 현재 보이는 전적을 그대로 유지합니다.
+  } finally {
+    sharedProfileCheckPending = false;
+  }
+}
+
 async function loadInitialDefault() {
   const name = $("nameInput").value.trim();
   const previewRequestId = state.requestId + 1;
@@ -812,3 +847,7 @@ if (!restoreSearchSession()) {
   if (!$("nameInput").value.trim()) $("nameInput").value = DEFAULT_NAME;
   loadInitialDefault();
 }
+setInterval(checkSharedProfile, 30000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkSharedProfile();
+});
