@@ -654,8 +654,8 @@ function renderIakkangMatchupPanel(profile) {
       const payload = await requestJson('/api/player-rival?player_id=' + encodeURIComponent(profile.wrId) + '&opponent=' + encodeURIComponent(input.value.trim()));
       if (currentRequest !== requestId || generation !== matchupPanelGeneration) return;
       const overall = payload.overall;
-      const recent = payload.recent90 || { games: 0, wins: 0, losses: 0, rate: 0 };
-      if (!overall && !recent.games) {
+      const recent = payload.recent90;
+      if (!overall && !recent?.games) {
         result.innerHTML = '<div class="empty">해당 상대와의 전적을 찾지 못했습니다.</div>';
         return;
       }
