@@ -1244,9 +1244,56 @@ function tallyRivalMatches(rows) {
   return { games, wins, losses, rate: games ? Math.round(wins / games * 1000) / 10 : 0 };
 }
 
+async function loadPublicPlayerRivalRecord(playerId, opponentQuery) {
+  const profile = sharedProfileEntry(playerId)?.profile || await loadPublicEloProfile(playerId);
+  const queryKey = normalizeName(opponentQuery);
+  const knownOpponent = (profile.matches || []).find((row) =>
+    row.opponentId && normalizeName(row.opponent) === queryKey
+  );
+  const candidates = knownOpponent ? [] : await searchPlayerCandidates(opponentQuery);
+  const opponentId = String(knownOpponent?.opponentId || candidates.find((item) =>
+    normalizeName(item.name) === queryKey
+  )?.wrId || "");
+  const empty = { playerName: profile.name, opponentName: opponentQuery,
+    opponentRace: "", overall: null, recent90: null, recentMatches: [] };
+  if (!/^\d+$/.test(opponentId)) return empty;
+
+  const response = await fetchWithRetry(apiPlayerUrl(playerId) + "?tab=rivals&vs=" + encodeURIComponent(opponentId), {
+    headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
+  }, 1);
+  if (!response.ok) throw new Error("ELOBoard 공개 상대전적 페이지 response error: " + response.status);
+  const html = await response.text();
+  const selected = html.match(/class="[^"]*__vsp[^"]*__vsRight[^"]*"[^>]*>\s*<i class="race\s+([TZP])"[^>]*>[^<]*<\/i>\s*<b>([^<]+)<\/b>/);
+  const score = html.match(/class="[^"]*__vsbig[^"]*"[^>]*>([\d,]+)<em>\s*:\s*<\/em>([\d,]+)<\/b>/);
+  if (!selected || normalizeName(cleanText(selected[2])) !== queryKey || !score) return empty;
+  const wins = Number(score[1].replace(/,/g, ""));
+  const losses = Number(score[2].replace(/,/g, ""));
+  const games = wins + losses;
+  const cutoff = koreaDateKey(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const allRows = Array.isArray(profile.matches) ? profile.matches : [];
+  const directRows = allRows.filter((row) => String(row.opponentId) === opponentId);
+  const recentRows = directRows.filter((row) => row.date >= cutoff);
+  const oldestDate = allRows.reduce((oldest, row) =>
+    row.date && (!oldest || row.date < oldest) ? row.date : oldest, "");
+  const covers90Days = allRows.length >= Number(profile.total?.games || Infinity) ||
+    Boolean(oldestDate && oldestDate <= cutoff);
+  return {
+    playerName: profile.name, opponentName: cleanText(selected[2]), opponentRace: selected[1],
+    overall: { games, wins, losses, rate: games ? Math.round(wins / games * 1000) / 10 : 0 },
+    recent90: covers90Days ? tallyRivalMatches(recentRows) : null,
+    recentMatches: recentRows.slice(0, 30)
+  };
+}
+
 async function loadPlayerRivalRecord(playerId, opponentQuery) {
-  const playerName = profileCache.get("api:" + playerId)?.profile?.name || "";
-  const rivals = await fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals", { q: opponentQuery });
+  const playerName = sharedProfileEntry(playerId)?.profile?.name || "";
+  let rivals;
+  try {
+    rivals = await fetchEloApi("/players/" + encodeURIComponent(playerId) + "/stats/rivals", { q: opponentQuery });
+  } catch (error) {
+    if (!/ELOBoard API response error:\s*(403|429)/.test(String(error?.message || ""))) throw error;
+    return loadPublicPlayerRivalRecord(playerId, opponentQuery);
+  }
   const queryKey = normalizeName(opponentQuery);
   const candidates = Array.isArray(rivals) ? rivals : [];
   const rival = candidates.find((item) => normalizeName(item.name) === queryKey)
