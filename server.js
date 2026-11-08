@@ -1447,17 +1447,33 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     cached: false, stale: false
   };
 }
+async function fetchPublicEloProfileHtml(playerId) {
+  if (!/^\d+$/.test(String(playerId))) throw new Error("올바른 ELOBoard 선수 번호가 필요합니다.");
+  const url = apiPlayerUrl(playerId);
+  try {
+    const response = await fetchWithRetry(url, {
+      headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
+    }, 1);
+    if (!response.ok) throw new Error("ELOBoard 공개 선수 페이지 response error: " + response.status);
+    return response.text();
+  } catch (error) {
+    // 명시적인 HTTP 거부는 다른 수단으로 재요청하지 않습니다. 연결 자체가 끊길 때만 재시도합니다.
+    if (/ELOBoard 공개 선수 페이지 response error:/.test(String(error?.message || ""))) throw error;
+    return new Promise((resolve, reject) => {
+      execFile("curl", ["--location", "--fail", "--silent", "--show-error", "--compressed",
+        "--max-time", "10", "--url", url],
+      { windowsHide: true, timeout: 12000, maxBuffer: 2 * 1024 * 1024, encoding: "utf8" },
+      (curlError, stdout) => curlError ? reject(curlError) : resolve(stdout));
+    });
+  }
+}
 async function loadPublicEloProfile(playerId, previous = null, expectedName = "", force = false) {
   const cacheKey = "public:" + playerId;
   const cached = profileCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cacheTime < PUBLIC_PROFILE_CACHE_MS) return cached.profile;
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
   const request = (async () => {
-    const response = await fetchWithRetry(apiPlayerUrl(playerId), {
-      headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
-    }, 1);
-    if (!response.ok) throw new Error("ELOBoard 공개 선수 페이지 response error: " + response.status);
-    const profile = parsePublicEloProfile(await response.text(), playerId, previous, expectedName);
+    const profile = parsePublicEloProfile(await fetchPublicEloProfileHtml(playerId), playerId, previous, expectedName);
     if (["T", "Z", "P"].some((race) => !profile.raceTotals.combined[race])) {
       try {
         const racesResponse = await fetchWithRetry(apiPlayerUrl(playerId) + "?tab=races", {
