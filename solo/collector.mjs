@@ -1,5 +1,18 @@
 import WebSocket from 'ws';
+import {createHash} from 'node:crypto';
 import {makePacket,parsePacket,getLiveInfo,BroadcastOfflineError} from './protocol.mjs';
+
+export function stationAdballoon(fields,bjId,sessionId){
+  if(fields[0]!==bjId)return null;
+  const donorId=String(fields[1]||'').trim(),donor=String(fields[2]||'').trim();
+  const count=Number(fields[3]),title=String(fields[5]||'').trim();
+  if((!donorId&&!donor)||!Number.isSafeInteger(count)||count<=0)return null;
+  // This is a prior station gift announced on live entry. A repeated entry must
+  // not count the same announcement again within this broadcast session.
+  const fingerprint=createHash('sha256').update(JSON.stringify([donorId||donor,count,title])).digest('hex');
+  return{kind:'adballoon',payload:{donorId,donor:donor||donorId,count,serviceCode:107,source:'station-adballoon'},
+    key:`${bjId}:station-adballoon:${sessionId}:${fingerprint}`};
+}
 export class Collector {
   constructor(store,options={}){this.bjId=options.bjId||'2ahgo1203';this.expectedBno=options.bno?String(options.bno):null;this.onEnd=options.onEnd;this.store=store;this.socket=null;this.timer=null;this.heartbeat=null;this.leaseTimer=null;this.generation=0;this.enabled=false;this.busy=false;this.queue=Promise.resolve();this.runtime={status:'starting',error:'',lastCheckedAt:null,lastEventAt:null,sessionId:null};}
   status(status,error=''){if(this.runtime.status!==status)console.log('SOLO collector state:',status);this.runtime.status=status;this.runtime.error=error;}
@@ -24,8 +37,9 @@ export class Collector {
         // Serialize writes: settlements must follow their earlier contributions.
         this.queue=this.queue.then(async()=>{
           let kind,payload,key=null;
-          if([18,33,86,105].includes(p.serviceCode)){if(p.serviceCode===105&&p.fields[1]!==this.bjId)return;if(p.serviceCode===86&&p.fields[0]!==this.bjId)return;const offset=p.serviceCode===105?1:0,count=Number(p.fields[3+offset]);if(!Number.isSafeInteger(count)||count<=0)return;kind='regular';payload={donorId:String(p.fields[1+offset]||''),donor:String(p.fields[2+offset]||p.fields[1+offset]||'익명'),count,serviceCode:p.serviceCode,...(p.serviceCode===105?{giftType:'video'}:p.serviceCode===86?{giftType:'vod'}:{})};if(p.serviceCode===86){const packetId=Buffer.from(data).subarray(14,50).toString('utf8');if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(packetId)&&packetId!=='00000000-0000-0000-0000-000000000000')key=this.bjId+':vodballoon:'+packetId;}}
+          if([18,33,105].includes(p.serviceCode)){if(p.serviceCode===105&&p.fields[1]!==this.bjId)return;const offset=p.serviceCode===105?1:0,count=Number(p.fields[3+offset]);if(!Number.isSafeInteger(count)||count<=0)return;kind='regular';payload={donorId:String(p.fields[1+offset]||''),donor:String(p.fields[2+offset]||p.fields[1+offset]||'익명'),count,serviceCode:p.serviceCode,...(p.serviceCode===105?{giftType:'video'}:{})};}
           else if(p.serviceCode===87){const count=Number(p.fields[9]);if(p.fields[1]!==this.bjId||!Number.isSafeInteger(count)||count<=0||p.fields[6])return;kind='adballoon';payload={donorId:String(p.fields[2]||''),donor:String(p.fields[3]||p.fields[2]||'익명'),count,serviceCode:87};const packetId=Buffer.from(data).subarray(14,50).toString('utf8');if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(packetId)&&packetId!=='00000000-0000-0000-0000-000000000000')key=this.bjId+':adballoon:'+packetId;}
+          else if(p.serviceCode===107){const gift=stationAdballoon(p.fields,this.bjId,session.id);if(!gift)return;({kind,payload,key}=gift);}
           else if(p.serviceCode===121){let e;try{e=JSON.parse(p.fields[0]);}catch{return;}if(e.is_relay===true||(e.bj_id&&e.bj_id!==this.bjId))return;
             const earned=e.type==='SETTLE';if(earned){if((!e.uuid&&!/^\d+$/.test(String(e.key)))||!Number.isSafeInteger(e.settle_count)||e.settle_count<=0)return;}else if(!e.uuid||!/^\d+$/.test(String(e.key)))return;
             const battle=e.type==='GIFT'&&e.is_relay===false&&e.bj_id===this.bjId&&/^mission_gift_\d+$/.test(e.image||'');
