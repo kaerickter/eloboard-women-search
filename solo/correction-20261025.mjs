@@ -24,3 +24,23 @@ export async function applyScreenshotCorrection(pool) {
     await c.query('COMMIT');return inserted;
   }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }
+
+// The supplied 2026-11-13 export confirms this one adballoon is absent from
+// broadcast 298561509. Keep the correction separate from live packet capture.
+export async function applyAdballoonCorrection20261113(pool) {
+  const sessionId='799bfab6-c8ae-4ec2-89d3-44e67b6bb404';
+  const at='2026-11-13T20:42:35+09:00';
+  const eventKey='screenshot:20261113:298561509:204235:adballoon';
+  const payload={donor:'쓰리런3',donorId:'',count:1,serviceCode:87,
+    source:'user-screenshot-20261113',sourceNote:'사용자 제공 외부 집계 사진과 방송기록 백업 대조로 보완'};
+  const result=await pool.query(`INSERT INTO solo_archive.events(session_id,at,kind,event_key,payload)
+    SELECT s.id,$1::timestamptz,'adballoon',$2,$3::jsonb
+    FROM solo_archive.sessions s
+    WHERE s.id=$4 AND s.bno='298561509' AND s.bj_id='2ahgo1203' AND s.deleted_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM solo_archive.events e WHERE e.session_id=s.id
+        AND e.kind='adballoon' AND e.payload->>'donor'='쓰리런3'
+        AND e.payload->>'count'='1'
+        AND e.at BETWEEN $1::timestamptz-interval '2 minutes' AND $1::timestamptz+interval '2 minutes')
+    ON CONFLICT(event_key) DO NOTHING`,[at,eventKey,JSON.stringify(payload),sessionId]);
+  return result.rowCount;
+}
