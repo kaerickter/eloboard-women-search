@@ -1383,7 +1383,7 @@ function parsePublicRaceTotals(html) {
   }
   return totals;
 }
-function parsePublicEloProfile(html, playerId, previous = null, expectedName = "") {
+function parsePublicEloProfile(html, playerId, previous = null, expectedName = "", monthHtml = "", monthKey = "") {
   const title = cleanText(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "");
   const name = title.split("·")[0].trim();
   if (!name || name === "EloBoard" ||
@@ -1399,14 +1399,15 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
   const division = html.includes("여성부") ? "women" : html.includes("남성부") ? "men" : previous?.division || "";
   // 이전 저장본의 부분 종족 기록은 공식 전체 기록으로 재사용하지 않습니다.
   const raceTotals = { women: {}, mixed: {}, combined: parsePublicRaceTotals(html) };
-  const recentSection = html.match(/<h2>최근 경기<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
+  const recentSection = monthHtml || html.match(/<h2>최근 경기<\/h2>[\s\S]*?<\/section>/)?.[0] || "";
   const publicRows = [];
   for (const match of recentSection.matchAll(/<div class="[^"]*mrow[^"]*">([\s\S]*?)<\/div>/g)) {
     const row = match[1];
     const opponentLink = row.match(/<a\s+href="\/players\/(\d+)"[^>]*>([\s\S]*?)<\/a>/);
     const date = row.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] || "";
     const result = cleanText(row.match(/class="[^"]*__res[^"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1] || "");
-    if (!opponentLink || !date || !["승", "패"].includes(result)) continue;
+    if (!opponentLink || !date || !["승", "패"].includes(result) ||
+        (monthHtml && !date.startsWith(monthKey))) continue;
     const deltaText = cleanText(row.match(/class="[^"]*__dlt[^"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1] || "");
     const delta = Number(deltaText);
     const eventName = cleanText(row.match(/<a[^>]*href="\/events\/\d+"[^>]*>([\s\S]*?)<\/a>/)?.[1] || "");
@@ -1425,14 +1426,20 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     const key = publicEloMatchKey(row);
     duplicates.set(key, (duplicates.get(key) || 0) + 1);
   }
+  const monthComplete = Boolean(monthHtml && publicRows.length && !/더보기/.test(monthHtml));
   const olderRows = (Array.isArray(previous?.matches) ? previous.matches : []).filter((row) => {
+    if (monthComplete && String(row.date || "").startsWith(monthKey)) return false;
     const key = publicEloMatchKey(row);
     const count = duplicates.get(key) || 0;
     if (!count) return true;
     duplicates.set(key, count - 1);
     return false;
   });
-  const rows = mergeProfileRows(publicRows, olderRows);
+  // 월별 원본에는 같은 날·상대·맵·점수인 별도 경기가 있을 수 있습니다.
+  // 공식 월별 행끼리는 중복 제거하지 않고, 저장본의 같은 달만 교체합니다.
+  const rows = monthComplete
+    ? [...publicRows, ...mergeProfileRows(olderRows)].sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    : mergeProfileRows(publicRows, olderRows);
   const avatarTag = html.match(/<img[^>]*class="[^"]*avatar-img[^"]*"[^>]*>/i)?.[0] || "";
   const avatarSrc = avatarTag.match(/\bsrc="([^"]+)"/i)?.[1] || "";
   return {
@@ -1442,14 +1449,16 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     image: avatarSrc ? new URL(avatarSrc, "https://eloboard.com/").href : previous?.image || "",
     division, total, women: division === "women" ? total : null,
     raceTotals, matches: rows, periodPartial: rows.length < total.games,
+    periodCompleteMonths: monthComplete ? [monthKey] : [],
     recent30: inferRecent30(rows),
     info: { ...(previous?.info || {}), source: "ELOBoard 공개 선수 페이지" },
     cached: false, stale: false
   };
 }
-async function fetchPublicEloProfileHtml(playerId) {
+async function fetchPublicEloProfileHtml(playerId, month = "") {
   if (!/^\d+$/.test(String(playerId))) throw new Error("올바른 ELOBoard 선수 번호가 필요합니다.");
-  const url = apiPlayerUrl(playerId);
+  if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("올바른 조회 월이 필요합니다.");
+  const url = apiPlayerUrl(playerId) + (month ? "?tab=matches&month=" + month + "&by=month" : "");
   try {
     const response = await fetchWithRetry(url, {
       headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
@@ -1473,7 +1482,15 @@ async function loadPublicEloProfile(playerId, previous = null, expectedName = ""
   if (!force && cached && Date.now() - cached.cacheTime < PUBLIC_PROFILE_CACHE_MS) return cached.profile;
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
   const request = (async () => {
-    const profile = parsePublicEloProfile(await fetchPublicEloProfileHtml(playerId), playerId, previous, expectedName);
+    const currentMonth = koreaDateKey().slice(0, 7);
+    const [html, monthHtml] = await Promise.all([
+      fetchPublicEloProfileHtml(playerId),
+      fetchPublicEloProfileHtml(playerId, currentMonth).catch((error) => {
+        console.warn("ELOBoard public monthly records unavailable:", error.message);
+        return "";
+      })
+    ]);
+    const profile = parsePublicEloProfile(html, playerId, previous, expectedName, monthHtml, currentMonth);
     if (["T", "Z", "P"].some((race) => !profile.raceTotals.combined[race])) {
       try {
         const racesResponse = await fetchWithRetry(apiPlayerUrl(playerId) + "?tab=races", {
