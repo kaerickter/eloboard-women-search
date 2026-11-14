@@ -354,6 +354,10 @@ function isCurrentMatchDayRow(row, window = currentMatchWindow()) {
 }
 
 function setPeriodValues(prefix, stats) {
+  if (!stats) {
+    for (const key of ["Games", "Wins", "Losses", "Rate"]) $(prefix + key).textContent = "확인 불가";
+    return;
+  }
   $(prefix + "Games").textContent = stats.games;
   $(prefix + "Wins").textContent = stats.wins;
   $(prefix + "Losses").textContent = stats.losses;
@@ -402,6 +406,12 @@ function selectedCurrentMonth(date = new Date()) {
   return state.selectedYear === current.year && state.selectedMonth === current.month;
 }
 
+function selectedMonthComplete(data) {
+  const profile = data?.profile;
+  return !profile?.periodPartial ||
+    (Array.isArray(profile.periodCompleteMonths) && profile.periodCompleteMonths.includes(selectedPeriodPrefix()));
+}
+
 function displayMonth(month) {
   return String(Number(month) || month);
 }
@@ -445,7 +455,7 @@ function renderRaceRates(data) {
     const values = {
       Overall: officialOverall || (completeHistory ? periodStats(raceRows) : null),
       Year: periodStats(yearRows),
-      Month: periodStats(monthRows)
+      Month: selectedMonthComplete(data) ? periodStats(monthRows) : null
     };
     for (const [period, stats] of Object.entries(values)) {
       const element = $("race" + period + race);
@@ -498,14 +508,15 @@ function renderPeriod(data) {
   const day = periodStats(dayRows);
 
   $("periodLabel").textContent = (data.profile?.name || state.query || "선수") + " \u00b7 " + TXT.periodBasis
-    + (data.profile?.periodPartial ? " · 공개 페이지와 저장된 최근 경기 기준(과거 일부 미포함)" : "");
+    + (data.profile?.periodPartial ? " · 과거 일부 기록 미포함" : "")
+    + (!selectedMonthComplete(data) ? " · 선택한 달의 전체 전적 확인 불가" : "");
   $("dayRowLabel").innerHTML = "<span>당일</span><small>"
     + matchWindow.startDate + " 06:01 ~ " + matchWindow.endDate + " 06:00</small>";
   $("dayRowLabel").title = matchWindow.startDate + " 오전 06:01부터 "
     + matchWindow.endDate + " 오전 06:00까지";
   setPeriodValues("year", year);
-  setPeriodValues("month", month);
-  setPeriodValues("day", day);
+  setPeriodValues("month", selectedMonthComplete(data) ? month : null);
+  setPeriodValues("day", selectedMonthComplete(data) ? day : null);
 }
 
 function renderProfile(data) {
