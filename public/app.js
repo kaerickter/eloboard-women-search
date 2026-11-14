@@ -406,10 +406,16 @@ function selectedCurrentMonth(date = new Date()) {
   return state.selectedYear === current.year && state.selectedMonth === current.month;
 }
 
+function selectedMonthFromVisibleRows(data) {
+  return String(data?.profile?.wrId || "") === DEFAULT_WR_ID &&
+    getProfileRows(data).some((row) => matchDateKey(row.date).startsWith(selectedPeriodPrefix()));
+}
+
 function selectedMonthComplete(data) {
   const profile = data?.profile;
   return !profile?.periodPartial ||
-    (Array.isArray(profile.periodCompleteMonths) && profile.periodCompleteMonths.includes(selectedPeriodPrefix()));
+    (Array.isArray(profile.periodCompleteMonths) && profile.periodCompleteMonths.includes(selectedPeriodPrefix())) ||
+    selectedMonthFromVisibleRows(data);
 }
 
 function displayMonth(month) {
@@ -509,6 +515,7 @@ function renderPeriod(data) {
 
   $("periodLabel").textContent = (data.profile?.name || state.query || "선수") + " \u00b7 " + TXT.periodBasis
     + (data.profile?.periodPartial ? " · 과거 일부 기록 미포함" : "")
+    + (data.profile?.periodPartial && selectedMonthFromVisibleRows(data) ? " · 당월·당일은 표시된 경기 기준" : "")
     + (!selectedMonthComplete(data) ? " · 선택한 달의 전체 전적 확인 불가" : "");
   $("dayRowLabel").innerHTML = "<span>당일</span><small>"
     + matchWindow.startDate + " 06:01 ~ " + matchWindow.endDate + " 06:00</small>";
