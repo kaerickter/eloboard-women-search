@@ -163,6 +163,11 @@ let menBroadcastMapRows = [];
 let channelRegistrySaveTimer = null;
 const CACHE_MS = 1000 * 60 * 3;
 const PUBLIC_PROFILE_CACHE_MS = 1000 * 30;
+const PUBLIC_ELO_REQUEST_INTERVAL_MS = 300;
+let publicEloNextRequestAt = 0;
+const PUBLIC_PROFILE_PROBE_MS = 1000 * 60;
+const publicProfileProbeAt = new Map();
+const publicProfileProbePromises = new Map();
 const ELO_API_REQUEST_INTERVAL_MS = 180;
 const ELO_API_429_RETRY_MS = 2500;
 const PUBLIC_PLAYER_DIRECTORY_CACHE_MS = 30 * 60 * 1000;
@@ -1457,21 +1462,30 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     cached: false, stale: false
   };
 }
-async function fetchPublicEloProfileHtml(playerId, month = "", from = "", to = "", category = "") {
+async function fetchPublicEloProfileHtml(playerId, month = "", from = "", to = "", category = "", freshness = "") {
   if (!/^\d+$/.test(String(playerId))) throw new Error("올바른 ELOBoard 선수 번호가 필요합니다.");
   if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("올바른 조회 월이 필요합니다.");
   if ((from || to) && (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))) {
     throw new Error("올바른 경기 날짜 범위가 필요합니다.");
   }
-  const url = apiPlayerUrl(playerId) + (month ? "?tab=matches&month=" + month + "&by=month"
-    : from ? "?tab=matches&from=" + from + "&to=" + to + (category ? "&category=" + category : "") : "");
+  const query = month ? "?tab=matches&month=" + month + "&by=month"
+    : from ? "?tab=matches&from=" + from + "&to=" + to + (category ? "&category=" + category : "") : "";
+  const token = /^\d{1,16}$/.test(String(freshness)) ? String(freshness) : String(Math.floor(Date.now() / 60000));
+  const url = apiPlayerUrl(playerId) + query + (query ? "&" : "?") + "_fresh=" + token;
   try {
-    const response = await fetchWithRetry(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-      }
-    }, 1);
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Accept-Language": "ko-KR,ko;q=0.9", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    };
+    let response;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const waitMs = Math.max(0, publicEloNextRequestAt - Date.now());
+      publicEloNextRequestAt = Math.max(Date.now(), publicEloNextRequestAt) + PUBLIC_ELO_REQUEST_INTERVAL_MS;
+      if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      response = await fetchWithRetry(url, { headers }, 1);
+      if (response.status !== 429 || attempt === 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
     if (!response.ok) throw new Error("ELOBoard 공개 선수 페이지 response error: " + response.status);
     return response.text();
   } catch (error) {
@@ -1485,8 +1499,8 @@ async function fetchPublicEloProfileHtml(playerId, month = "", from = "", to = "
     });
   }
 }
-async function fetchPublicEloMonthHtml(playerId, month) {
-  const page = await fetchPublicEloProfileHtml(playerId, month);
+async function fetchPublicEloMonthHtml(playerId, month, freshness = "") {
+  const page = await fetchPublicEloProfileHtml(playerId, month, "", "", "", freshness);
   const rowCount = (html) => [...html.matchAll(/<div class="[^"]*mrow[^"]*">/g)].length;
   if (!/경기 기록<\/h2>/.test(page)) throw new Error("ELOBoard 월별 경기 화면을 확인하지 못했습니다.");
   if (rowCount(page) < 15) return { html: page, complete: true };
@@ -1504,7 +1518,7 @@ async function fetchPublicEloMonthHtml(playerId, month) {
     requests += 1;
     const from = month + "-" + String(first).padStart(2, "0");
     const to = month + "-" + String(last).padStart(2, "0");
-    const html = await fetchPublicEloProfileHtml(playerId, "", from, to);
+    const html = await fetchPublicEloProfileHtml(playerId, "", from, to, "", freshness);
     if (!/경기 기록<\/h2>/.test(html)) throw new Error("ELOBoard 날짜별 경기 화면을 확인하지 못했습니다.");
     if (rowCount(html) < 15) return { html, complete: true };
     if (first === last) {
@@ -1513,7 +1527,7 @@ async function fetchPublicEloMonthHtml(playerId, month) {
       for (const category of categories) {
         if (requests >= requestLimit) return { html, complete: false };
         requests += 1;
-        const categoryHtml = await fetchPublicEloProfileHtml(playerId, "", from, to, category);
+        const categoryHtml = await fetchPublicEloProfileHtml(playerId, "", from, to, category, freshness);
         if (!/경기 기록<\/h2>/.test(categoryHtml)) return { html, complete: false };
         const count = rowCount(categoryHtml);
         if (count >= 15) return { html, complete: false };
@@ -1533,16 +1547,17 @@ async function fetchPublicEloMonthHtml(playerId, month) {
     return { html: page, complete: false };
   }
 }
-async function loadPublicEloProfile(playerId, previous = null, expectedName = "", force = false) {
+async function loadPublicEloProfile(playerId, previous = null, expectedName = "", force = false, prefetchedHtml = "") {
   const cacheKey = "public:" + playerId;
   const cached = profileCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cacheTime < PUBLIC_PROFILE_CACHE_MS) return cached.profile;
   if (profilePromises.has(cacheKey)) return profilePromises.get(cacheKey);
   const request = (async () => {
     const currentMonth = koreaDateKey().slice(0, 7);
+    const freshness = force ? String(Date.now()) : String(Math.floor(Date.now() / 60000));
     const [html, monthRecords] = await Promise.all([
-      fetchPublicEloProfileHtml(playerId),
-      fetchPublicEloMonthHtml(playerId, currentMonth).catch((error) => {
+      prefetchedHtml || fetchPublicEloProfileHtml(playerId, "", "", "", "", freshness),
+      fetchPublicEloMonthHtml(playerId, currentMonth, freshness).catch((error) => {
         console.warn("ELOBoard public monthly records unavailable:", error.message);
         return { html: "", complete: false };
       })
@@ -1584,6 +1599,25 @@ function sharedProfileEntry(playerId) {
   if (!api) return publicProfile || null;
   if (!publicProfile) return api;
   return api.cacheTime >= publicProfile.cacheTime ? api : publicProfile;
+}
+function probePublicProfileIfDue(playerId) {
+  const id = String(playerId || "");
+  const entry = sharedProfileEntry(id);
+  if (!entry?.profile?.total || publicProfileProbePromises.has(id) ||
+      Date.now() - Math.max(entry.cacheTime, publicProfileProbeAt.get(id) || 0) < PUBLIC_PROFILE_PROBE_MS) return;
+  publicProfileProbeAt.set(id, Date.now());
+  const request = (async () => {
+    const html = await fetchPublicEloProfileHtml(id, "", "", "", "", String(Date.now()));
+    const latest = parsePublicEloProfile(html, id);
+    const oldTotal = entry.profile.total;
+    if (latest.total.games === Number(oldTotal.games) &&
+        latest.total.wins === Number(oldTotal.wins) &&
+        latest.total.losses === Number(oldTotal.losses)) return;
+    await loadPublicEloProfile(id, entry.profile, latest.name, true, html);
+  })().catch((error) => {
+    console.warn("ELOBoard profile update check unavailable:", id, error.message);
+  }).finally(() => publicProfileProbePromises.delete(id));
+  publicProfileProbePromises.set(id, request);
 }
 function profileRevisionFor(profile) {
   const id = String(profile?.wrId || "");
@@ -5098,6 +5132,7 @@ const server = http.createServer(async (req, res) => {
     if (!/^\d{1,8}$/.test(playerId)) {
       return send(res, 400, JSON.stringify({ error: "올바른 선수 번호가 필요합니다." }), "application/json; charset=utf-8");
     }
+    probePublicProfileIfDue(playerId);
     const entry = sharedProfileEntry(playerId);
     const since = Number(url.searchParams.get("since") || 0);
     if (!entry || entry.cacheTime <= since) return send(res, 204, "");
