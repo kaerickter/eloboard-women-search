@@ -706,7 +706,9 @@ async function load(name = "", refresh = false, silent = false, preview = false)
   const pages = 10;
   if (!silent) {
     setSearchState("loading", refresh ? TXT.refreshing : TXT.loading);
-    resetResultPanels("검색 결과를 확인하고 있습니다.", "search-loading");
+    if (!state.data?.profile || cleanName(state.query) !== cleanName(name)) {
+      resetResultPanels("검색 결과를 확인하고 있습니다.", "search-loading");
+    }
   }
   const params = new URLSearchParams({ pages: String(pages) });
   if (name) params.set("name", name);
@@ -823,11 +825,13 @@ async function search(refresh = false) {
     if (expectedRequestId !== state.requestId) return;
     const errorMessage = error.message || TXT.loadFail;
     setSearchState("error", errorMessage);
-    resetResultPanels(errorMessage);
-    $("profile").innerHTML = '<div class="empty search-error">' +
-      escapeHtml(errorMessage) +
-      '<button id="retrySearch" class="ghost" type="button">다시 시도</button></div>';
-    $("retrySearch").addEventListener("click", () => search(true), { once: true });
+    if (!state.data?.profile || cleanName(state.query) !== cleanName(name)) {
+      resetResultPanels(errorMessage);
+      $("profile").innerHTML = '<div class="empty search-error">' +
+        escapeHtml(errorMessage) +
+        '<button id="retrySearch" class="ghost" type="button">다시 시도</button></div>';
+      $("retrySearch").addEventListener("click", () => search(true), { once: true });
+    }
   } finally {
     if (expectedRequestId === state.requestId) {
       $("searchButton").disabled = false;
