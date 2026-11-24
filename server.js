@@ -1253,28 +1253,32 @@ function tallyRivalMatches(rows) {
 }
 
 async function loadPublicPlayerRivalRecord(playerId, opponentQuery) {
-  const profile = sharedProfileEntry(playerId)?.profile || await loadPublicEloProfile(playerId);
+  // 상대전적 한 건을 위해 선수의 한 달 경기 전체를 다시 수집하지 않습니다.
+  const profile = sharedProfileEntry(playerId)?.profile
+    || profileCache.get("public:" + playerId)?.profile
+    || profileCache.get("api:" + playerId)?.profile;
   const queryKey = normalizeName(opponentQuery);
-  const knownOpponent = (profile.matches || []).find((row) =>
+  const knownOpponent = (profile?.matches || []).find((row) =>
     row.opponentId && normalizeName(row.opponent) === queryKey
   );
   const candidates = knownOpponent ? [] : await searchPlayerCandidates(opponentQuery);
   const opponentId = String(knownOpponent?.opponentId || candidates.find((item) =>
     normalizeName(item.name) === queryKey
   )?.wrId || "");
-  const empty = { playerName: profile.name, opponentName: opponentQuery,
+  const empty = { playerName: profile?.name || "", opponentName: opponentQuery,
     opponentRace: "", overall: null, recent90: null, recentMatches: [] };
   if (!/^\d+$/.test(opponentId)) return empty;
 
   const official = await fetchPublicRivalById(playerId, opponentId);
-  if (!official || normalizeName(official.opponentName) !== queryKey) return empty;
+  if (!official) return empty;
   const cutoff = koreaDateKey(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  const allRows = Array.isArray(profile.matches) ? profile.matches : [];
+  const allRows = Array.isArray(profile?.matches) ? profile.matches : [];
   const directRows = allRows.filter((row) => String(row.opponentId) === opponentId);
   const recentRows = directRows.filter((row) => row.date >= cutoff);
-  const covers90Days = allRows.length >= Number(profile.total?.games || Infinity);
+  const covers90Days = allRows.length >= Number(profile?.total?.games || Infinity);
   return {
-    playerName: profile.name, opponentName: official.opponentName, opponentRace: official.opponentRace,
+    playerName: profile?.name || "", opponentName: opponentQuery, opponentRace: official.opponentRace,
+    sourceOpponentName: official.opponentName,
     overall: official.overall,
     recent90: covers90Days ? tallyRivalMatches(recentRows) : official.recent90,
     recentMatches: recentRows.length ? recentRows.slice(0, 30) : official.recentMatches
@@ -1285,11 +1289,22 @@ async function fetchPublicRivalByIdUncached(playerId, opponentId) {
   const waitMs = Math.max(0, publicEloNextRequestAt - Date.now());
   publicEloNextRequestAt = Math.max(Date.now(), publicEloNextRequestAt) + PUBLIC_ELO_REQUEST_INTERVAL_MS;
   if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
-  const response = await fetchWithRetry(apiPlayerUrl(playerId) + "?tab=rivals&vs=" + encodeURIComponent(opponentId), {
-    headers: { "User-Agent": "Mozilla/5.0 elo-kitten", "Accept-Language": "ko-KR,ko;q=0.9" }
-  }, 1);
-  if (!response.ok) throw new Error("ELOBoard 공개 상대전적 페이지 response error: " + response.status);
-  const html = await response.text();
+  const url = apiPlayerUrl(playerId) + "?vs=" + encodeURIComponent(opponentId) + "&tab=rivals";
+  let html;
+  try {
+    const response = await fetchWithRetry(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
+    }, 1);
+    if (!response.ok) throw new Error("ELOBoard 공개 상대전적 페이지 response error: " + response.status);
+    html = await response.text();
+  } catch (error) {
+    if (/ELOBoard 공개 상대전적 페이지 response error:/.test(String(error?.message || ""))) throw error;
+    html = await new Promise((resolve, reject) => execFile("curl", ["--location", "--fail", "--silent",
+      "--show-error", "--compressed", "--max-time", "10", "--url", url],
+    { windowsHide: true, timeout: 12000, maxBuffer: 2 * 1024 * 1024, encoding: "utf8" },
+    (curlError, stdout) => curlError ? reject(curlError) : resolve(stdout)));
+  }
   if (!html.includes("__vsRight")) throw new Error("ELOBoard 공개 상대전적 페이지 형식이 올바르지 않습니다.");
   const selected = html.match(/class="[^"]*__vsp[^"]*__vsRight[^"]*"[^>]*>\s*<i class="race\s+([TZP])"[^>]*>[^<]*<\/i>\s*<b>([^<]+)<\/b>/);
   const scoreTag = html.match(/<b class="[^"]*__(?:heroScore|vsbig)[^"]*"[^>]*>([\s\S]*?)<\/b>/)?.[1] || "";
@@ -1346,12 +1361,14 @@ async function loadPlayerRivalRecord(playerId, opponentQuery) {
   }
   const rows = mergeProfileRows(apiMatchRows(rawMatches, playerId))
     .filter((row) => String(row.opponentId) === String(rival.player_id));
+  const official = await fetchPublicRivalById(playerId, rival.player_id).catch(() => null);
+  const overall = official?.overall || apiRecord(rival.wins, rival.losses);
   const cutoff = koreaDateKey(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const recentRows = rows.filter((row) => row.date >= cutoff);
   return {
     playerName, opponentName: rival.name, opponentRace: rival.race || rows[0]?.opponentRace || "",
-    overall: tallyRivalMatches(rows), recent90: tallyRivalMatches(recentRows),
-    recentMatches: recentRows.slice(0, 30)
+    overall, recent90: rows.length >= overall.games ? tallyRivalMatches(recentRows) : official?.recent90 || null,
+    recentMatches: recentRows.length ? recentRows.slice(0, 30) : official?.recentMatches || []
   };
 }
 
@@ -1495,14 +1512,16 @@ function parsePublicEloProfile(html, playerId, previous = null, expectedName = "
     cached: false, stale: false
   };
 }
-async function fetchPublicEloProfileHtml(playerId, month = "", from = "", to = "", category = "", freshness = "") {
+async function fetchPublicEloProfileHtml(playerId, month = "", from = "", to = "", category = "", freshness = "", race = "") {
   if (!/^\d+$/.test(String(playerId))) throw new Error("올바른 ELOBoard 선수 번호가 필요합니다.");
   if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("올바른 조회 월이 필요합니다.");
   if ((from || to) && (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))) {
     throw new Error("올바른 경기 날짜 범위가 필요합니다.");
   }
+  if (race && !/^[TZP]$/.test(race)) throw new Error("올바른 상대 종족이 필요합니다.");
   const query = month ? "?tab=matches&month=" + month + "&by=month"
-    : from ? "?tab=matches&from=" + from + "&to=" + to + (category ? "&category=" + category : "") : "";
+    : from ? "?tab=matches&from=" + from + "&to=" + to
+      + (category ? "&category=" + category : "") + (race ? "&race=" + race : "") : "";
   const token = /^\d{1,16}$/.test(String(freshness)) ? String(freshness) : String(Math.floor(Date.now() / 60000));
   const url = apiPlayerUrl(playerId) + query + (query ? "&" : "?") + "_fresh=" + token;
   try {
@@ -1544,8 +1563,8 @@ async function fetchPublicEloMonthHtml(playerId, month, freshness = "") {
   const today = koreaDateKey();
   const endDay = today.startsWith(month) ? Math.min(lastDay, Number(today.slice(8, 10))) : lastDay;
   let requests = 1;
-  const requestLimit = 40;
-  const categories = ["pro_league", "team_event", "college_event", "college_war", "solo_event", "sponsored"];
+  const requestLimit = 80;
+  const categories = ["pro_league", "team_event", "college_event", "college_war", "college_mini", "solo_event", "sponsored"];
   async function collect(first, last) {
     if (requests >= requestLimit) return { html: "", complete: false };
     requests += 1;
@@ -1563,9 +1582,21 @@ async function fetchPublicEloMonthHtml(playerId, month, freshness = "") {
         const categoryHtml = await fetchPublicEloProfileHtml(playerId, "", from, to, category, freshness);
         if (!/경기 기록<\/h2>/.test(categoryHtml)) return { html, complete: false };
         const count = rowCount(categoryHtml);
-        if (count >= 15) return { html, complete: false };
-        total += count;
-        parts.push(categoryHtml);
+        if (count < 15) {
+          total += count;
+          parts.push(categoryHtml);
+          continue;
+        }
+        // 같은 날 한 경기 종류가 15건을 넘으면 원본 화면의 상대 종족 필터로 나눕니다.
+        // 각 분할도 15건 이상이면 완전 수집으로 표시하지 않습니다.
+        for (const race of ["T", "Z", "P"]) {
+          if (requests >= requestLimit) return { html, complete: false };
+          requests += 1;
+          const raceHtml = await fetchPublicEloProfileHtml(playerId, "", from, to, category, freshness, race);
+          if (!/경기 기록<\/h2>/.test(raceHtml) || rowCount(raceHtml) >= 15) return { html, complete: false };
+          total += rowCount(raceHtml);
+          parts.push(raceHtml);
+        }
       }
       return total >= 15 ? { html: parts.join(""), complete: true } : { html, complete: false };
     }
@@ -2705,13 +2736,10 @@ async function fetchMatchup(main, opponent) {
     String(item.player_id || "") === String(opponentProfile.wrId)
     || normalizeName(item.name) === opponentKey
   );
-  const official = rival ? null : await fetchPublicRivalById(mainProfile.wrId, opponentProfile.wrId);
-  if (official && normalizeName(official.opponentName) !== normalizeName(opponentProfile.name)) {
-    throw new Error("ELOBoard 상대 선수 확인에 실패했습니다.");
-  }
-  const total = rival
-    ? [Number(rival.wins || 0), Number(rival.losses || 0)]
-    : official ? [official.overall.wins, official.overall.losses] : matchupTally(directRows);
+  const official = await fetchPublicRivalById(mainProfile.wrId, opponentProfile.wrId)
+    .catch((error) => { if (!rival && !directRows.length) throw error; return null; });
+  const total = official ? [official.overall.wins, official.overall.losses]
+    : rival ? [Number(rival.wins || 0), Number(rival.losses || 0)] : matchupTally(directRows);
   const cutoff = new Date();
   cutoff.setHours(0, 0, 0, 0);
   cutoff.setDate(cutoff.getDate() - 90);
@@ -3629,12 +3657,10 @@ async function fetchUniversityPair(pair, summaryOnly = false) {
         const opponentId = universityApiPlayerId(pair.playerB);
         if (opponentId) {
           const official = await fetchPublicRivalById(playerId, opponentId);
-          if (!official || ![pair.playerB.name, pair.playerB.realName].some((name) =>
-            name && normalizeName(official.opponentName) === normalizeName(name))) {
-            throw new Error("ELOBoard 상대 선수 확인에 실패했습니다.");
-          }
+          if (!official) throw new Error("ELOBoard 상대 선수 확인에 실패했습니다.");
           record = {
             main: pair.playerA.name, opponent: pair.playerB.name,
+            sourceOpponentName: official.opponentName,
             total: [official.overall.wins, official.overall.losses],
             recent: official.recent90 ? [official.recent90.wins, official.recent90.losses] : [0, 0],
             recentPartial: !official.recent90,
