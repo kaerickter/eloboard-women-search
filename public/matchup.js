@@ -199,6 +199,7 @@ function sortedRows() {
 
 function renderResults() {
   const rows = sortedRows();
+  const incompleteRecent = state.range !== "all" && rows.some((row) => row.recentPartial);
   const summary = rows.reduce((total, row) => {
     const record = state.range === "all" ? row.total : row.recent;
     return [total[0] + record[0], total[1] + record[1]];
@@ -206,9 +207,9 @@ function renderResults() {
   const best = [...rows].sort((a, b) => pct(state.range === "all" ? b.total : b.recent) - pct(state.range === "all" ? a.total : a.recent))[0];
   const group = state.mode === "group";
   byId("summaryTitle").textContent = (state.range === "all" ? "전체" : "최근 90일") + (group ? " 팀 합산" : " 종합");
-  byId("summaryWins").textContent = summary[0] + "승";
-  byId("summaryLosses").textContent = summary[1] + "패";
-  byId("summaryRate").textContent = pct(summary) + "%";
+  byId("summaryWins").textContent = incompleteRecent ? "일부 미확인" : summary[0] + "승";
+  byId("summaryLosses").textContent = incompleteRecent ? "일부 미확인" : summary[1] + "패";
+  byId("summaryRate").textContent = incompleteRecent ? "–" : pct(summary) + "%";
   byId("summaryBar").style.width = pct(summary) + "%";
   const bestPlayer = best ? player(best.opponent) : { race: "T" };
   byId("bestRace").className = "race " + bestPlayer.race;
@@ -224,10 +225,11 @@ function renderResults() {
     : (state.mains[0] ? avatarMarkup(state.mains[0]) : "");
   byId("resultAvatar").classList.toggle("dual", group && state.lastPairs.length > 0);
   byId("resultStatus").textContent = rows.length
-    ? rows.length + (group ? "개 선수 짝" : "개 대결 조합") + " · 총 " + (summary[0] + summary[1]) + "경기"
+    ? rows.length + (group ? "개 선수 짝" : "개 대결 조합") + " · " + (incompleteRecent ? "최근 90일 일부 미확인" : "총 " + (summary[0] + summary[1]) + "경기")
     : (group ? "비교할 선수 짝을 입력해 주세요." : "검색할 선수를 선택해 주세요.");
   byId("recordRows").innerHTML = rows.length ? rows.map((row) => {
     const record = state.range === "all" ? row.total : row.recent;
+    const unknown = state.range !== "all" && row.recentPartial;
     const rate = pct(record);
     const key = row.main + "|" + row.opponent;
     const recentRate = pct(row.recent);
@@ -235,10 +237,10 @@ function renderResults() {
     const detail = state.expanded === key ? '<div class="match-detail">' + (row.maps.length ? row.maps.map((match) => '<span><b class="' + (match.result === "승" ? "win" : "loss") + '">' + match.result + '</b>' + safe(match.date) + ' · ' + safe(match.map) + '</span>').join("") : "등록된 맞대결이 없습니다.") + '</div>' : "";
     return '<article class="men-duel-card matchup-duel-card"><div class="duel-stage">'
       + duelPlayerMarkup(row.main)
-      + '<div class="duel-score duel-score-one"><strong>' + record[0] + '</strong><span>' + rate + '% WINS</span><small>' + record[0] + '승</small></div>'
+      + '<div class="duel-score duel-score-one"><strong>' + (unknown ? '–' : record[0]) + '</strong><span>' + (unknown ? '데이터 부족' : rate + '% WINS') + '</span><small>' + (unknown ? '' : record[0] + '승') + '</small></div>'
       + '<div class="duel-center"><div class="duel-logo"><img src="https://eloboard.com/men/img/vs_01.png" alt="VS"><b>VS</b></div>'
-      + '<div class="duel-recent"><span>최근 90일</span><strong>' + row.recent[0] + '승 ' + row.recent[1] + '패</strong><em>' + recentRate + '%</em></div></div>'
-      + '<div class="duel-score duel-score-two"><strong>' + record[1] + '</strong><span>' + opponentRate + '% WINS</span><small>' + record[1] + '승</small></div>'
+      + '<div class="duel-recent"><span>최근 90일</span><strong>' + (row.recentPartial ? '데이터 부족' : row.recent[0] + '승 ' + row.recent[1] + '패') + '</strong><em>' + (row.recentPartial ? '' : recentRate + '%') + '</em></div></div>'
+      + '<div class="duel-score duel-score-two"><strong>' + (unknown ? '–' : record[1]) + '</strong><span>' + (unknown ? '데이터 부족' : opponentRate + '% WINS') + '</span><small>' + (unknown ? '' : record[1] + '승') + '</small></div>'
       + duelPlayerMarkup(row.opponent)
       + '</div><div class="duel-record-meta"><span><small>조회 범위</small><strong>' + (state.range === "all" ? "전체 전적" : "최근 90일") + '</strong></span>'
       + '<span><small>최근 경기</small><strong>' + safe(row.lastPlayed) + '</strong></span>'
